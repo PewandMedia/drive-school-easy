@@ -169,6 +169,38 @@ export type Database = {
         }
         Relationships: []
       }
+      theory_sessions: {
+        Row: {
+          created_at: string
+          datum: string
+          id: string
+          student_id: string
+          typ: Database["public"]["Enums"]["theory_session_typ"]
+        }
+        Insert: {
+          created_at?: string
+          datum?: string
+          id?: string
+          student_id: string
+          typ: Database["public"]["Enums"]["theory_session_typ"]
+        }
+        Update: {
+          created_at?: string
+          datum?: string
+          id?: string
+          student_id?: string
+          typ?: Database["public"]["Enums"]["theory_session_typ"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theory_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -187,6 +219,7 @@ export type Database = {
       fahrzeug_typ: "automatik" | "schaltwagen"
       fuehrerscheinklasse_enum: "B" | "B78" | "B197"
       service_status: "offen" | "bezahlt" | "erledigt"
+      theory_session_typ: "grundstoff" | "klassenspezifisch"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -325,6 +358,7 @@ export const Constants = {
       fahrzeug_typ: ["automatik", "schaltwagen"],
       fuehrerscheinklasse_enum: ["B", "B78", "B197"],
       service_status: ["offen", "bezahlt", "erledigt"],
+      theory_session_typ: ["grundstoff", "klassenspezifisch"],
     },
   },
 } as const
