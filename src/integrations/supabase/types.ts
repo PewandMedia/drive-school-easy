@@ -55,6 +55,38 @@ export type Database = {
           },
         ]
       }
+      gear_lessons: {
+        Row: {
+          created_at: string
+          datum: string
+          dauer_minuten: number
+          id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          datum?: string
+          dauer_minuten?: number
+          id?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          datum?: string
+          dauer_minuten?: number
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gear_lessons_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prices: {
         Row: {
           aktiv: boolean
