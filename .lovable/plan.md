@@ -1,115 +1,97 @@
 
-## Saldo-Berechnung pro Schüler
+## Erweiterung Sonderfahrten-Block mit Schaltstunden (B197)
 
-### Übersicht
+### Analyse des aktuellen Codes
 
-Die Saldoberechnung wird als reine Frontend-Logik implementiert. Alle nötigen Tabellen existieren bereits. Es werden **keine Datenbankänderungen** benötigt.
+In `FahrschuelerDetail.tsx` existieren aktuell zwei getrennte Blöcke:
 
-**Formel:**
+1. **Sonderfahrten-Block** (Zeilen 360–419): Zeigt Überland / Autobahn / Nacht als identisch aufgebaute Fortschrittsbalken – aber nur bei Nicht-Umschreibern
+2. **Schaltstunden-Block** (Zeilen 465–540): Ein separater Block für B197, der Schaltstunden (via Minuten-Berechnung) und Testfahrt B197 enthält
+
+Der User möchte die Schaltstunden optisch identisch zu Überland/Autobahn/Nacht **im Sonderfahrten-Block** integrieren – mit `COUNT(*)` statt Minuten-Berechnung.
+
+### Konkrete Änderungen
+
+#### 1. Berechnungslogik anpassen
+
+Die aktuelle Berechnung nutzt Minuten:
+```typescript
+const gearHoursDone = Math.floor(gearMinutesTotal / 45);
+```
+
+Neu: Anzahl der Einträge direkt verwenden:
+```typescript
+const gearCount = gearLessons.length; // COUNT(*) aus gear_lessons
+const gearRequired = SCHALTSTUNDEN_PFLICHT; // = 10
+const gearPct = Math.min(100, Math.round((gearCount / gearRequired) * 100));
+const gearComplete = gearCount >= gearRequired;
+```
+
+Die Variable `gearMinutesTotal` und `gearHoursDone` werden im separaten Schaltstunden-Block weiterhin verwendet – diese bleiben unberührt.
+
+#### 2. Sonderfahrten-Block erweitern (Zeilen 386–416)
+
+Nach den drei bestehenden `map`-Iterationen (ueberland, autobahn, nacht) wird ein **konditionaler Eintrag für Schaltstunden** hinzugefügt – nur wenn `isB197 === true`.
+
+Der neue Eintrag folgt exakt dem gleichen JSX-Muster:
 
 ```text
-Saldo (offen) =
-  Summe driving_lessons.preis
-  + Summe exams.preis
-  + Summe services.preis
-  - Summe payments.betrag
+Schaltstunden
+0 / 10                          ✓ (wenn fertig)
+▓▓▓░░░░░░░  30%
 ```
 
-Ein positiver Saldo bedeutet: Der Schüler hat noch offene Forderungen. Ein negativer oder Null-Saldo bedeutet: Alles bezahlt.
+Bedingung für Anzeige:
+- `!student.ist_umschreiber` (bereits durch äußere if-Bedingung gegeben)
+- `isB197 === true`
 
----
+#### 3. `allSonderComplete`-Logik erweitern
 
-### 1. Schülerdetailseite (`FahrschuelerDetail.tsx`)
-
-**Neu: `payments`-Query hinzufügen**
-
-Ein weiterer `useQuery`-Hook lädt alle Zahlungen des Schülers:
+Aktuell:
 ```typescript
-const { data: payments = [] } = useQuery({
-  queryKey: ["payments", id],
-  queryFn: async () => supabase.from("payments").select("*").eq("student_id", id!)...
-});
+const allSonderComplete =
+  !student?.ist_umschreiber &&
+  sonderCounts.ueberland >= PFLICHT.ueberland &&
+  sonderCounts.autobahn >= PFLICHT.autobahn &&
+  sonderCounts.nacht >= PFLICHT.nacht;
 ```
 
-**Saldo-Berechnung im Code:**
+Neu – bei B197 muss auch `gearComplete` erfüllt sein:
 ```typescript
-const totalFahrstunden = lessons.reduce((s, l) => s + Number(l.preis), 0);
-const totalPruefungen  = exams.reduce((s, e) => s + Number(e.preis), 0);
-const totalLeistungen  = services.reduce((s, sv) => s + Number(sv.preis), 0);
-const totalZahlungen   = payments.reduce((s, p) => s + Number(p.betrag), 0);
-const saldo            = totalFahrstunden + totalPruefungen + totalLeistungen - totalZahlungen;
+const allSonderComplete =
+  !student?.ist_umschreiber &&
+  sonderCounts.ueberland >= PFLICHT.ueberland &&
+  sonderCounts.autobahn >= PFLICHT.autobahn &&
+  sonderCounts.nacht >= PFLICHT.nacht &&
+  (!isB197 || gearComplete); // B197: Schaltstunden müssen auch erfüllt sein
 ```
 
-**Erweiterung der linken Profilkarte** – der bestehende „Übersicht"-Block wird durch eine vollständige Saldo-Aufschlüsselung ersetzt:
+#### 4. Separater Schaltstunden-Block bleibt unverändert
 
-```
-┌─────────────────────────────────┐
-│  Übersicht / Saldo              │
-│  Fahrstunden (n)     123,45 €   │
-│  Prüfungen (n)        45,00 €   │
-│  Leistungen (n)       30,00 €   │
-│  Zahlungen (n)       −80,00 €   │
-│  ─────────────────────────────  │
-│  Offener Saldo       118,45 €   │  ← amber wenn > 0, grün wenn = 0
-│  oder: Ausgeglichen   0,00 €    │
-└─────────────────────────────────┘
-```
+Der bestehende Block „Schaltstunden & Schaltberechtigung" (Zeilen 465–540) mit Testfahrt B197 und Schaltberechtigungs-Banner bleibt **vollständig erhalten**. Die neue Schaltstunden-Anzeige im Sonderfahrten-Block ist eine zusätzliche, kompaktere Sicht.
 
-Farben:
-- Saldo > 0 → `text-amber-400` (offen)
-- Saldo <= 0 → `text-green-400` (ausgeglichen)
+### Anzeigeregeln im Überblick
 
-**Zahlungsliste** – unterhalb der Leistungen-Liste wird ein neuer Block „Zahlungen" eingefügt (analog zu Fahrstunden/Leistungen), der die letzten Zahlungen des Schülers zeigt (Datum, Zahlungsart, Betrag).
+```text
+ist_umschreiber = true:
+  → Sonderfahrten-Block: NICHT anzeigen (bleibt so)
+  → Schaltstunden im Sonderfahrten-Block: NICHT anzeigen
+  → Separater Schaltstunden/Schaltberechtigungs-Block: NICHT anzeigen (bleibt so)
 
----
+ist_umschreiber = false, Klasse B oder B78:
+  → Sonderfahrten: Überland / Autobahn / Nacht (wie bisher)
+  → Schaltstunden im Block: NICHT anzeigen
+  → Separater Block: NICHT anzeigen (bleibt so)
 
-### 2. Abrechnungsseite (`Abrechnung.tsx`) – vollständige Implementierung
-
-Die bisherige Platzhalterseite wird vollständig durch echte Supabase-Daten ersetzt.
-
-**Queries (alle Schüler auf einmal):**
-- `students` – alle Schüler
-- `driving_lessons` – alle Fahrstunden (nur `student_id`, `preis`)
-- `exams` – alle Prüfungen (nur `student_id`, `preis`)
-- `services` – alle Leistungen (nur `student_id`, `preis`)
-- `payments` – alle Zahlungen (nur `student_id`, `betrag`)
-
-**Saldo pro Schüler** wird im Frontend berechnet:
-```typescript
-const saldoMap = students.map(s => ({
-  ...s,
-  fahrstunden: driving_lessons.filter(l => l.student_id === s.id).reduce(...),
-  pruefungen: exams.filter(e => e.student_id === s.id).reduce(...),
-  leistungen: services.filter(sv => sv.student_id === s.id).reduce(...),
-  zahlungen: payments.filter(p => p.student_id === s.id).reduce(...),
-  saldo: ... // Summe der drei Positionen - Zahlungen
-}));
+ist_umschreiber = false, Klasse B197:
+  → Sonderfahrten: Überland / Autobahn / Nacht / Schaltstunden (NEU)
+  → Separater Block: Schaltstunden (Minuten) + Testfahrt B197 + Schaltberechtigungs-Banner (bleibt so)
 ```
 
-**Layout der Abrechnungsseite:**
-
-Oben: 3 Statistik-Karten:
-- Gesamtforderungen (Fahrstunden + Prüfungen + Leistungen aller Schüler)
-- Eingegangene Zahlungen (gesamt)
-- Offener Gesamtsaldo
-
-Darunter: Tabelle aller Schüler sortiert nach höchstem Saldo:
-
-| Schüler | Klasse | Fahrstunden | Prüfungen | Leistungen | Zahlungen | Saldo |
-|---|---|---|---|---|---|---|
-| Mustermann, Max | B197 | 195,00 € | 45,00 € | 30,00 € | −100,00 € | 170,00 € |
-
-- Saldo-Spalte: amber (offen) oder grünes Badge (ausgeglichen)
-- Zeilen-Klick → Link zur Detailseite des Schülers
-- Schüler mit Saldo = 0 können ausgegraut werden oder am Ende erscheinen
-
----
-
-### Geänderte Dateien
+### Geänderte Datei
 
 | Datei | Änderung |
 |---|---|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Neuer `payments`-Query, Saldo-Berechnung, erweiterter Übersichtsblock in Profilkarte, neuer Zahlungs-Block |
-| `src/pages/dashboard/Abrechnung.tsx` | Vollständige Neuentwicklung mit Supabase-Daten, Statistik-Karten und Schüler-Saldo-Tabelle |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Schaltstunden-Fortschritt im Sonderfahrten-Block ergänzt (nach Nacht-Eintrag, nur bei B197); `allSonderComplete`-Logik angepasst |
 
-Keine Datenbankänderungen erforderlich – alle Tabellen und Spalten existieren bereits.
+Keine Datenbankänderungen – `gear_lessons` existiert bereits, Query ist bereits vorhanden.
