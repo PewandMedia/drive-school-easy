@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -17,6 +17,8 @@ const THEORIE_LABELS: Record<string, string> = {
   grundstoff: "Grundstoff",
   klassenspezifisch: "Klassenspezifisch",
 };
+
+const SCHALTSTUNDEN_PFLICHT = 10; // Stunden in Minuten × Einheiten egal – hier Einträge
 
 const SONDER_LABELS: Record<string, string> = {
   ueberland: "Überlandfahrt",
@@ -110,8 +112,22 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
+  const { data: gearLessons = [], isLoading: loadingGear } = useQuery({
+    queryKey: ["gear_lessons", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("gear_lessons")
+        .select("*")
+        .eq("student_id", id!)
+        .order("datum", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // ── Derived data ────────────────────────────────────────────────────────────
-  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory;
+  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingGear;
 
   const initials = student
     ? `${student.vorname[0]}${student.nachname[0]}`.toUpperCase()
@@ -137,6 +153,13 @@ const FahrschuelerDetail = () => {
   const allTheorieComplete =
     theoryCounts.grundstoff >= THEORIE_PFLICHT.grundstoff &&
     theoryCounts.klassenspezifisch >= THEORIE_PFLICHT.klassenspezifisch;
+
+  const isB197 = student?.fuehrerscheinklasse === "B197";
+  const gearMinutesTotal = gearLessons.reduce((sum, g) => sum + Number(g.dauer_minuten), 0);
+  const gearHoursDone = Math.floor(gearMinutesTotal / 45); // 1 Einheit = 45 min
+  const gearHoursRequired = SCHALTSTUNDEN_PFLICHT;
+  const gearPct = Math.min(100, Math.round((gearHoursDone / gearHoursRequired) * 100));
+  const gearComplete = gearHoursDone >= gearHoursRequired;
 
   const totalLessonsPrice = lessons.reduce((sum, l) => sum + Number(l.preis), 0);
   const totalServicesOpen = services
@@ -384,6 +407,42 @@ const FahrschuelerDetail = () => {
               })}
             </div>
           </div>
+
+          {/* ── Schaltstunden (B197 only) ── */}
+          {isB197 && (
+            <div className="rounded-xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="font-semibold text-foreground">Schaltstunden</h2>
+                </div>
+                {gearComplete && (
+                  <div className="flex items-center gap-1.5 text-sm text-green-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Pflicht erfüllt</span>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">Schaltstunden absolviert</span>
+                  <div className="flex items-center gap-2">
+                    <span className={gearComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                      {gearHoursDone} / {gearHoursRequired}
+                    </span>
+                    {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                  </div>
+                </div>
+                <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${gearComplete ? "bg-green-500" : "bg-primary"}`}
+                    style={{ width: `${gearPct}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{gearPct}% · {gearMinutesTotal} min gesamt · {gearLessons.length} Einträge</p>
+              </div>
+            </div>
+          )}
 
           {/* ── Fahrstunden Liste ── */}
           <div className="rounded-xl border border-border bg-card p-5">
