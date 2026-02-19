@@ -61,6 +61,14 @@ type Student = {
   nachname: string;
 };
 
+type Vehicle = {
+  id: string;
+  bezeichnung: string;
+  typ: FahrzeugTyp;
+  kennzeichen: string;
+  aktiv: boolean;
+};
+
 type DrivingLesson = {
   id: string;
   student_id: string;
@@ -75,6 +83,7 @@ const defaultForm = {
   student_id: "",
   typ: "uebungsstunde" as DrivingLessonTyp,
   fahrzeug_typ: "automatik" as FahrzeugTyp,
+  vehicle_id: "",
   dauer_minuten: 45,
   datum: new Date().toISOString().slice(0, 16),
 };
@@ -97,6 +106,20 @@ const Fahrstunden = () => {
         .order("nachname");
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Vehicles
+  const { data: vehicles = [] } = useQuery<Vehicle[]>({
+    queryKey: ["vehicles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("aktiv", true)
+        .order("bezeichnung");
+      if (error) throw error;
+      return (data ?? []) as Vehicle[];
     },
   });
 
@@ -246,28 +269,51 @@ const Fahrstunden = () => {
                   </Select>
                 </div>
 
-                {/* Fahrzeug-Typ */}
+                {/* Fahrzeug auswählen */}
                 <div className="space-y-1.5">
                   <Label>Fahrzeug</Label>
-                  <Select
-                    value={form.fahrzeug_typ}
-                    onValueChange={(v) =>
-                      setForm((f) => ({ ...f, fahrzeug_typ: v as FahrzeugTyp }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(
-                        Object.entries(FAHRZEUG_LABELS) as [FahrzeugTyp, string][]
-                      ).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {vehicles.length > 0 ? (
+                    <Select
+                      value={form.vehicle_id}
+                      onValueChange={(v) => {
+                        const veh = vehicles.find((x) => x.id === v);
+                        setForm((f) => ({
+                          ...f,
+                          vehicle_id: v,
+                          fahrzeug_typ: veh ? veh.typ : f.fahrzeug_typ,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Fahrzeug wählen…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vehicles.map((veh) => (
+                          <SelectItem key={veh.id} value={veh.id}>
+                            {veh.bezeichnung}
+                            {veh.kennzeichen && ` · ${veh.kennzeichen}`}
+                            {" · "}{FAHRZEUG_LABELS[veh.typ]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value={form.fahrzeug_typ}
+                      onValueChange={(v) =>
+                        setForm((f) => ({ ...f, fahrzeug_typ: v as FahrzeugTyp }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.entries(FAHRZEUG_LABELS) as [FahrzeugTyp, string][]).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 {/* Datum */}

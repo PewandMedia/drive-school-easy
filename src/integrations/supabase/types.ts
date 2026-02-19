@@ -274,6 +274,33 @@ export type Database = {
           },
         ]
       }
+      vehicles: {
+        Row: {
+          aktiv: boolean
+          bezeichnung: string
+          created_at: string
+          id: string
+          kennzeichen: string
+          typ: Database["public"]["Enums"]["fahrzeug_typ"]
+        }
+        Insert: {
+          aktiv?: boolean
+          bezeichnung: string
+          created_at?: string
+          id?: string
+          kennzeichen?: string
+          typ?: Database["public"]["Enums"]["fahrzeug_typ"]
+        }
+        Update: {
+          aktiv?: boolean
+          bezeichnung?: string
+          created_at?: string
+          id?: string
+          kennzeichen?: string
+          typ?: Database["public"]["Enums"]["fahrzeug_typ"]
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
