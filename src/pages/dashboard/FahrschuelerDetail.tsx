@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -169,11 +169,17 @@ const FahrschuelerDetail = () => {
     theoryCounts.klassenspezifisch >= THEORIE_PFLICHT.klassenspezifisch;
 
   const isB197 = student?.fuehrerscheinklasse === "B197";
+  const isB78 = student?.fuehrerscheinklasse === "B78";
   const gearMinutesTotal = gearLessons.reduce((sum, g) => sum + Number(g.dauer_minuten), 0);
   const gearHoursDone = Math.floor(gearMinutesTotal / 45); // 1 Einheit = 45 min
   const gearHoursRequired = SCHALTSTUNDEN_PFLICHT;
   const gearPct = Math.min(100, Math.round((gearHoursDone / gearHoursRequired) * 100));
   const gearComplete = gearHoursDone >= gearHoursRequired;
+
+  // B197 Schaltberechtigung
+  const testfahrtVorhanden = lessons.some((l) => l.typ === "testfahrt_b197");
+  const testfahrtPct = testfahrtVorhanden ? 100 : 0;
+  const schaltberechtigungAktiv = isB197 && gearComplete && testfahrtVorhanden;
 
   const totalLessonsPrice = lessons.reduce((sum, l) => sum + Number(l.preis), 0);
   const totalServicesOpen = services
@@ -317,6 +323,16 @@ const FahrschuelerDetail = () => {
         {/* ── Right Column ── */}
         <div className="lg:col-span-2 space-y-5">
 
+          {/* ── B78 Info-Banner ── */}
+          {isB78 && (
+            <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4 flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-purple-400 shrink-0" />
+              <p className="text-sm text-purple-300">
+                <span className="font-semibold">Klasse B78</span> – Nur Automatik, keine Schaltberechtigung
+              </p>
+            </div>
+          )}
+
           {/* ── Sonderfahrten Fortschritt ── */}
           {student.ist_umschreiber ? (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
@@ -422,38 +438,80 @@ const FahrschuelerDetail = () => {
             </div>
           </div>
 
-          {/* ── Schaltstunden (B197 only) ── */}
+          {/* ── Schaltstunden + Schaltberechtigung (B197 only) ── */}
           {isB197 && (
             <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-muted-foreground" />
-                  <h2 className="font-semibold text-foreground">Schaltstunden</h2>
-                </div>
-                {gearComplete && (
-                  <div className="flex items-center gap-1.5 text-sm text-green-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Pflicht erfüllt</span>
-                  </div>
-                )}
+              <div className="flex items-center gap-2 mb-4">
+                <Settings className="h-5 w-5 text-muted-foreground" />
+                <h2 className="font-semibold text-foreground">Schaltstunden & Schaltberechtigung</h2>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-foreground">Schaltstunden absolviert</span>
-                  <div className="flex items-center gap-2">
-                    <span className={gearComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
-                      {gearHoursDone} / {gearHoursRequired}
-                    </span>
-                    {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+
+              <div className="space-y-4">
+                {/* Schaltstunden Fortschritt */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Schaltstunden absolviert</span>
+                    <div className="flex items-center gap-2">
+                      <span className={gearComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                        {gearHoursDone} / {gearHoursRequired}
+                      </span>
+                      {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                    </div>
+                  </div>
+                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${gearComplete ? "bg-green-500" : "bg-primary"}`}
+                      style={{ width: `${gearPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{gearPct}% · {gearMinutesTotal} min gesamt</p>
+                </div>
+
+                {/* Testfahrt B197 Fortschritt */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Testfahrt B197</span>
+                    <div className="flex items-center gap-2">
+                      <span className={testfahrtVorhanden ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                        {testfahrtVorhanden ? 1 : 0} / 1
+                      </span>
+                      {testfahrtVorhanden && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                    </div>
+                  </div>
+                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${testfahrtVorhanden ? "bg-green-500" : "bg-primary"}`}
+                      style={{ width: `${testfahrtPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{testfahrtPct}%</p>
+                </div>
+
+                {/* Schaltberechtigung Status-Banner */}
+                <div className={`flex items-center gap-3 rounded-lg border p-3 ${
+                  schaltberechtigungAktiv
+                    ? "border-green-500/30 bg-green-500/10"
+                    : "border-amber-500/30 bg-amber-500/10"
+                }`}>
+                  {schaltberechtigungAktiv ? (
+                    <ShieldCheck className="h-5 w-5 text-green-400 shrink-0" />
+                  ) : (
+                    <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0" />
+                  )}
+                  <div>
+                    <p className={`text-sm font-semibold ${schaltberechtigungAktiv ? "text-green-400" : "text-amber-400"}`}>
+                      {schaltberechtigungAktiv ? "Schaltberechtigung aktiv" : "Schaltberechtigung ausstehend"}
+                    </p>
+                    {!schaltberechtigungAktiv && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Erforderlich:{" "}
+                        {!gearComplete && `${gearHoursRequired - gearHoursDone} Schaltstunden`}
+                        {!gearComplete && !testfahrtVorhanden && " · "}
+                        {!testfahrtVorhanden && "Testfahrt B197"}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${gearComplete ? "bg-green-500" : "bg-primary"}`}
-                    style={{ width: `${gearPct}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">{gearPct}% · {gearMinutesTotal} min gesamt · {gearLessons.length} Einträge</p>
               </div>
             </div>
           )}
