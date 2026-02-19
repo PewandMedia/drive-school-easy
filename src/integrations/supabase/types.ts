@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      prices: {
+        Row: {
+          aktiv: boolean
+          bezeichnung: string
+          created_at: string
+          einheit: string | null
+          id: string
+          kategorie: string
+          preis: number
+        }
+        Insert: {
+          aktiv?: boolean
+          bezeichnung: string
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          kategorie: string
+          preis?: number
+        }
+        Update: {
+          aktiv?: boolean
+          bezeichnung?: string
+          created_at?: string
+          einheit?: string | null
+          id?: string
+          kategorie?: string
+          preis?: number
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           adresse: string | null
