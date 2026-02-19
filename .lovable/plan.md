@@ -1,115 +1,127 @@
 
-## Fortschrittsanzeige Sonderfahrten pro Schüler
+## Prüfungslogik nach Führerscheinklasse
 
-### Übersicht
+### Zusammenfassung
 
-Die Fortschrittsanzeige zeigt pro Schüler, wie viele Pflicht-Sonderfahrten bereits absolviert wurden. Die Logik greift auf die bestehende Tabelle `driving_lessons` zu und zählt Einträge nach `typ`.
-
-**Pflichtanforderungen (nur für Nicht-Umschreiber):**
-
-| Typ | Pflicht |
-|---|---|
-| ueberland | 5 Fahrten |
-| autobahn | 4 Fahrten |
-| nacht | 3 Fahrten |
-
-Wenn `student.ist_umschreiber = true` → Sonderfahrten werden komplett ausgeblendet, keine Pflichtberechnung.
+Die Anforderung definiert klassenspezifische Regeln für Ausbildung und Prüfung. Diese werden als rein frontendbasierte Logik und UI-Regeln implementiert – ohne Datenbankänderungen, da alle nötigen Tabellen bereits vorhanden sind (`students`, `driving_lessons`, `gear_lessons`, `exams`, `prices`).
 
 ---
 
-### Wo wird die Fortschrittsanzeige eingebaut?
+### Regelwerk je Führerscheinklasse
 
-Die Fortschrittsanzeige wird in **zwei Stellen** integriert:
+```text
+B:
+  - Prüfung: Schaltwagen oder Automatik
+  - Keine Schaltstunden-Pflicht
+  - Keine Testfahrt-Pflicht
 
-1. **`FahrschuelerDetail.tsx`** – vollständig neu implementiert mit echten Daten aus Supabase, Stammdaten des Schülers und dem Fortschritts-Block für Sonderfahrten
-2. **`Fahrschueler.tsx`** (Listenansicht) – kleines kompaktes Fortschritts-Widget pro Zeile (optional, nur Mini-Anzeige)
+B78:
+  - Nur Automatik (kein Schaltwagen in Fahrstunden/Prüfung)
+  - Keine Schaltberechtigung
+  - Schaltstunden & Testfahrt nicht relevant
 
-Der Hauptfokus liegt auf der Detailseite.
+B197:
+  - Prüfung: Automatik (Fahrprüfung immer Automatik)
+  - Zusatzpflicht: 10/10 Schaltstunden + 1× Testfahrt B197
+  - Erst wenn beides erfüllt: Schaltberechtigung aktiv
+  - Schaltberechtigung-Status sichtbar
+```
 
 ---
 
-### Technische Umsetzung
+### Was konkret umgesetzt wird
 
-#### Kein Datenbankumbau nötig
+#### 1. `FahrschuelerDetail.tsx` – Schaltberechtigungs-Block (B197)
 
-Alle benötigten Daten sind bereits vorhanden:
-- `driving_lessons.typ` enthält die Sonderfahrten-Typen
-- `driving_lessons.student_id` verknüpft mit dem Schüler
-- `students.ist_umschreiber` steuert, ob Pflicht gilt
+Der bestehende Schaltstunden-Block (B197) wird erweitert um:
 
-#### Datenabfragen in `FahrschuelerDetail.tsx`
+- **Testfahrt B197**: Zeigt an, ob eine `driving_lesson` mit `typ = "testfahrt_b197"` für diesen Schüler existiert (0/1)
+- **Schaltberechtigung-Status**: Großes Status-Badge/Banner:
+  - Grün + Checkmark: "Schaltberechtigung aktiv" → wenn `gearComplete && testfahrtVorhanden`
+  - Gelb: "Schaltberechtigung ausstehend" → solange eine der Bedingungen nicht erfüllt ist
+  - Fortschrittsbalken für Testfahrt B197 (0/1) mit gleicher Optik wie bisherige Balken
 
-```
-students      → Stammdaten, ist_umschreiber
-driving_lessons WHERE student_id = :id → alle Fahrstunden des Schülers
-```
+```text
+Schaltstunden  8 / 10  ▓▓▓▓▓▓▓▓░░  80%
+Testfahrt B197 0 / 1   ░░░░░░░░░░   0%
 
-#### Berechnungslogik (Frontend)
-
-```typescript
-const PFLICHT = {
-  ueberland: 5,
-  autobahn: 4,
-  nacht: 3,
-};
-
-// Anzahl je Typ zählen
-const counts = {
-  ueberland: lessons.filter(l => l.typ === "ueberland").length,
-  autobahn:  lessons.filter(l => l.typ === "autobahn").length,
-  nacht:     lessons.filter(l => l.typ === "nacht").length,
-};
-
-// Fortschritt: absolviert / erforderlich
-// Bei Umschreiber → Block nicht rendern
+⚠ Schaltberechtigung ausstehend
 ```
 
-#### UI-Komponente: Fortschrittsblock
+#### 2. `FahrschuelerDetail.tsx` – B78-Hinweis
 
-Für jeden Sonderfahrten-Typ ein Eintrag mit:
-- Label (Überlandfahrt / Autobahnfahrt / Nachtfahrt)
-- Anzeige: `absolviert / erforderlich` (z.B. `3 / 5`)
-- Fortschrittsbalken (Progress-Komponente aus `@radix-ui/react-progress`, bereits installiert)
-- Farbe: grün wenn erfüllt (`absolviert >= erforderlich`), sonst primär/blau
+Bei `fuehrerscheinklasse === "B78"`:
+- Kleines Info-Banner: "Klasse B78 – Nur Automatik, keine Schaltberechtigung"
+- Kein Schaltstunden-Block
+- Keine Testfahrt-Anforderung
 
-```
-┌─────────────────────────────────────────────┐
-│  Sonderfahrten                              │
-│                                             │
-│  Überlandfahrt          3 / 5               │
-│  ████████░░░░░░░░░░░░   60%                │
-│                                             │
-│  Autobahnfahrt          4 / 4  ✓           │
-│  ████████████████████   100%               │
-│                                             │
-│  Nachtfahrt             1 / 3              │
-│  ████░░░░░░░░░░░░░░░░   33%               │
-└─────────────────────────────────────────────┘
-```
+#### 3. `Pruefungen.tsx` – Vollständige Implementierung
 
-Bei `ist_umschreiber = true` → Block komplett ausgeblendet, stattdessen Badge "Umschreiber – keine Sonderfahrten erforderlich".
+Die Prüfungsseite wird mit echten Daten aus Supabase ausgebaut:
+
+**Formular "Prüfung eintragen"** mit klassenspezifischen Einschränkungen:
+- Schüler auswählen → Klasse wird automatisch erkannt
+- Typ: Theorie / Fahrprüfung
+- Fahrzeug-Typ:
+  - B: Automatik oder Schaltwagen wählbar
+  - B78: nur Automatik (Schaltwagen deaktiviert/ausgeblendet)
+  - B197: nur Automatik (Fahrprüfung immer Automatik)
+- Bestanden: Ja / Nein
+- Datum
+- **Preis aus Preisliste**: Beim Speichern wird in der `prices`-Tabelle ein passender Eintrag gesucht (Kategorie "Prüfungen"). Der gefundene Preis wird vorausgefüllt (überschreibbar).
+
+**Liste aller Prüfungen:**
+- Spalten: Schüler, Typ, Fahrzeug, Datum, Ergebnis, Preis
+- Stats-Karten oben: Bestanden / Nicht bestanden / Gesamt
+
+#### 4. Preislogik aus Preisliste
+
+Beim Öffnen des Formulars wird die `prices`-Tabelle nach Kategorie "Prüfungen" abgefragt. Der erste aktive Treffer wird als Standardpreis vorausgefüllt. Der Benutzer kann den Preis manuell überschreiben. Kein Trigger – manuelle Übernahme im Frontend.
 
 ---
 
-### Geänderte Dateien
+### Dateien die geändert werden
 
 | Datei | Änderung |
 |---|---|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Vollständig neu implementiert: Stammdaten aus Supabase, Fahrstunden-Query, Fortschrittsanzeige Sonderfahrten, Leistungen-Liste |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Schaltstunden-Block erweitert um Testfahrt B197 + Schaltberechtigung-Badge; B78-Hinweis-Banner |
+| `src/pages/dashboard/Pruefungen.tsx` | Vollständig implementiert: Supabase-Daten, Formular mit Klassenlogik, Preisübernahme aus Preisliste |
 
-Keine Datenbankänderung erforderlich. Keine Migration nötig.
+Keine Datenbankänderungen – alle Tabellen und Enums existieren bereits.
 
 ---
 
-### Detailaufbau der neuen FahrschuelerDetail-Seite
+### Detaillogik: Schaltberechtigung B197
 
-**Linke Spalte (1/3):** Schüler-Profil-Karte
-- Avatar-Icon mit Initialen
-- Name, Klasse, Umschreiber-Badge
-- Kontaktdaten (E-Mail, Telefon, Adresse)
-- Anmeldedatum
+```typescript
+const testfahrtVorhanden = lessons.some(l => l.typ === "testfahrt_b197");
+const gearComplete = gearHoursDone >= 10;
+const schaltberechtigungAktiv = gearComplete && testfahrtVorhanden;
+```
 
-**Rechte Spalte (2/3):** Tabs oder Sektionen:
-1. **Sonderfahrten-Fortschritt** (wenn kein Umschreiber)
-2. **Fahrstunden** – Liste der letzten Fahrstunden des Schülers
-3. **Leistungen** – aus `services`-Tabelle mit Status und Saldo
+Anzeige im Schaltstunden-Block:
+- Bestehender Fortschrittsbalken Schaltstunden (10/10) bleibt
+- Neuer Fortschrittsbalken: Testfahrt B197 (0 oder 1 / 1)
+- Neues Status-Banner am Ende des Blocks:
+  - `schaltberechtigungAktiv = true` → grünes Banner "Schaltberechtigung aktiv"
+  - `schaltberechtigungAktiv = false` → gelbes Banner mit offenen Punkten
+
+### Detaillogik: Fahrzeugtyp-Einschränkung in Prüfungen
+
+```typescript
+// Beim Schüler-Wechsel im Formular
+const selectedStudent = students.find(s => s.id === form.student_id);
+const klasse = selectedStudent?.fuehrerscheinklasse;
+
+// Fahrzeugtyp-Optionen
+const fahrzeugOptionen = klasse === "B78" || klasse === "B197"
+  ? [{ value: "automatik", label: "Automatik" }]  // nur Automatik
+  : [{ value: "automatik", label: "Automatik" }, { value: "schaltwagen", label: "Schaltwagen" }];
+
+// Automatisch setzen wenn eingeschränkt
+useEffect(() => {
+  if (klasse === "B78" || klasse === "B197") {
+    setForm(f => ({ ...f, fahrzeug_typ: "automatik" }));
+  }
+}, [form.student_id]);
+```
