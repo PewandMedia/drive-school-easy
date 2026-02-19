@@ -44,6 +44,51 @@ export type Database = {
         }
         Relationships: []
       }
+      services: {
+        Row: {
+          bezeichnung: string
+          created_at: string
+          id: string
+          preis: number
+          preis_id: string | null
+          status: Database["public"]["Enums"]["service_status"]
+          student_id: string
+        }
+        Insert: {
+          bezeichnung: string
+          created_at?: string
+          id?: string
+          preis?: number
+          preis_id?: string | null
+          status?: Database["public"]["Enums"]["service_status"]
+          student_id: string
+        }
+        Update: {
+          bezeichnung?: string
+          created_at?: string
+          id?: string
+          preis?: number
+          preis_id?: string | null
+          status?: Database["public"]["Enums"]["service_status"]
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_preis_id_fkey"
+            columns: ["preis_id"]
+            isOneToOne: false
+            referencedRelation: "prices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           adresse: string | null
@@ -92,6 +137,7 @@ export type Database = {
     }
     Enums: {
       fuehrerscheinklasse_enum: "B" | "B78" | "B197"
+      service_status: "offen" | "bezahlt" | "erledigt"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -220,6 +266,7 @@ export const Constants = {
   public: {
     Enums: {
       fuehrerscheinklasse_enum: ["B", "B78", "B197"],
+      service_status: ["offen", "bezahlt", "erledigt"],
     },
   },
 } as const
