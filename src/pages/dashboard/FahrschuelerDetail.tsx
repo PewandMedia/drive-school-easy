@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -140,8 +140,22 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
+  const { data: payments = [], isLoading: loadingPayments } = useQuery({
+    queryKey: ["payments", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("student_id", id!)
+        .order("datum", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // ── Derived data ────────────────────────────────────────────────────────────
-  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingGear || loadingExams;
+  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingGear || loadingExams || loadingPayments;
 
   const initials = student
     ? `${student.vorname[0]}${student.nachname[0]}`.toUpperCase()
@@ -181,10 +195,11 @@ const FahrschuelerDetail = () => {
   const testfahrtPct = testfahrtVorhanden ? 100 : 0;
   const schaltberechtigungAktiv = isB197 && gearComplete && testfahrtVorhanden;
 
-  const totalLessonsPrice = lessons.reduce((sum, l) => sum + Number(l.preis), 0);
-  const totalServicesOpen = services
-    .filter((s) => s.status === "offen")
-    .reduce((sum, s) => sum + Number(s.preis), 0);
+  const totalFahrstunden = lessons.reduce((sum, l) => sum + Number(l.preis), 0);
+  const totalPruefungen  = exams.reduce((sum, e) => sum + Number(e.preis), 0);
+  const totalLeistungen  = services.reduce((sum, sv) => sum + Number(sv.preis), 0);
+  const totalZahlungen   = payments.reduce((sum, p) => sum + Number(p.betrag), 0);
+  const saldo            = totalFahrstunden + totalPruefungen + totalLeistungen - totalZahlungen;
 
   // ── Skeleton ────────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -304,17 +319,26 @@ const FahrschuelerDetail = () => {
 
           {/* Saldo Übersicht */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Übersicht</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Fahrstunden ({lessons.length})</span>
-              <span className="font-medium text-foreground">
-                {totalLessonsPrice.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Übersicht / Saldo</p>
+            {[
+              { label: `Fahrstunden (${lessons.length})`, value: totalFahrstunden, sign: "" },
+              { label: `Prüfungen (${exams.length})`, value: totalPruefungen, sign: "" },
+              { label: `Leistungen (${services.length})`, value: totalLeistungen, sign: "" },
+              { label: `Zahlungen (${payments.length})`, value: totalZahlungen, sign: "−", cls: "text-green-400" },
+            ].map(({ label, value, sign, cls }) => (
+              <div key={label} className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{label}</span>
+                <span className={`font-medium ${cls ?? "text-foreground"}`}>
+                  {sign}{value.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                </span>
+              </div>
+            ))}
+            <div className="border-t border-border pt-2 flex justify-between text-sm">
+              <span className="font-semibold text-foreground">
+                {saldo > 0 ? "Offener Saldo" : "Ausgeglichen"}
               </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Offene Leistungen</span>
-              <span className={`font-medium ${totalServicesOpen > 0 ? "text-amber-400" : "text-foreground"}`}>
-                {totalServicesOpen.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+              <span className={`font-bold ${saldo > 0 ? "text-amber-400" : "text-green-400"}`}>
+                {saldo.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
               </span>
             </div>
           </div>
@@ -637,6 +661,38 @@ const FahrschuelerDetail = () => {
               </div>
             )}
           </div>
+
+          {/* ── Zahlungen Liste ── */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <h2 className="font-semibold text-foreground">
+                Zahlungen
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({payments.length})</span>
+              </h2>
+            </div>
+            {payments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Noch keine Zahlungen erfasst.</p>
+            ) : (
+              <div className="space-y-0 divide-y divide-border/50">
+                {payments.map((payment) => (
+                  <div key={payment.id} className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground capitalize">
+                        {payment.zahlungsart === "bar" ? "Bar" : payment.zahlungsart === "ec" ? "EC" : "Überweisung"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(payment.datum), "dd.MM.yyyy", { locale: de })}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-green-400 shrink-0">
+                      {Number(payment.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -644,3 +700,4 @@ const FahrschuelerDetail = () => {
 };
 
 export default FahrschuelerDetail;
+
