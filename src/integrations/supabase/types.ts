@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      students: {
+        Row: {
+          adresse: string | null
+          created_at: string
+          email: string | null
+          fuehrerscheinklasse: Database["public"]["Enums"]["fuehrerscheinklasse_enum"]
+          id: string
+          ist_umschreiber: boolean
+          nachname: string
+          status: string | null
+          telefon: string | null
+          vorname: string
+        }
+        Insert: {
+          adresse?: string | null
+          created_at?: string
+          email?: string | null
+          fuehrerscheinklasse: Database["public"]["Enums"]["fuehrerscheinklasse_enum"]
+          id?: string
+          ist_umschreiber?: boolean
+          nachname: string
+          status?: string | null
+          telefon?: string | null
+          vorname: string
+        }
+        Update: {
+          adresse?: string | null
+          created_at?: string
+          email?: string | null
+          fuehrerscheinklasse?: Database["public"]["Enums"]["fuehrerscheinklasse_enum"]
+          id?: string
+          ist_umschreiber?: boolean
+          nachname?: string
+          status?: string | null
+          telefon?: string | null
+          vorname?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +61,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      fuehrerscheinklasse_enum: "B" | "B78" | "B197"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +188,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      fuehrerscheinklasse_enum: ["B", "B78", "B197"],
+    },
   },
 } as const
