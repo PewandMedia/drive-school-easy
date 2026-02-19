@@ -128,6 +128,51 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          betrag: number
+          created_at: string
+          datum: string
+          id: string
+          service_id: string | null
+          student_id: string
+          zahlungsart: Database["public"]["Enums"]["zahlungsart_enum"]
+        }
+        Insert: {
+          betrag?: number
+          created_at?: string
+          datum?: string
+          id?: string
+          service_id?: string | null
+          student_id: string
+          zahlungsart?: Database["public"]["Enums"]["zahlungsart_enum"]
+        }
+        Update: {
+          betrag?: number
+          created_at?: string
+          datum?: string
+          id?: string
+          service_id?: string | null
+          student_id?: string
+          zahlungsart?: Database["public"]["Enums"]["zahlungsart_enum"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prices: {
         Row: {
           aktiv: boolean
@@ -321,6 +366,7 @@ export type Database = {
       fuehrerscheinklasse_enum: "B" | "B78" | "B197"
       service_status: "offen" | "bezahlt" | "erledigt"
       theory_session_typ: "grundstoff" | "klassenspezifisch"
+      zahlungsart_enum: "bar" | "ec" | "ueberweisung"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -461,6 +507,7 @@ export const Constants = {
       fuehrerscheinklasse_enum: ["B", "B78", "B197"],
       service_status: ["offen", "bezahlt", "erledigt"],
       theory_session_typ: ["grundstoff", "klassenspezifisch"],
+      zahlungsart_enum: ["bar", "ec", "ueberweisung"],
     },
   },
 } as const
