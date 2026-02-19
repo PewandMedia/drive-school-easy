@@ -28,6 +28,7 @@ type ExamForm = {
   student_id: string;
   typ: "theorie" | "praxis";
   fahrzeug_typ: "automatik" | "schaltwagen";
+  vehicle_id: string;
   datum: string;
   bestanden: boolean;
   preis: string;
@@ -37,6 +38,7 @@ const defaultForm = (): ExamForm => ({
   student_id: "",
   typ: "theorie",
   fahrzeug_typ: "automatik",
+  vehicle_id: "",
   datum: new Date().toISOString().slice(0, 10),
   bestanden: false,
   preis: "0",
@@ -89,6 +91,19 @@ const Pruefungen = () => {
         .ilike("kategorie", "Prüfungen");
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ["vehicles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("aktiv", true)
+        .order("bezeichnung");
+      if (error) throw error;
+      return data as { id: string; bezeichnung: string; typ: "automatik" | "schaltwagen"; kennzeichen: string }[];
     },
   });
 
@@ -292,24 +307,53 @@ const Pruefungen = () => {
               </Select>
             </div>
 
-            {/* Fahrzeugtyp */}
+            {/* Fahrzeug */}
             <div className="space-y-1.5">
-              <Label>Fahrzeugtyp</Label>
-              <Select
-                value={form.fahrzeug_typ}
-                onValueChange={(v) => setForm((f) => ({ ...f, fahrzeug_typ: v as "automatik" | "schaltwagen" }))}
-                disabled={nurAutomatik}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="automatik">Automatik</SelectItem>
-                  {!nurAutomatik && (
-                    <SelectItem value="schaltwagen">Schaltwagen</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+              <Label>Fahrzeug</Label>
+              {vehicles.length > 0 ? (
+                <Select
+                  value={form.vehicle_id}
+                  onValueChange={(v) => {
+                    const veh = vehicles.find((x) => x.id === v);
+                    setForm((f) => ({
+                      ...f,
+                      vehicle_id: v,
+                      // nur setzen wenn nicht durch Klasse eingeschränkt
+                      fahrzeug_typ: !nurAutomatik && veh ? veh.typ : f.fahrzeug_typ,
+                    }));
+                  }}
+                  disabled={nurAutomatik && false}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Fahrzeug wählen…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles
+                      .filter((v) => !nurAutomatik || v.typ === "automatik")
+                      .map((veh) => (
+                        <SelectItem key={veh.id} value={veh.id}>
+                          {veh.bezeichnung}
+                          {veh.kennzeichen && ` · ${veh.kennzeichen}`}
+                          {" · "}{veh.typ === "automatik" ? "Automatik" : "Schaltwagen"}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select
+                  value={form.fahrzeug_typ}
+                  onValueChange={(v) => setForm((f) => ({ ...f, fahrzeug_typ: v as "automatik" | "schaltwagen" }))}
+                  disabled={nurAutomatik}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="automatik">Automatik</SelectItem>
+                    {!nurAutomatik && <SelectItem value="schaltwagen">Schaltwagen</SelectItem>}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Datum */}
