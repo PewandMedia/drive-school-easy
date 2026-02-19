@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      driving_lessons: {
+        Row: {
+          created_at: string
+          datum: string
+          dauer_minuten: number
+          fahrzeug_typ: Database["public"]["Enums"]["fahrzeug_typ"]
+          id: string
+          preis: number
+          student_id: string
+          typ: Database["public"]["Enums"]["driving_lesson_typ"]
+        }
+        Insert: {
+          created_at?: string
+          datum?: string
+          dauer_minuten?: number
+          fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
+          id?: string
+          preis?: number
+          student_id: string
+          typ: Database["public"]["Enums"]["driving_lesson_typ"]
+        }
+        Update: {
+          created_at?: string
+          datum?: string
+          dauer_minuten?: number
+          fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
+          id?: string
+          preis?: number
+          student_id?: string
+          typ?: Database["public"]["Enums"]["driving_lesson_typ"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driving_lessons_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prices: {
         Row: {
           aktiv: boolean
@@ -136,6 +177,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      driving_lesson_typ:
+        | "uebungsstunde"
+        | "ueberland"
+        | "autobahn"
+        | "nacht"
+        | "fehlstunde"
+        | "testfahrt_b197"
+      fahrzeug_typ: "automatik" | "schaltwagen"
       fuehrerscheinklasse_enum: "B" | "B78" | "B197"
       service_status: "offen" | "bezahlt" | "erledigt"
     }
@@ -265,6 +314,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      driving_lesson_typ: [
+        "uebungsstunde",
+        "ueberland",
+        "autobahn",
+        "nacht",
+        "fehlstunde",
+        "testfahrt_b197",
+      ],
+      fahrzeug_typ: ["automatik", "schaltwagen"],
       fuehrerscheinklasse_enum: ["B", "B78", "B197"],
       service_status: ["offen", "bezahlt", "erledigt"],
     },
