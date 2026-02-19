@@ -55,6 +55,47 @@ export type Database = {
           },
         ]
       }
+      exams: {
+        Row: {
+          bestanden: boolean
+          created_at: string
+          datum: string
+          fahrzeug_typ: Database["public"]["Enums"]["fahrzeug_typ"]
+          id: string
+          preis: number
+          student_id: string
+          typ: Database["public"]["Enums"]["exam_typ"]
+        }
+        Insert: {
+          bestanden?: boolean
+          created_at?: string
+          datum?: string
+          fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
+          id?: string
+          preis?: number
+          student_id: string
+          typ: Database["public"]["Enums"]["exam_typ"]
+        }
+        Update: {
+          bestanden?: boolean
+          created_at?: string
+          datum?: string
+          fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
+          id?: string
+          preis?: number
+          student_id?: string
+          typ?: Database["public"]["Enums"]["exam_typ"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exams_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gear_lessons: {
         Row: {
           created_at: string
@@ -248,6 +289,7 @@ export type Database = {
         | "nacht"
         | "fehlstunde"
         | "testfahrt_b197"
+      exam_typ: "theorie" | "praxis"
       fahrzeug_typ: "automatik" | "schaltwagen"
       fuehrerscheinklasse_enum: "B" | "B78" | "B197"
       service_status: "offen" | "bezahlt" | "erledigt"
@@ -387,6 +429,7 @@ export const Constants = {
         "fehlstunde",
         "testfahrt_b197",
       ],
+      exam_typ: ["theorie", "praxis"],
       fahrzeug_typ: ["automatik", "schaltwagen"],
       fuehrerscheinklasse_enum: ["B", "B78", "B197"],
       service_status: ["offen", "bezahlt", "erledigt"],

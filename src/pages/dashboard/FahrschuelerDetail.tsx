@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -126,8 +126,22 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
+  const { data: exams = [], isLoading: loadingExams } = useQuery({
+    queryKey: ["exams", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("exams")
+        .select("*")
+        .eq("student_id", id!)
+        .order("datum", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // ── Derived data ────────────────────────────────────────────────────────────
-  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingGear;
+  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingGear || loadingExams;
 
   const initials = student
     ? `${student.vorname[0]}${student.nachname[0]}`.toUpperCase()
@@ -443,6 +457,59 @@ const FahrschuelerDetail = () => {
               </div>
             </div>
           )}
+
+          {/* ── Prüfungen ── */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <GraduationCap className="h-5 w-5 text-muted-foreground" />
+              <h2 className="font-semibold text-foreground">
+                Prüfungen
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({exams.length})</span>
+              </h2>
+            </div>
+            {exams.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Noch keine Prüfungen eingetragen.</p>
+            ) : (
+              <div className="space-y-0 divide-y divide-border/50">
+                {exams.map((exam) => {
+                  const isTheorie = exam.typ === "theorie";
+                  return (
+                    <div key={exam.id} className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-foreground">
+                            {isTheorie ? "Theorieprüfung" : "Fahrprüfung"}
+                          </p>
+                          {!isTheorie && (
+                            <span className="text-xs text-muted-foreground">
+                              · {FAHRZEUG_LABELS[exam.fahrzeug_typ] ?? exam.fahrzeug_typ}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(exam.datum), "dd.MM.yyyy", { locale: de })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {exam.bestanden ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-400">
+                            <CheckCircle2 className="h-3 w-3" /> Bestanden
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
+                            <XCircle className="h-3 w-3" /> Nicht bestanden
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold text-foreground w-20 text-right">
+                          {Number(exam.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* ── Fahrstunden Liste ── */}
           <div className="rounded-xl border border-border bg-card p-5">
