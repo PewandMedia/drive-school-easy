@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -11,6 +11,12 @@ import { de } from "date-fns/locale";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PFLICHT: Record<string, number> = { ueberland: 5, autobahn: 4, nacht: 3 };
+
+const THEORIE_PFLICHT: Record<string, number> = { grundstoff: 12, klassenspezifisch: 2 };
+const THEORIE_LABELS: Record<string, string> = {
+  grundstoff: "Grundstoff",
+  klassenspezifisch: "Klassenspezifisch",
+};
 
 const SONDER_LABELS: Record<string, string> = {
   ueberland: "Überlandfahrt",
@@ -90,8 +96,22 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
+  const { data: theorySessions = [], isLoading: loadingTheory } = useQuery({
+    queryKey: ["theory_sessions", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("theory_sessions")
+        .select("*")
+        .eq("student_id", id!)
+        .order("datum", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // ── Derived data ────────────────────────────────────────────────────────────
-  const isLoading = loadingStudent || loadingLessons || loadingServices;
+  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory;
 
   const initials = student
     ? `${student.vorname[0]}${student.nachname[0]}`.toUpperCase()
@@ -108,6 +128,15 @@ const FahrschuelerDetail = () => {
     sonderCounts.ueberland >= PFLICHT.ueberland &&
     sonderCounts.autobahn >= PFLICHT.autobahn &&
     sonderCounts.nacht >= PFLICHT.nacht;
+
+  const theoryCounts = {
+    grundstoff: theorySessions.filter((s) => s.typ === "grundstoff").length,
+    klassenspezifisch: theorySessions.filter((s) => s.typ === "klassenspezifisch").length,
+  };
+
+  const allTheorieComplete =
+    theoryCounts.grundstoff >= THEORIE_PFLICHT.grundstoff &&
+    theoryCounts.klassenspezifisch >= THEORIE_PFLICHT.klassenspezifisch;
 
   const totalLessonsPrice = lessons.reduce((sum, l) => sum + Number(l.preis), 0);
   const totalServicesOpen = services
@@ -311,6 +340,50 @@ const FahrschuelerDetail = () => {
               </div>
             </div>
           )}
+
+          {/* ── Theorie Fortschritt ── */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-muted-foreground" />
+                <h2 className="font-semibold text-foreground">Theorieunterricht</h2>
+              </div>
+              {allTheorieComplete && (
+                <div className="flex items-center gap-1.5 text-sm text-green-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Pflicht erfüllt</span>
+                </div>
+              )}
+            </div>
+            <div className="space-y-4">
+              {(["grundstoff", "klassenspezifisch"] as const).map((typ) => {
+                const done = theoryCounts[typ];
+                const required = THEORIE_PFLICHT[typ];
+                const pct = Math.min(100, Math.round((done / required) * 100));
+                const completed = done >= required;
+                return (
+                  <div key={typ} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-foreground">{THEORIE_LABELS[typ]}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={completed ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                          {done} / {required}
+                        </span>
+                        {completed && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                      </div>
+                    </div>
+                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${completed ? "bg-green-500" : "bg-primary"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{pct}%</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* ── Fahrstunden Liste ── */}
           <div className="rounded-xl border border-border bg-card p-5">
