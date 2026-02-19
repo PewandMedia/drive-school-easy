@@ -1,87 +1,115 @@
 
-## Preislogik für Fahrstunden
+## Fortschrittsanzeige Sonderfahrten pro Schüler
 
-### Zusammenfassung
+### Übersicht
 
-Die Anforderung ist klar: In der Tabelle `driving_lessons` soll der `preis` automatisch nach der Formel `(dauer_minuten / 45) * 65` berechnet werden, sobald ein Eintrag gespeichert wird. Basispreis: 45 min = 65,00 €.
+Die Fortschrittsanzeige zeigt pro Schüler, wie viele Pflicht-Sonderfahrten bereits absolviert wurden. Die Logik greift auf die bestehende Tabelle `driving_lessons` zu und zählt Einträge nach `typ`.
 
-Der Preis soll:
-- beim **Erstellen** einer neuen Fahrstunde automatisch berechnet werden
-- beim **Ändern von `dauer_minuten`** automatisch neu berechnet werden
-- in der UI als **Vorschau** angezeigt werden, bevor der Nutzer speichert
-- **nicht manuell überschreibbar** sein (der Preis ergibt sich ausschließlich aus der Dauer)
+**Pflichtanforderungen (nur für Nicht-Umschreiber):**
+
+| Typ | Pflicht |
+|---|---|
+| ueberland | 5 Fahrten |
+| autobahn | 4 Fahrten |
+| nacht | 3 Fahrten |
+
+Wenn `student.ist_umschreiber = true` → Sonderfahrten werden komplett ausgeblendet, keine Pflichtberechnung.
+
+---
+
+### Wo wird die Fortschrittsanzeige eingebaut?
+
+Die Fortschrittsanzeige wird in **zwei Stellen** integriert:
+
+1. **`FahrschuelerDetail.tsx`** – vollständig neu implementiert mit echten Daten aus Supabase, Stammdaten des Schülers und dem Fortschritts-Block für Sonderfahrten
+2. **`Fahrschueler.tsx`** (Listenansicht) – kleines kompaktes Fortschritts-Widget pro Zeile (optional, nur Mini-Anzeige)
+
+Der Hauptfokus liegt auf der Detailseite.
 
 ---
 
 ### Technische Umsetzung
 
-#### 1. Datenbankebene: PostgreSQL Trigger (sicher & zuverlässig)
+#### Kein Datenbankumbau nötig
 
-Ein `BEFORE INSERT OR UPDATE`-Trigger auf `driving_lessons` berechnet den Preis automatisch serverseitig. Das stellt sicher, dass der Preis immer korrekt ist – egal ob Daten über die App, direkt über die Datenbank oder zukünftige API-Endpunkte gespeichert werden.
+Alle benötigten Daten sind bereits vorhanden:
+- `driving_lessons.typ` enthält die Sonderfahrten-Typen
+- `driving_lessons.student_id` verknüpft mit dem Schüler
+- `students.ist_umschreiber` steuert, ob Pflicht gilt
 
-```sql
-CREATE OR REPLACE FUNCTION public.calculate_driving_lesson_price()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.preis := ROUND((NEW.dauer_minuten::numeric / 45) * 65, 2);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+#### Datenabfragen in `FahrschuelerDetail.tsx`
 
-CREATE TRIGGER trg_calculate_driving_lesson_price
-BEFORE INSERT OR UPDATE OF dauer_minuten ON public.driving_lessons
-FOR EACH ROW
-EXECUTE FUNCTION public.calculate_driving_lesson_price();
+```
+students      → Stammdaten, ist_umschreiber
+driving_lessons WHERE student_id = :id → alle Fahrstunden des Schülers
 ```
 
-Migration: neue Datei in `supabase/migrations/`
+#### Berechnungslogik (Frontend)
 
-#### 2. Seite `/dashboard/fahrstunden` (neu implementiert)
+```typescript
+const PFLICHT = {
+  ueberland: 5,
+  autobahn: 4,
+  nacht: 3,
+};
 
-Die Seite `Fahrstunden.tsx` wird vollständig ausgebaut:
+// Anzahl je Typ zählen
+const counts = {
+  ueberland: lessons.filter(l => l.typ === "ueberland").length,
+  autobahn:  lessons.filter(l => l.typ === "autobahn").length,
+  nacht:     lessons.filter(l => l.typ === "nacht").length,
+};
 
-**Formular "Fahrstunde eintragen":**
-- Schüler auswählen (Dropdown aus `students`)
-- Typ (uebungsstunde, ueberland, autobahn, nacht, fehlstunde, testfahrt_b197) – auf Deutsch
-- Fahrzeug-Typ (automatik / schaltwagen)
-- Datum & Uhrzeit
-- Dauer in Minuten (Eingabe oder Auswahl: 45 / 90 / 135 min)
-- **Preisvorschau:** zeigt live den berechneten Preis `(dauer / 45) * 65 €` an
-- Der `preis` wird beim Speichern durch den Trigger automatisch gesetzt (kein manuelles Preis-Feld)
+// Fortschritt: absolviert / erforderlich
+// Bei Umschreiber → Block nicht rendern
+```
 
-**Liste aller Fahrstunden:**
-- Spalten: Schüler, Datum, Typ, Fahrzeug, Dauer, Preis
-- Sortierung: neueste zuerst
-- Filtermöglichkeit nach Typ und Fahrzeug-Typ
-- Löschen-Funktion
+#### UI-Komponente: Fortschrittsblock
 
-**Statistiken oben:**
-- Gesamtumsatz (Summe aller Fahrstunden)
-- Anzahl Fahrstunden
-- Durchschnittliche Dauer
+Für jeden Sonderfahrten-Typ ein Eintrag mit:
+- Label (Überlandfahrt / Autobahnfahrt / Nachtfahrt)
+- Anzeige: `absolviert / erforderlich` (z.B. `3 / 5`)
+- Fortschrittsbalken (Progress-Komponente aus `@radix-ui/react-progress`, bereits installiert)
+- Farbe: grün wenn erfüllt (`absolviert >= erforderlich`), sonst primär/blau
+
+```
+┌─────────────────────────────────────────────┐
+│  Sonderfahrten                              │
+│                                             │
+│  Überlandfahrt          3 / 5               │
+│  ████████░░░░░░░░░░░░   60%                │
+│                                             │
+│  Autobahnfahrt          4 / 4  ✓           │
+│  ████████████████████   100%               │
+│                                             │
+│  Nachtfahrt             1 / 3              │
+│  ████░░░░░░░░░░░░░░░░   33%               │
+└─────────────────────────────────────────────┘
+```
+
+Bei `ist_umschreiber = true` → Block komplett ausgeblendet, stattdessen Badge "Umschreiber – keine Sonderfahrten erforderlich".
 
 ---
 
-### Enum-Labels (Deutsch)
-
-| Wert | Anzeige |
-|---|---|
-| uebungsstunde | Übungsstunde |
-| ueberland | Überlandfahrt |
-| autobahn | Autobahnfahrt |
-| nacht | Nachtfahrt |
-| fehlstunde | Fehlstunde |
-| testfahrt_b197 | Testfahrt B197 |
-| automatik | Automatik |
-| schaltwagen | Schaltwagen |
-
----
-
-### Dateien die geändert werden
+### Geänderte Dateien
 
 | Datei | Änderung |
 |---|---|
-| `supabase/migrations/[ts]_driving_lesson_price_trigger.sql` | Neu: Trigger + Funktion |
-| `src/pages/dashboard/Fahrstunden.tsx` | Vollständig implementiert |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Vollständig neu implementiert: Stammdaten aus Supabase, Fahrstunden-Query, Fortschrittsanzeige Sonderfahrten, Leistungen-Liste |
 
-Keine Änderungen an bestehenden Tabellen oder Typen nötig – der Trigger schreibt nur in `preis`, das bereits existiert.
+Keine Datenbankänderung erforderlich. Keine Migration nötig.
+
+---
+
+### Detailaufbau der neuen FahrschuelerDetail-Seite
+
+**Linke Spalte (1/3):** Schüler-Profil-Karte
+- Avatar-Icon mit Initialen
+- Name, Klasse, Umschreiber-Badge
+- Kontaktdaten (E-Mail, Telefon, Adresse)
+- Anmeldedatum
+
+**Rechte Spalte (2/3):** Tabs oder Sektionen:
+1. **Sonderfahrten-Fortschritt** (wenn kein Umschreiber)
+2. **Fahrstunden** – Liste der letzten Fahrstunden des Schülers
+3. **Leistungen** – aus `services`-Tabelle mit Status und Saldo
