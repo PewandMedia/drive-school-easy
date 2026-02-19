@@ -1,64 +1,66 @@
 
-## Schaltstunden-Seite vollständig implementieren
+## Theorie-Seite vollständig implementieren
 
-### Problem
+### Analyse
 
-Die Seite `/dashboard/schaltstunden` ist ein reiner Platzhalter. Der „+ Stunde planen"-Button öffnet keinen Dialog – es existiert keinerlei Funktionalität zum Erfassen, Anzeigen oder Löschen von Schaltstunden.
+Die Seite `Theorie.tsx` ist ein reiner Platzhalter – der Button „+ Kurs erstellen" öffnet keinen Dialog und es gibt keine Supabase-Anbindung.
 
-### Datenbankstruktur `gear_lessons`
-
-Die Tabelle hat folgende Spalten:
+Die Datenbanktabelle `theory_sessions` hat folgende Struktur:
 - `id` (uuid)
 - `student_id` (uuid)
+- `typ` (enum: `grundstoff` | `klassenspezifisch`)
 - `datum` (timestamptz)
-- `dauer_minuten` (integer)
 - `created_at` (timestamptz)
 
-Kein `vehicle_id`-Feld vorhanden – die Fahrzeugspalte in der bestehenden Tabellenkopfzeile war ein Platzhalterkonzept und wird durch eine vereinfachtere Ansicht ersetzt.
+Kein Dauer-Feld – eine Theoriestunde entspricht immer einer Einheit (90 Minuten Standard in deutschen Fahrschulen). Der „Typ" bestimmt, ob es Grundstoff oder klassenspezifischer Stoff ist.
+
+---
 
 ### Geplante Implementierung
 
-Die Seite `Schaltstunden.tsx` wird vollständig neu gebaut – analog zu `Fahrstunden.tsx` – mit folgenden Elementen:
+Analog zu `Schaltstunden.tsx` wird die Seite vollständig neu gebaut.
 
-#### 1. Dialog „Stunde planen"
+#### 1. Dialog „Theoriestunde eintragen"
 
-Felder im Formular:
-- **Schüler** – Select aus `students` (nur B197-Schüler würden gefiltert werden, aber für Flexibilität alle zeigen)
-- **Datum & Uhrzeit** – `datetime-local` Input, Standardwert = jetzt
-- **Dauer** – Schnellauswahl: 45 / 90 / 135 min + freies Eingabefeld
+Felder:
+- **Schüler** – Select aus `students`
+- **Datum & Uhrzeit** – `datetime-local` Input
+- **Typ** – Select: `Grundstoff` / `Klassenspezifisch`
 
 #### 2. Statistik-Karten (oben)
 
-3 Karten:
-- Schaltstunden gesamt (Anzahl Einträge)
-- Schüler mit ≥ 10 Stunden (abgeschlossen)
-- Ø Dauer (Minuten)
+3 Karten (ersetzen die statischen Platzhalter):
+- **Theoriestunden gesamt** – `COUNT(*)` aus `theory_sessions`
+- **Schüler mit Grundstoff** – Anzahl eindeutiger Schüler mit mind. 1 Grundstoff-Einheit
+- **Klassenspezifisch** – Anzahl klassenspezifischer Einträge gesamt
 
 #### 3. Tabelle
 
 Spalten:
 - Schüler
 - Datum
-- Dauer (min)
-- Einheit (Stunden-Nummer dieses Schülers, z.B. „3. Stunde")
+- Typ (Badge: „Grundstoff" / „Klassenspezifisch")
+- Einheit (laufende Nummer pro Schüler, z. B. „3. Stunde")
 - Löschen-Button
 
-Die Tabelle wird nach Datum absteigend sortiert.
+Tabelle nach Datum absteigend sortiert.
 
-#### 4. Mutations
+#### 4. Filter
 
-- **Insert**: `supabase.from("gear_lessons").insert({ student_id, datum, dauer_minuten })`
-- **Delete**: `supabase.from("gear_lessons").delete().eq("id", id)`
-- Nach jeder Mutation: `queryClient.invalidateQueries(["gear_lessons"])` und auch `["gear_lessons", student_id]` für den Cache der Detailseite
+Schüler-Filter per Select-Dropdown (identisch zu Schaltstunden-Seite).
 
-#### 5. Filter
+#### 5. Mutations
 
-Ein einfacher Schüler-Filter per Select-Dropdown.
+- **Insert**: `supabase.from("theory_sessions").insert({ student_id, datum, typ })`
+- **Delete**: `supabase.from("theory_sessions").delete().eq("id", id)`
+- Nach jeder Mutation: `queryClient.invalidateQueries({ queryKey: ["theory_sessions"] })`
+
+---
 
 ### Geänderte Datei
 
 | Datei | Änderung |
 |---|---|
-| `src/pages/dashboard/Schaltstunden.tsx` | Vollständige Neuentwicklung: Dialog, Queries, Tabelle, Statistik-Karten, Delete-Funktionalität |
+| `src/pages/dashboard/Theorie.tsx` | Vollständige Neuentwicklung: Dialog, Queries, Tabelle, Statistik-Karten, Delete-Funktionalität |
 
-Keine Datenbankänderungen nötig – `gear_lessons` existiert bereits mit allen benötigten Feldern.
+Keine Datenbankänderungen nötig – `theory_sessions` existiert bereits mit allen benötigten Feldern.
