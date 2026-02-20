@@ -162,10 +162,16 @@ const FahrschuelerDetail = () => {
     : "??";
 
   const sonderCounts = {
-    ueberland: lessons.filter((l) => l.typ === "ueberland").length,
-    autobahn: lessons.filter((l) => l.typ === "autobahn").length,
-    nacht: lessons.filter((l) => l.typ === "nacht").length,
+    ueberland: lessons.filter((l) => l.typ === "ueberland").reduce((s, l) => s + (l.einheiten || 1), 0),
+    autobahn: lessons.filter((l) => l.typ === "autobahn").reduce((s, l) => s + (l.einheiten || 1), 0),
+    nacht: lessons.filter((l) => l.typ === "nacht").reduce((s, l) => s + (l.einheiten || 1), 0),
   };
+
+  const uebungsstundenEinheiten = lessons
+    .filter((l) => l.typ === "uebungsstunde")
+    .reduce((s, l) => s + (l.einheiten || 1), 0);
+
+  const gesamtEinheiten = lessons.reduce((s, l) => s + (l.einheiten || 1), 0);
 
   const theoryCounts = {
     grundstoff: theorySessions.filter((s) => s.typ === "grundstoff").length,
@@ -324,7 +330,7 @@ const FahrschuelerDetail = () => {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Übersicht / Saldo</p>
             {[
-              { label: `Fahrstunden (${lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einh.)`, value: totalFahrstunden, sign: "" },
+              { label: `Fahrstunden (${gesamtEinheiten} Einh.)`, value: totalFahrstunden, sign: "" },
               { label: `Prüfungen (${exams.length})`, value: totalPruefungen, sign: "" },
               { label: `Leistungen (${services.length})`, value: totalLeistungen, sign: "" },
               { label: `Zahlungen (${payments.length})`, value: totalZahlungen, sign: "−", cls: "text-green-400" },
@@ -373,10 +379,10 @@ const FahrschuelerDetail = () => {
             </div>
           ) : (
             <div className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Car className="h-5 w-5 text-muted-foreground" />
-                  <h2 className="font-semibold text-foreground">Sonderfahrten</h2>
+                  <h2 className="font-semibold text-foreground">Fahrstunden Übersicht</h2>
                 </div>
                 {allSonderComplete && (
                   <div className="flex items-center gap-1.5 text-sm text-green-400">
@@ -387,6 +393,12 @@ const FahrschuelerDetail = () => {
               </div>
 
               <div className="space-y-4">
+                {/* Übungsstunden */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">Übungsstunden</span>
+                  <span className="text-muted-foreground font-semibold">{uebungsstundenEinheiten}</span>
+                </div>
+
                 {(["ueberland", "autobahn", "nacht"] as const).map((typ) => {
                   const done = sonderCounts[typ];
                   const required = PFLICHT[typ];
@@ -441,6 +453,12 @@ const FahrschuelerDetail = () => {
                     <p className="text-xs text-muted-foreground">{gearPct}%</p>
                   </div>
                 )}
+
+                {/* Gesamt-Fahrstunden */}
+                <div className="border-t border-border pt-3 flex items-center justify-between text-sm">
+                  <span className="font-semibold text-foreground">Gesamt-Fahrstunden</span>
+                  <span className="font-bold text-foreground">{gesamtEinheiten} Einheiten</span>
+                </div>
               </div>
             </div>
           )}
