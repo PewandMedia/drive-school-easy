@@ -1,28 +1,46 @@
 
 
-## Exams-Tabelle um instructor_id erweitern
+## Pruefungen-Modal um Fahrlehrer-Auswahl erweitern
 
-### Datenbankaenderung
+### Aenderungen in `src/pages/dashboard/Pruefungen.tsx`
 
-Neue Spalte `instructor_id` (UUID, nullable, FK -> instructors.id) in der `exams`-Tabelle. Ein Validierungs-Trigger stellt sicher, dass bei `typ = 'praxis'` ein Fahrlehrer angegeben wird.
+#### 1. Instructors-Query hinzufuegen
 
-### Migration (SQL)
+Neue `useQuery` fuer aktive Fahrlehrer:
+```text
+supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname")
+```
 
-1. Spalte hinzufuegen: `ALTER TABLE public.exams ADD COLUMN instructor_id UUID REFERENCES public.instructors(id)`
-2. Validierungs-Trigger erstellen, der bei INSERT und UPDATE prueft:
-   - Wenn `NEW.typ = 'praxis'` und `NEW.instructor_id IS NULL` -> Fehler ausloesen
-   - Wenn `NEW.typ = 'theorie'` -> `NEW.instructor_id` auf NULL setzen (automatisch bereinigen)
+#### 2. ExamForm-Typ erweitern
 
-Bestehende Daten bleiben unberuehrt (Spalte ist nullable, bestehende Praxis-Pruefungen behalten NULL bis sie aktualisiert werden).
+Neues Feld `instructor_id: string` im `ExamForm`-Typ und in `defaultForm()` (default: `""`).
 
-### Code-Aenderungen
+#### 3. Bedingtes Fahrlehrer-Dropdown im Dialog
 
-Keine Code-Aenderungen noetig -- die Spalte wird automatisch in den generierten Typen erscheinen. Die Pruefungen-Seite (`Pruefungen.tsx`) muss erst angepasst werden, wenn das Formular zum Erstellen/Bearbeiten von Pruefungen um ein Fahrlehrer-Dropdown erweitert wird (separater Schritt).
+Zwischen dem Pruefungstyp-Select und dem Fahrzeug-Select wird ein neues Feld eingefuegt:
 
-### Technische Details
+- Nur sichtbar wenn `form.typ === "praxis"`
+- Select-Dropdown mit allen aktiven Fahrlehrern (Nachname, Vorname)
+- Pflichtfeld: `canSave` wird erweitert um `(form.typ === "praxis" ? !!form.instructor_id : true)`
 
-- FK-Constraint: `exams.instructor_id -> instructors.id`
-- Trigger-Funktion: `validate_exam_instructor()` als BEFORE INSERT OR UPDATE Trigger
-- Bestehende Theorie-Pruefungen: instructor_id bleibt NULL (korrekt)
-- Bestehende Praxis-Pruefungen: instructor_id bleibt NULL (Trigger greift nur bei neuen/aktualisierten Eintraegen)
+#### 4. instructor_id beim Reset zuruecksetzen
+
+Wenn der Pruefungstyp auf "theorie" wechselt, wird `instructor_id` automatisch auf `""` gesetzt (per useEffect oder inline im onValueChange).
+
+#### 5. Mutation erweitern
+
+Im `saveMutation` wird `instructor_id` mitgeschickt:
+```text
+instructor_id: form.typ === "praxis" ? form.instructor_id : null
+```
+
+### Keine DB-Aenderungen noetig
+
+Die Spalte `instructor_id` und der Validierungs-Trigger existieren bereits.
+
+### Betroffene Datei
+
+| Datei | Aenderung |
+|---|---|
+| `src/pages/dashboard/Pruefungen.tsx` | Query, Form, Dialog, Mutation erweitern |
 
