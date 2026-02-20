@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,8 +54,10 @@ const statusBadge = (bestanden: boolean) =>
 const Pruefungen = () => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ExamForm>(defaultForm());
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const typFilter = searchParams.get("typ") || "all";
 
   // ── Queries ─────────────────────────────────────────────────────────────────
   const { data: exams = [], isLoading: loadingExams } = useQuery({
@@ -157,10 +160,16 @@ const Pruefungen = () => {
     },
   });
 
-  // ── Stats ───────────────────────────────────────────────────────────────────
-  const bestanden = exams.filter((e) => e.bestanden).length;
-  const nichtBestanden = exams.filter((e) => !e.bestanden).length;
-  const gesamt = exams.length;
+  // ── Filter + Stats ─────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    if (typFilter === "theorie") return exams.filter((e) => e.typ === "theorie");
+    if (typFilter === "praxis") return exams.filter((e) => e.typ === "praxis");
+    return exams;
+  }, [exams, typFilter]);
+
+  const bestanden = filtered.filter((e) => e.bestanden).length;
+  const nichtBestanden = filtered.filter((e) => !e.bestanden).length;
+  const gesamt = filtered.length;
 
   const canSave = form.student_id && form.datum;
 
@@ -191,6 +200,31 @@ const Pruefungen = () => {
         ))}
       </div>
 
+      {/* Filter */}
+      <div className="flex items-center gap-3">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <Select
+          value={typFilter}
+          onValueChange={(v) => {
+            if (v === "all") {
+              searchParams.delete("typ");
+              setSearchParams(searchParams);
+            } else {
+              setSearchParams({ typ: v });
+            }
+          }}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle Prüfungen</SelectItem>
+            <SelectItem value="theorie">Theorieprüfung</SelectItem>
+            <SelectItem value="praxis">Fahrprüfung</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="grid grid-cols-6 gap-4 px-5 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -205,14 +239,14 @@ const Pruefungen = () => {
           <div className="flex flex-col items-center justify-center py-16">
             <div className="h-8 w-48 rounded-lg bg-secondary/60 animate-pulse" />
           </div>
-        ) : exams.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <ClipboardCheck className="h-10 w-10 text-muted-foreground/40 mb-3" />
             <p className="text-muted-foreground text-sm">Noch keine Prüfungen eingetragen</p>
           </div>
         ) : (
           <div className="divide-y divide-border/50">
-            {exams.map((exam) => {
+            {filtered.map((exam) => {
               const st = exam.students as { vorname: string; nachname: string; fuehrerscheinklasse: string } | null;
               return (
                 <div key={exam.id} className="grid grid-cols-6 gap-4 px-5 py-3 items-center text-sm">
