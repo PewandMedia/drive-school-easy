@@ -16,12 +16,10 @@ import {
   LayoutDashboard,
   Users,
   ListChecks,
-  DollarSign,
   Car,
   BookOpen,
   ToggleLeft,
   ClipboardCheck,
-  Truck,
   UserCheck,
   CreditCard,
   BarChart3,
@@ -43,8 +41,6 @@ const schuelerItems = [
 
 const verwaltungItems = [
   { title: "Leistungen", url: "/dashboard/leistungen", icon: ListChecks },
-  { title: "Preisliste", url: "/dashboard/preisliste", icon: DollarSign },
-  { title: "Fahrzeuge", url: "/dashboard/fahrzeuge", icon: Truck },
 ];
 
 const finanzItems = [
