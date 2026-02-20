@@ -1,47 +1,28 @@
 
 
-## Pruefungen-Seite: Filter nach Pruefungstyp
+## Exams-Tabelle um instructor_id erweitern
 
-### Aenderungen in `src/pages/dashboard/Pruefungen.tsx`
+### Datenbankaenderung
 
-#### 1. URL-basierter Filterstate
+Neue Spalte `instructor_id` (UUID, nullable, FK -> instructors.id) in der `exams`-Tabelle. Ein Validierungs-Trigger stellt sicher, dass bei `typ = 'praxis'` ein Fahrlehrer angegeben wird.
 
-- `useSearchParams` aus `react-router-dom` importieren
-- Filterwert aus URL-Parameter `typ` lesen (default: `"all"`)
-- Setter aktualisiert den URL-Parameter (`setSearchParams`)
+### Migration (SQL)
 
-#### 2. Filter-Dropdown oberhalb der Tabelle
+1. Spalte hinzufuegen: `ALTER TABLE public.exams ADD COLUMN instructor_id UUID REFERENCES public.instructors(id)`
+2. Validierungs-Trigger erstellen, der bei INSERT und UPDATE prueft:
+   - Wenn `NEW.typ = 'praxis'` und `NEW.instructor_id IS NULL` -> Fehler ausloesen
+   - Wenn `NEW.typ = 'theorie'` -> `NEW.instructor_id` auf NULL setzen (automatisch bereinigen)
 
-Zwischen den Statistik-Karten und der Tabelle wird ein Filterbereich eingefuegt:
+Bestehende Daten bleiben unberuehrt (Spalte ist nullable, bestehende Praxis-Pruefungen behalten NULL bis sie aktualisiert werden).
 
-- Select-Dropdown mit drei Optionen: "Alle Pruefungen", "Theoriepruefung", "Fahpruefung"
-- Icon: `Filter` aus lucide-react
+### Code-Aenderungen
 
-#### 3. Gefilterte Daten
+Keine Code-Aenderungen noetig -- die Spalte wird automatisch in den generierten Typen erscheinen. Die Pruefungen-Seite (`Pruefungen.tsx`) muss erst angepasst werden, wenn das Formular zum Erstellen/Bearbeiten von Pruefungen um ein Fahrlehrer-Dropdown erweitert wird (separater Schritt).
 
-Neue Variable `filtered` per `useMemo`:
+### Technische Details
 
-```text
-all    -> exams (unveraendert)
-theorie -> exams.filter(e => e.typ === "theorie")
-praxis  -> exams.filter(e => e.typ === "praxis")
-```
-
-#### 4. Statistik-Karten dynamisch
-
-Die drei Statistik-Karten (Gesamt, Bestanden, Nicht bestanden) rechnen auf `filtered` statt auf `exams`.
-
-#### 5. Tabelle nutzt `filtered`
-
-Die Tabellen-Schleife iteriert ueber `filtered` statt `exams`. Die Leer-Pruefung nutzt ebenfalls `filtered.length`.
-
-### Neue Imports
-
-- `useSearchParams` aus `react-router-dom`
-- `useMemo` aus `react`
-- `Filter` Icon aus `lucide-react`
-
-### Keine weiteren Dateien betroffen
-
-Alle Aenderungen erfolgen ausschliesslich in `Pruefungen.tsx`. Keine DB-Aenderungen noetig.
+- FK-Constraint: `exams.instructor_id -> instructors.id`
+- Trigger-Funktion: `validate_exam_instructor()` als BEFORE INSERT OR UPDATE Trigger
+- Bestehende Theorie-Pruefungen: instructor_id bleibt NULL (korrekt)
+- Bestehende Praxis-Pruefungen: instructor_id bleibt NULL (Trigger greift nur bei neuen/aktualisierten Eintraegen)
 
