@@ -65,6 +65,7 @@ export type Database = {
           datum: string
           fahrzeug_typ: Database["public"]["Enums"]["fahrzeug_typ"]
           id: string
+          instructor_id: string | null
           preis: number
           student_id: string
           typ: Database["public"]["Enums"]["exam_typ"]
@@ -75,6 +76,7 @@ export type Database = {
           datum?: string
           fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
           id?: string
+          instructor_id?: string | null
           preis?: number
           student_id: string
           typ: Database["public"]["Enums"]["exam_typ"]
@@ -85,11 +87,19 @@ export type Database = {
           datum?: string
           fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
           id?: string
+          instructor_id?: string | null
           preis?: number
           student_id?: string
           typ?: Database["public"]["Enums"]["exam_typ"]
         }
         Relationships: [
+          {
+            foreignKeyName: "exams_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "exams_student_id_fkey"
             columns: ["student_id"]
