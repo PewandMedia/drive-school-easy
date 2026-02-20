@@ -179,12 +179,7 @@ const FahrschuelerDetail = () => {
   const isB197 = student?.fuehrerscheinklasse === "B197";
   const isB78 = student?.fuehrerscheinklasse === "B78";
 
-  // Schaltstunden – COUNT(*) für den Sonderfahrten-Block
-  const gearCount = gearLessons.length;
-  const gearCountPct = Math.min(100, Math.round((gearCount / SCHALTSTUNDEN_PFLICHT) * 100));
-  const gearCountComplete = gearCount >= SCHALTSTUNDEN_PFLICHT;
-
-  // Schaltstunden – Minuten-Berechnung für den separaten Schaltstunden-Block (bleibt unverändert)
+  // Schaltstunden – Minuten-Berechnung (eine einzige Logik für alle Blöcke)
   const gearMinutesTotal = gearLessons.reduce((sum, g) => sum + Number(g.dauer_minuten), 0);
   const gearHoursDone = Math.floor(gearMinutesTotal / 45); // 1 Einheit = 45 min
   const gearHoursRequired = SCHALTSTUNDEN_PFLICHT;
@@ -196,7 +191,7 @@ const FahrschuelerDetail = () => {
     sonderCounts.ueberland >= PFLICHT.ueberland &&
     sonderCounts.autobahn >= PFLICHT.autobahn &&
     sonderCounts.nacht >= PFLICHT.nacht &&
-    (!isB197 || gearCountComplete); // B197: Schaltstunden müssen auch erfüllt sein
+    (!isB197 || gearComplete); // B197: Schaltstunden müssen auch erfüllt sein
 
   // B197 Schaltberechtigung
   const testfahrtVorhanden = lessons.some((l) => l.typ === "testfahrt_b197");
@@ -429,21 +424,21 @@ const FahrschuelerDetail = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-foreground">Schaltstunden</span>
                       <div className="flex items-center gap-2">
-                        <span className={gearCountComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
-                          {gearCount} / {SCHALTSTUNDEN_PFLICHT}
+                      <span className={gearComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                          {gearHoursDone} / {SCHALTSTUNDEN_PFLICHT}
                         </span>
-                        {gearCountComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                        {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
                       </div>
                     </div>
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                          gearCountComplete ? "bg-green-500" : "bg-primary"
+                          gearComplete ? "bg-green-500" : "bg-primary"
                         }`}
-                        style={{ width: `${gearCountPct}%` }}
+                        style={{ width: `${gearPct}%` }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">{gearCountPct}%</p>
+                    <p className="text-xs text-muted-foreground">{gearPct}%</p>
                   </div>
                 )}
               </div>
