@@ -417,9 +417,9 @@ const FahrschuelerDetail = () => {
   const previewPrice = calculatePrice(fsFahrstunde.dauer_minuten);
 
   // ── Section "+" Button helper ──
-  const SectionPlusBtn = ({ onClick }: { onClick: () => void }) => (
-    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onClick}>
-      <Plus className="h-4 w-4" />
+  const SectionAddBtn = ({ label, onClick }: { label: string; onClick: () => void }) => (
+    <Button variant="outline" size="sm" className="text-xs h-7 px-2.5 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary" onClick={onClick}>
+      {label}
     </Button>
   );
 
@@ -628,12 +628,15 @@ const FahrschuelerDetail = () => {
                   <Car className="h-5 w-5 text-muted-foreground" />
                   <h2 className="font-semibold text-foreground">Fahrstunden Übersicht</h2>
                 </div>
-                {allSonderComplete && (
-                  <div className="flex items-center gap-1.5 text-sm text-green-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Alle Pflichtfahrten absolviert</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {allSonderComplete && (
+                    <div className="flex items-center gap-1.5 text-sm text-green-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Alle Pflichtfahrten absolviert</span>
+                    </div>
+                  )}
+                  <SectionAddBtn label="+ Fahrstunde hinzufügen" onClick={() => setDlgFahrstunde(true)} />
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -713,12 +716,15 @@ const FahrschuelerDetail = () => {
                 <BookOpen className="h-5 w-5 text-muted-foreground" />
                 <h2 className="font-semibold text-foreground">Theorieunterricht</h2>
               </div>
-              {allTheorieComplete && (
-                <div className="flex items-center gap-1.5 text-sm text-green-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Pflicht erfüllt</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {allTheorieComplete && (
+                  <div className="flex items-center gap-1.5 text-sm text-green-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Pflicht erfüllt</span>
+                  </div>
+                )}
+                <SectionAddBtn label="+ Theoriestunde hinzufügen" onClick={() => setDlgTheorie(true)} />
+              </div>
             </div>
             <div className="space-y-4">
               {(["grundstoff", "klassenspezifisch"] as const).map((typ) => {
@@ -835,7 +841,7 @@ const FahrschuelerDetail = () => {
                   <span className="ml-2 text-sm font-normal text-muted-foreground">({exams.length})</span>
                 </h2>
               </div>
-              <SectionPlusBtn onClick={() => setDlgPruefung(true)} />
+              <SectionAddBtn label="+ Prüfung eintragen" onClick={() => setDlgPruefung(true)} />
             </div>
             {exams.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Prüfungen eingetragen.</p>
@@ -888,7 +894,7 @@ const FahrschuelerDetail = () => {
                 Fahrstunden
                 <span className="ml-2 text-sm font-normal text-muted-foreground">({lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einheiten)</span>
               </h2>
-              <SectionPlusBtn onClick={() => setDlgFahrstunde(true)} />
+              <SectionAddBtn label="+ Fahrstunde hinzufügen" onClick={() => setDlgFahrstunde(true)} />
             </div>
             {lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Fahrstunden eingetragen.</p>
@@ -925,7 +931,7 @@ const FahrschuelerDetail = () => {
                 Leistungen
                 <span className="ml-2 text-sm font-normal text-muted-foreground">({services.length})</span>
               </h2>
-              <SectionPlusBtn onClick={() => setDlgLeistung(true)} />
+              <SectionAddBtn label="+ Leistung hinzufügen" onClick={() => setDlgLeistung(true)} />
             </div>
             {services.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Leistungen erfasst.</p>
@@ -966,7 +972,7 @@ const FahrschuelerDetail = () => {
                   <span className="ml-2 text-sm font-normal text-muted-foreground">({payments.length})</span>
                 </h2>
               </div>
-              <SectionPlusBtn onClick={() => setDlgZahlung(true)} />
+              <SectionAddBtn label="+ Zahlung hinzufügen" onClick={() => setDlgZahlung(true)} />
             </div>
             {payments.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Zahlungen erfasst.</p>
