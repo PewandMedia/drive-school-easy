@@ -1,66 +1,31 @@
 
-## Theorie-Seite vollständig implementieren
 
-### Analyse
+## Schaltstunden-Berechnung im Sonderfahrten-Block korrigieren
 
-Die Seite `Theorie.tsx` ist ein reiner Platzhalter – der Button „+ Kurs erstellen" öffnet keinen Dialog und es gibt keine Supabase-Anbindung.
+### Problem
 
-Die Datenbanktabelle `theory_sessions` hat folgende Struktur:
-- `id` (uuid)
-- `student_id` (uuid)
-- `typ` (enum: `grundstoff` | `klassenspezifisch`)
-- `datum` (timestamptz)
-- `created_at` (timestamptz)
+Im Sonderfahrten-Block wird `gearLessons.length` (Anzahl Eintraege) verwendet, im unteren Block `FLOOR(SUM(dauer_minuten) / 45)`. Bei einer 90-Minuten-Stunde zeigt oben 1/10, unten korrekt 2/10.
 
-Kein Dauer-Feld – eine Theoriestunde entspricht immer einer Einheit (90 Minuten Standard in deutschen Fahrschulen). Der „Typ" bestimmt, ob es Grundstoff oder klassenspezifischer Stoff ist.
+### Loesung
 
----
+Die separaten `gearCount`-Variablen (Zeilen 182-185) werden entfernt und stattdessen die bereits vorhandenen minutenbasierten Variablen (`gearHoursDone`, `gearPct`, `gearComplete`) wiederverwendet.
 
-### Geplante Implementierung
+### Aenderungen in `FahrschuelerDetail.tsx`
 
-Analog zu `Schaltstunden.tsx` wird die Seite vollständig neu gebaut.
+1. **Zeilen 181-185 loeschen** -- die COUNT-basierte Berechnung (`gearCount`, `gearCountPct`, `gearCountComplete`) wird komplett entfernt.
 
-#### 1. Dialog „Theoriestunde eintragen"
+2. **Zeile 199**: `gearCountComplete` durch `gearComplete` ersetzen in der `allSonderComplete`-Berechnung.
 
-Felder:
-- **Schüler** – Select aus `students`
-- **Datum & Uhrzeit** – `datetime-local` Input
-- **Typ** – Select: `Grundstoff` / `Klassenspezifisch`
+3. **Sonderfahrten-JSX (Zeilen 430-447)**: Alle Referenzen ersetzen:
+   - `gearCount` wird zu `gearHoursDone`
+   - `gearCountPct` wird zu `gearPct`
+   - `gearCountComplete` wird zu `gearComplete`
 
-#### 2. Statistik-Karten (oben)
+Damit gibt es nur noch eine einzige Berechnungslogik: `FLOOR(SUM(dauer_minuten) / 45)`.
 
-3 Karten (ersetzen die statischen Platzhalter):
-- **Theoriestunden gesamt** – `COUNT(*)` aus `theory_sessions`
-- **Schüler mit Grundstoff** – Anzahl eindeutiger Schüler mit mind. 1 Grundstoff-Einheit
-- **Klassenspezifisch** – Anzahl klassenspezifischer Einträge gesamt
+### Betroffene Datei
 
-#### 3. Tabelle
-
-Spalten:
-- Schüler
-- Datum
-- Typ (Badge: „Grundstoff" / „Klassenspezifisch")
-- Einheit (laufende Nummer pro Schüler, z. B. „3. Stunde")
-- Löschen-Button
-
-Tabelle nach Datum absteigend sortiert.
-
-#### 4. Filter
-
-Schüler-Filter per Select-Dropdown (identisch zu Schaltstunden-Seite).
-
-#### 5. Mutations
-
-- **Insert**: `supabase.from("theory_sessions").insert({ student_id, datum, typ })`
-- **Delete**: `supabase.from("theory_sessions").delete().eq("id", id)`
-- Nach jeder Mutation: `queryClient.invalidateQueries({ queryKey: ["theory_sessions"] })`
-
----
-
-### Geänderte Datei
-
-| Datei | Änderung |
+| Datei | Aenderung |
 |---|---|
-| `src/pages/dashboard/Theorie.tsx` | Vollständige Neuentwicklung: Dialog, Queries, Tabelle, Statistik-Karten, Delete-Funktionalität |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | COUNT-Variablen entfernen, alle Referenzen auf minutenbasierte Variablen umstellen |
 
-Keine Datenbankänderungen nötig – `theory_sessions` existiert bereits mit allen benötigten Feldern.
