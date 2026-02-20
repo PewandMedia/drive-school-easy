@@ -16,12 +16,10 @@ import Dashboard from "./pages/dashboard/Dashboard";
 import Fahrschueler from "./pages/dashboard/Fahrschueler";
 import FahrschuelerDetail from "./pages/dashboard/FahrschuelerDetail";
 import Leistungen from "./pages/dashboard/Leistungen";
-import Preisliste from "./pages/dashboard/Preisliste";
 import Fahrstunden from "./pages/dashboard/Fahrstunden";
 import Theorie from "./pages/dashboard/Theorie";
 import Schaltstunden from "./pages/dashboard/Schaltstunden";
 import Pruefungen from "./pages/dashboard/Pruefungen";
-import Fahrzeuge from "./pages/dashboard/Fahrzeuge";
 import Zahlungen from "./pages/dashboard/Zahlungen";
 import Abrechnung from "./pages/dashboard/Abrechnung";
 import Auswertung from "./pages/dashboard/Auswertung";
@@ -53,12 +51,10 @@ const App = () => (
               <Route path="fahrschueler" element={<Fahrschueler />} />
               <Route path="fahrschueler/:id" element={<FahrschuelerDetail />} />
               <Route path="leistungen" element={<Leistungen />} />
-              <Route path="preisliste" element={<Preisliste />} />
               <Route path="fahrstunden" element={<Fahrstunden />} />
               <Route path="theorie" element={<Theorie />} />
               <Route path="schaltstunden" element={<Schaltstunden />} />
               <Route path="pruefungen" element={<Pruefungen />} />
-              <Route path="fahrzeuge" element={<Fahrzeuge />} />
               <Route path="zahlungen" element={<Zahlungen />} />
               <Route path="abrechnung" element={<Abrechnung />} />
               <Route path="auswertung" element={<Auswertung />} />
