@@ -1,53 +1,44 @@
 
 
-## Fahrstunden-Seite: Gruppierte Ansicht nach Schueler
+## Fahrstunden um `einheiten`-Spalte erweitern
 
-### Uebersicht
+### Datenbankänderung
 
-Die Fahrstunden-Seite wird um einen Schueler-Filter und eine gruppierte Ansicht erweitert, damit bei vielen Eintraegen die Uebersicht gewahrt bleibt.
+Neue Spalte `einheiten` (integer, NOT NULL, default 1) in `driving_lessons`. Ein Trigger berechnet den Wert automatisch beim Insert/Update:
 
-### Aenderungen
+```text
+einheiten = FLOOR(dauer_minuten / 45)
+```
 
-#### 1. Neuer State: `filterStudent`
+Bestehende Daten werden per Migration nachberechnet. Der bestehende Preis-Trigger wird um die Einheiten-Berechnung erweitert (oder ein separater Trigger angelegt).
 
-Ein neuer State `filterStudent` (default: `"all"`) wird hinzugefuegt. Dieser steuert, ob alle Schueler oder nur ein bestimmter angezeigt wird.
+### Migration (SQL)
 
-#### 2. Ansichts-Toggle
+1. Spalte hinzufuegen: `ALTER TABLE driving_lessons ADD COLUMN einheiten integer NOT NULL DEFAULT 1`
+2. Bestehende Daten aktualisieren: `UPDATE driving_lessons SET einheiten = FLOOR(dauer_minuten / 45)`
+3. Trigger-Funktion erweitern (oder neue erstellen), die bei INSERT/UPDATE automatisch `NEW.einheiten := FLOOR(NEW.dauer_minuten / 45)` setzt
 
-Im Filterbereich (Zeilen 425-468) wird ein dritter Select hinzugefuegt:
-- **Schueler-Filter** -- Dropdown mit "Alle Schueler" + Liste aller Schueler
-- Wird ein Schueler gewaehlt, werden Statistiken und Tabelle nur fuer diesen berechnet
-
-#### 3. Statistiken reagieren auf Filter
-
-Die drei Statistik-Karten (Gesamtumsatz, Fahrstunden gesamt, Durchschnittsdauer) werden basierend auf den gefilterten Daten berechnet -- nicht mehr immer auf `lessons`, sondern auf die aktive Auswahl.
-
-#### 4. Gruppierte Ansicht (kein Schueler gewaehlt)
-
-Wenn `filterStudent === "all"`:
-- Fahrstunden werden nach Schueler gruppiert
-- Jede Gruppe bekommt eine eigene Card mit dem Schuelernamen als Ueberschrift und einer Mini-Zusammenfassung (Anzahl Stunden, Gesamtpreis)
-- Innerhalb der Card eine kompakte Tabelle mit Datum, Typ, Fahrzeug, Dauer, Preis, Loeschen-Button
-- Gruppen alphabetisch nach Nachname sortiert
-
-#### 5. Einzelansicht (Schueler gewaehlt)
-
-Wenn ein bestimmter Schueler gewaehlt ist:
-- Normale Tabellenansicht wie bisher, aber nur fuer diesen Schueler
-- Statistiken zeigen nur dessen Werte
-
-### Technische Details
-
-| Bereich | Detail |
-|---|---|
-| Keine neuen DB-Abfragen | Gruppierung erfolgt rein clientseitig aus dem bestehenden `lessons`-Array |
-| Gruppierungs-Logik | `Object.groupBy` bzw. manuelles `reduce` ueber `student_id` |
-| Bestehende Filter | Typ- und Fahrzeug-Filter wirken weiterhin -- auch innerhalb der Gruppen |
-| Neue Imports | `Users` Icon aus lucide-react fuer den Schueler-Filter |
-
-### Betroffene Datei
+### Code-Aenderungen
 
 | Datei | Aenderung |
 |---|---|
-| `src/pages/dashboard/Fahrstunden.tsx` | Schueler-Filter, gruppierte Ansicht, adaptive Statistiken |
+| `src/pages/dashboard/Fahrstunden.tsx` | DrivingLesson-Typ um `einheiten` erweitern. Statistik "Fahrstunden gesamt" zeigt Summe der Einheiten statt `filtered.length`. Durchschnittsdauer bleibt auf Minutenbasis. In der Tabelle optional Einheiten anzeigen. |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Sonderfahrten-Zaehlung (`sonderCounts`) bleibt unveraendert (1 Eintrag = 1 Sonderfahrt, das ist korrekt). Aber die Gesamt-Fahrstundenzahl in der Saldo-Uebersicht koennte Einheiten nutzen. |
+| `src/pages/dashboard/Abrechnung.tsx` | Pruefen ob dort Fahrstunden gezaehlt werden -- ggf. auf `einheiten` umstellen. |
+
+### Wichtige Entscheidungen
+
+- **Sonderfahrten**: Die Zaehlung ueberland/autobahn/nacht bleibt bei Anzahl Eintraege, da 1 Sonderfahrt = 1 Eintrag (unabhaengig von Dauer). Das `einheiten`-Feld betrifft primaer Uebungsstunden-Statistiken.
+- **Schaltstunden (gear_lessons)**: Behalten die bestehende Minutenlogik (`FLOOR(SUM(dauer_minuten) / 45)`), da `gear_lessons` keine `einheiten`-Spalte bekommt (nicht Teil der Anforderung).
+- **Bestehende Daten**: `dauer_minuten` bleibt erhalten, `einheiten` wird zusaetzlich gespeichert.
+
+### Technische Details
+
+Der bestehende Trigger `calculate_driving_lesson_price` wird erweitert um eine Zeile:
+
+```text
+NEW.einheiten := FLOOR(NEW.dauer_minuten / 45);
+```
+
+So werden Preis und Einheiten in einem einzigen Trigger berechnet.
 
