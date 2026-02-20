@@ -134,16 +134,10 @@ const Schaltstunden = () => {
     students.map((s) => [s.id, `${s.vorname} ${s.nachname}`])
   );
 
-  // Laufende Nummer pro Schüler (nach Datum aufsteigend sortiert)
-  const lessonsSortedAsc = [...lessons].sort(
-    (a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime()
+  // Einheiten gesamt
+  const totalEinheiten = lessons.reduce(
+    (sum, l) => sum + Math.floor(l.dauer_minuten / 45), 0
   );
-  const lessonNumberMap: Record<string, number> = {};
-  const counterPerStudent: Record<string, number> = {};
-  for (const l of lessonsSortedAsc) {
-    counterPerStudent[l.student_id] = (counterPerStudent[l.student_id] ?? 0) + 1;
-    lessonNumberMap[l.id] = counterPerStudent[l.student_id];
-  }
 
   // Filter
   const filtered =
@@ -157,11 +151,14 @@ const Schaltstunden = () => {
       ? Math.round(lessons.reduce((s, l) => s + l.dauer_minuten, 0) / lessons.length)
       : 0;
 
-  const studentsCompleted = new Set(
-    Object.entries(counterPerStudent)
-      .filter(([, count]) => count >= SCHALTSTUNDEN_PFLICHT)
-      .map(([id]) => id)
-  ).size;
+  // Einheiten pro Schüler summieren
+  const einheitenPerStudent: Record<string, number> = {};
+  for (const l of lessons) {
+    einheitenPerStudent[l.student_id] = (einheitenPerStudent[l.student_id] ?? 0) + Math.floor(l.dauer_minuten / 45);
+  }
+
+  const studentsCompleted = Object.values(einheitenPerStudent)
+    .filter((count) => count >= SCHALTSTUNDEN_PFLICHT).length;
 
   return (
     <div className="space-y-6">
@@ -265,8 +262,8 @@ const Schaltstunden = () => {
             <ToggleLeft className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Schaltstunden gesamt</p>
-            <p className="text-xl font-bold text-foreground">{lessons.length}</p>
+            <p className="text-xs text-muted-foreground">Einheiten gesamt</p>
+            <p className="text-xl font-bold text-foreground">{totalEinheiten}</p>
           </div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
@@ -346,7 +343,7 @@ const Schaltstunden = () => {
                   </TableCell>
                   <TableCell>{lesson.dauer_minuten} min</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {lessonNumberMap[lesson.id]}. Stunde
+                    {lesson.dauer_minuten} min ({Math.floor(lesson.dauer_minuten / 45)}E)
                   </TableCell>
                   <TableCell>
                     <Button
