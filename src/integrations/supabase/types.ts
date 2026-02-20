@@ -131,6 +131,36 @@ export type Database = {
           },
         ]
       }
+      instructors: {
+        Row: {
+          aktiv: boolean
+          created_at: string
+          email: string | null
+          id: string
+          nachname: string
+          telefon: string | null
+          vorname: string
+        }
+        Insert: {
+          aktiv?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          nachname: string
+          telefon?: string | null
+          vorname: string
+        }
+        Update: {
+          aktiv?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          nachname?: string
+          telefon?: string | null
+          vorname?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           betrag: number
