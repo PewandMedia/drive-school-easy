@@ -1,66 +1,33 @@
 
 
-## Fahrlehrer-Statistik Seite visuell und strukturell verbessern
+## Schaltstunden: Einheiten-Berechnung korrigieren (wie Fahrstunden)
 
-### 1. KPI-Karten oben (4 Karten in einer Reihe)
+### Problem
+Die Spalte "Einheit" zeigt aktuell eine laufende Nummer pro Schueler ("1. Stunde", "2. Stunde") statt der korrekten Einheitenberechnung. 90 Minuten werden als "1. Stunde" angezeigt, sollen aber "2E" sein.
 
-Vier Karten mit den wichtigsten Kennzahlen, jeweils mit Icon und farblicher Hervorhebung:
+### Aenderungen in `src/pages/dashboard/Schaltstunden.tsx`
 
-| Karte | Inhalt | Icon |
-|-------|--------|------|
-| Gesamt Fahrpruefungen | Summe aller Praxis-Pruefungen | ClipboardCheck |
-| Durchschnittliche Durchfallquote | Durchschnitt ueber alle Fahrlehrer | TrendingDown |
-| Bester Fahrlehrer | Name + niedrigste Quote | Trophy |
-| Hoechste Durchfallquote | Name + hoechste Quote | AlertTriangle |
+**1. Einheiten-Berechnung in der Tabelle**
+- Spalte "Dauer" und "Einheit" zusammenfuehren bzw. Einheit korrekt berechnen
+- Formel: `Einheiten = Math.floor(dauer_minuten / 45)`
+- Anzeige im Format: `"90 min (2E)"`, `"45 min (1E)"`, `"135 min (3E)"`
+- Die bisherige laufende Nummerierung (lessonNumberMap/counterPerStudent) wird entfernt
 
-### 2. Tabelle verbessern
+**2. Statistik-Karte "Schaltstunden gesamt" in Einheiten**
+- Statt `lessons.length` (Anzahl Eintraege) wird die Summe der Einheiten angezeigt
+- Berechnung: `lessons.reduce((sum, l) => sum + Math.floor(l.dauer_minuten / 45), 0)`
+- Label aendern zu "Einheiten gesamt"
 
-- Standardsortierung nach Durchfallquote **absteigend** (hoechste Quote oben)
-- Farbige Progressbar neben dem Prozentwert:
-  - 0-20%: gruen
-  - 21-40%: gelb
-  - ueber 40%: rot (statt bisherige 50%-Grenze)
-- Prozentwert und Progressbar in derselben Zelle nebeneinander
-
-### 3. Balkendiagramm hinzufuegen
-
-- Neuer Bereich unterhalb der KPI-Karten und oberhalb oder neben der Tabelle
-- Horizontales Balkendiagramm (recharts `BarChart`) mit Durchfallquote pro Fahrlehrer
-- Farben passend zur Farblogik (gruen/gelb/rot)
-- Verwendet bestehende `ChartContainer`, `ChartTooltip` Komponenten
-
-### 4. Layout-Optimierung
-
-- Weniger vertikaler Abstand (`space-y-4` statt `space-y-6`)
-- KPI-Karten: `grid grid-cols-2 lg:grid-cols-4 gap-4`
-- Diagramm und Tabelle nebeneinander auf grossen Bildschirmen: `grid grid-cols-1 xl:grid-cols-2 gap-4`
-- Kompakteres Padding in Cards
+**3. Tabellenspalten anpassen**
+- Spalte "Dauer" zeigt weiterhin die Minuten
+- Spalte "Einheit" zeigt das neue Format: `"{dauer} min ({einheiten}E)"`
+- Alternativ: Beide Infos in einer Spalte kombinieren wie bei Fahrstunden
 
 ### Technische Details
 
-**Betroffene Datei:** `src/pages/dashboard/FahrlehrerStatistik.tsx`
-
-**Neue Imports:**
-- `ClipboardCheck, TrendingDown, Trophy, AlertTriangle` aus lucide-react
-- `BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, ResponsiveContainer` aus recharts
-- `CardHeader, CardTitle` aus card.tsx
-
-**KPI-Berechnung im useMemo:**
-```text
-gesamtPruefungen = summe aller stats.gesamt
-durchschnittQuote = mittelwert aller stats.durchfallquote
-besterFahrlehrer = stats mit niedrigster durchfallquote (gesamt > 0)
-schlechtesterFahrlehrer = stats mit hoechster durchfallquote
-```
-
-**Sortierung:**
-```text
-.sort((a, b) => b.durchfallquote - a.durchfallquote)
-```
-(bereits fast so vorhanden, nur Sortierkriterium aendern von `gesamt` auf `durchfallquote`)
-
-**Balkendiagramm:**
-- Daten: `stats`-Array mit `name` und `durchfallquote`
-- Jeder Balken erhaelt individuelle Fuellfarbe basierend auf Wert
-- Tooltip zeigt Fahrlehrer-Name und Quote
+- Entfernung des `lessonNumberMap` und `counterPerStudent` Codes (ca. 10 Zeilen)
+- Inline-Berechnung `Math.floor(lesson.dauer_minuten / 45)` in der Tabellenzeile
+- Statistik-Karte: `lessons.reduce(...)` statt `lessons.length`
+- Konstante `SCHALTSTUNDEN_PFLICHT` bleibt bestehen (bezieht sich auf Pflicht-Einheiten)
+- Konsistent mit der Fahrstunden-Logik (`FLOOR(dauer_minuten / 45)`)
 
