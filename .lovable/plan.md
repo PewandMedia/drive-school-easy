@@ -1,40 +1,66 @@
 
 
-## Offenes Saldo in der Fahrschueler-Uebersicht anzeigen
+## Direkte Hinzufuegen-Buttons im Schuelerprofil
 
-### Problem
-In der Fahrschueler-Tabelle steht bei "Saldo" ueberall "0,00 EUR" (hardcoded). Der tatsaechliche Saldo wird nur auf der Detailseite berechnet.
+### Uebersicht
+In der Schueler-Detailansicht werden Schnellaktionen hinzugefuegt, damit man direkt aus dem Profil heraus Fahrstunden, Schaltstunden, Theorie, Pruefungen, Leistungen und Zahlungen eintragen kann -- ohne Seitenwechsel.
 
-### Loesung
-Zusaetzliche Daten (driving_lessons, exams, services, payments) laden und pro Schueler den Saldo berechnen.
+### Aenderungen
 
-### Aenderungen in `src/pages/dashboard/Fahrschueler.tsx`
+**1. Zentraler Aktions-Dropdown im Header (neben Zurueck-Button)**
+- Ein `DropdownMenu` mit dem Label "Aktion hinzufuegen" wird neben dem Schueler-Namen platziert
+- Enthaelt 6 Eintraege: Fahrstunde, Schaltstunde, Theorie, Pruefung, Leistung, Zahlung
+- Klick auf einen Eintrag oeffnet das jeweilige Modal
 
-**1. Zusaetzliche Queries hinzufuegen**
-- `driving_lessons` laden (nur `student_id`, `preis`)
-- `exams` laden (nur `student_id`, `preis`)
-- `services` laden (nur `student_id`, `preis`)
-- `payments` laden (nur `student_id`, `betrag`)
+**2. Kleine "+"-Buttons in den Sektions-Headern**
+- Fahrstunden-Sektion: "+" Button rechts oben
+- Pruefungen-Sektion: "+" Button rechts oben
+- Leistungen-Sektion: "+" Button rechts oben
+- Zahlungen-Sektion: "+" Button rechts oben
 
-**2. Saldo-Berechnung pro Schueler**
-- Per `useMemo` ein `saldoMap: Record<string, number>` erstellen
-- Formel (identisch zur Detailseite):
-  ```text
-  Saldo = Summe(driving_lessons.preis) + Summe(exams.preis) + Summe(services.preis) - Summe(payments.betrag)
-  ```
+**3. Sechs Inline-Modals mit vorausgewaehltem Schueler**
+Jedes Modal uebernimmt die Formularlogik der jeweiligen Seite, aber mit dem aktuellen Schueler fest vorausgewaehlt (kein Schueler-Dropdown noetig):
 
-**3. Anzeige in der Tabelle**
-- Statt hardcoded `0,00 EUR` den berechneten Saldo anzeigen
-- Farblogik:
-  - Saldo > 0: amber/gelb (offener Betrag)
-  - Saldo == 0: normale Farbe (ausgeglichen)
-  - Saldo < 0: gruen (Ueberzahlung/Guthaben)
-- Format: `482,00 EUR` mit `toLocaleString("de-DE", { style: "currency", currency: "EUR" })`
+- **Fahrstunde**: Typ, Fahrzeugtyp, Dauer (45/90/135), Datum. Preis wird automatisch berechnet (Dauer/45 x 65 EUR)
+- **Schaltstunde**: Dauer (45/90/135), Datum
+- **Theorie**: Typ (Grundstoff/Klassenspezifisch), Datum
+- **Pruefung**: Typ (Theorie/Praxis), Fahrzeugtyp, Datum, Bestanden-Toggle, Preis (aus Preisliste vorausgefuellt)
+- **Leistung**: Preisliste-Auswahl, Bezeichnung, Preis, Status
+- **Zahlung**: Betrag, Zahlungsart (Bar/EC/Ueberweisung), Datum
+
+Nach erfolgreichem Speichern werden die relevanten Queries invalidiert, sodass die Detailansicht sofort aktualisiert wird.
 
 ### Technische Details
 
-- 4 neue `useQuery`-Aufrufe mit `.select("student_id, preis")` bzw. `.select("student_id, betrag")`
-- `useMemo` gruppiert die Summen per `student_id` und berechnet den Saldo
-- `isLoading` wird um die 4 neuen Loading-States erweitert
-- Keine Aenderung an der Detailseite noetig, Logik bleibt konsistent
+**Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
+
+- 6 neue `useState<boolean>` fuer Dialog-Sichtbarkeit (je ein Modal)
+- 6 `useState` fuer Formularwerte (angelehnt an die `defaultForm`-Objekte der jeweiligen Seiten)
+- 6 `useMutation`-Hooks fuer Insert-Operationen (identisch zur Logik in den jeweiligen Seiten)
+- Zusaetzliche Queries: `prices` (fuer Leistungen/Pruefungen), `vehicles` (fuer Pruefungen), `instructors` (fuer Pruefungen)
+- Import von `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuTrigger` aus `@/components/ui/dropdown-menu`
+- Import von `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogFooter`
+- Import von `useToast`, `useMutation`, `useQueryClient`
+- Neue Icons: `Plus`, `ChevronDown`
+
+**Query-Invalidierung nach Speichern:**
+- Fahrstunde: `driving_lessons`, `driving_lessons_saldo`
+- Schaltstunde: `gear_lessons`
+- Theorie: `theory_sessions`
+- Pruefung: `exams`, `exams_saldo`
+- Leistung: `services`, `services_saldo`
+- Zahlung: `payments`, `payments_saldo`
+
+**Aufbau im Header:**
+
+```text
+[<- Zurueck]  Nachname, Vorname          [Aktion hinzufuegen v]
+              Fahrschueler-Details
+```
+
+**Aufbau der Sektions-Header (Beispiel Fahrstunden):**
+
+```text
+Fahrstunden (4 Einheiten)                              [+]
+```
 
