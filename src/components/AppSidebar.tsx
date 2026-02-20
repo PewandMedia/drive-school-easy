@@ -22,6 +22,7 @@ import {
   ToggleLeft,
   ClipboardCheck,
   Truck,
+  UserCheck,
   CreditCard,
   BarChart3,
   Receipt,
@@ -37,6 +38,7 @@ const schuelerItems = [
   { title: "Schaltstunden", url: "/dashboard/schaltstunden", icon: ToggleLeft },
   { title: "Theorie", url: "/dashboard/theorie", icon: BookOpen },
   { title: "Prüfungen", url: "/dashboard/pruefungen", icon: ClipboardCheck },
+  { title: "Fahrlehrer-Statistik", url: "/dashboard/fahrlehrer-statistik", icon: UserCheck },
 ];
 
 const verwaltungItems = [
