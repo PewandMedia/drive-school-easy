@@ -30,6 +30,7 @@ type ExamForm = {
   typ: "theorie" | "praxis";
   fahrzeug_typ: "automatik" | "schaltwagen";
   vehicle_id: string;
+  instructor_id: string;
   datum: string;
   bestanden: boolean;
   preis: string;
@@ -40,6 +41,7 @@ const defaultForm = (): ExamForm => ({
   typ: "theorie",
   fahrzeug_typ: "automatik",
   vehicle_id: "",
+  instructor_id: "",
   datum: new Date().toISOString().slice(0, 10),
   bestanden: false,
   preis: "0",
@@ -110,6 +112,19 @@ const Pruefungen = () => {
     },
   });
 
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["instructors_active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("instructors")
+        .select("id, vorname, nachname")
+        .eq("aktiv", true)
+        .order("nachname");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // ── Derived class logic ────────────────────────────────────────────────────
   const selectedStudent = students.find((s) => s.id === form.student_id);
   const klasse = selectedStudent?.fuehrerscheinklasse;
@@ -146,6 +161,7 @@ const Pruefungen = () => {
         datum: new Date(form.datum).toISOString(),
         bestanden: form.bestanden,
         preis: parseFloat(form.preis) || 0,
+        instructor_id: form.typ === "praxis" ? form.instructor_id : null,
       });
       if (error) throw error;
     },
@@ -171,7 +187,7 @@ const Pruefungen = () => {
   const nichtBestanden = filtered.filter((e) => !e.bestanden).length;
   const gesamt = filtered.length;
 
-  const canSave = form.student_id && form.datum;
+  const canSave = form.student_id && form.datum && (form.typ === "praxis" ? !!form.instructor_id : true);
 
   return (
     <div className="space-y-6">
@@ -329,7 +345,7 @@ const Pruefungen = () => {
               <Label>Prüfungstyp</Label>
               <Select
                 value={form.typ}
-                onValueChange={(v) => setForm((f) => ({ ...f, typ: v as "theorie" | "praxis" }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, typ: v as "theorie" | "praxis", instructor_id: v === "theorie" ? "" : f.instructor_id }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -340,6 +356,28 @@ const Pruefungen = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Fahrlehrer (nur bei Praxis) */}
+            {form.typ === "praxis" && (
+              <div className="space-y-1.5">
+                <Label>Fahrlehrer *</Label>
+                <Select
+                  value={form.instructor_id}
+                  onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Fahrlehrer wählen…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {i.nachname}, {i.vorname}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Fahrzeug */}
             <div className="space-y-1.5">
