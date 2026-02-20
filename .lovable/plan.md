@@ -1,66 +1,50 @@
 
 
-## Direkte Hinzufuegen-Buttons im Schuelerprofil
+## Sektions-Aktionsbuttons im Schuelerprofil verbessern
 
 ### Uebersicht
-In der Schueler-Detailansicht werden Schnellaktionen hinzugefuegt, damit man direkt aus dem Profil heraus Fahrstunden, Schaltstunden, Theorie, Pruefungen, Leistungen und Zahlungen eintragen kann -- ohne Seitenwechsel.
+Die bestehenden kleinen Icon-only "+"-Buttons in den Sektions-Headern werden durch beschriftete, dezente Buttons im Primary-Stil ersetzt. Zusaetzlich erhalten die Sektionen "Fahrstunden Uebersicht" und "Theorieunterricht" erstmals eigene Buttons.
 
-### Aenderungen
+### Aenderungen in `src/pages/dashboard/FahrschuelerDetail.tsx`
 
-**1. Zentraler Aktions-Dropdown im Header (neben Zurueck-Button)**
-- Ein `DropdownMenu` mit dem Label "Aktion hinzufuegen" wird neben dem Schueler-Namen platziert
-- Enthaelt 6 Eintraege: Fahrstunde, Schaltstunde, Theorie, Pruefung, Leistung, Zahlung
-- Klick auf einen Eintrag oeffnet das jeweilige Modal
+**1. `SectionPlusBtn`-Komponente ersetzen**
+Die bestehende Icon-only-Komponente (Zeile 420-424) wird durch eine beschriftete Button-Variante ersetzt:
+- Stil: `variant="outline"`, kleiner (`size="sm"`), mit Primary-Textfarbe und dezenter Primary-Border
+- Klassen: `text-xs h-7 px-2.5 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary`
+- Jeder Button bekommt ein eigenes Label als Prop
 
-**2. Kleine "+"-Buttons in den Sektions-Headern**
-- Fahrstunden-Sektion: "+" Button rechts oben
-- Pruefungen-Sektion: "+" Button rechts oben
-- Leistungen-Sektion: "+" Button rechts oben
-- Zahlungen-Sektion: "+" Button rechts oben
+**2. Buttons in allen 5 Sektionen platzieren**
 
-**3. Sechs Inline-Modals mit vorausgewaehltem Schueler**
-Jedes Modal uebernimmt die Formularlogik der jeweiligen Seite, aber mit dem aktuellen Schueler fest vorausgewaehlt (kein Schueler-Dropdown noetig):
+| Sektion | Button-Label | Oeffnet Dialog |
+|---------|-------------|----------------|
+| Fahrstunden Uebersicht (Zeile ~626) | + Fahrstunde hinzufuegen | `dlgFahrstunde` |
+| Theorieunterricht (Zeile ~711) | + Theoriestunde hinzufuegen | `dlgTheorie` |
+| Pruefungen (Zeile ~838) | + Pruefung eintragen | `dlgPruefung` |
+| Leistungen (Zeile ~928) | + Leistung hinzufuegen | `dlgLeistung` |
+| Zahlungen (Zeile ~969) | + Zahlung hinzufuegen | `dlgZahlung` |
 
-- **Fahrstunde**: Typ, Fahrzeugtyp, Dauer (45/90/135), Datum. Preis wird automatisch berechnet (Dauer/45 x 65 EUR)
-- **Schaltstunde**: Dauer (45/90/135), Datum
-- **Theorie**: Typ (Grundstoff/Klassenspezifisch), Datum
-- **Pruefung**: Typ (Theorie/Praxis), Fahrzeugtyp, Datum, Bestanden-Toggle, Preis (aus Preisliste vorausgefuellt)
-- **Leistung**: Preisliste-Auswahl, Bezeichnung, Preis, Status
-- **Zahlung**: Betrag, Zahlungsart (Bar/EC/Ueberweisung), Datum
+**3. Konkrete Code-Aenderungen**
 
-Nach erfolgreichem Speichern werden die relevanten Queries invalidiert, sodass die Detailansicht sofort aktualisiert wird.
+- **SectionPlusBtn** wird zu `SectionAddBtn` mit `label`-Prop und `onClick`-Prop
+- **Fahrstunden Uebersicht** (Zeile 631): Neben "Alle Pflichtfahrten absolviert" wird der Button eingefuegt
+- **Theorieunterricht** (Zeile 716): Neben "Pflicht erfuellt" wird der Button eingefuegt
+- **Pruefungen** (Zeile 838): Bestehender `SectionPlusBtn` wird durch `SectionAddBtn` ersetzt
+- **Fahrstunden-Liste** (Zeile 891): Wird entfernt, da Fahrstunden Uebersicht bereits den Button hat
+- **Leistungen** (Zeile 928): Bestehender `SectionPlusBtn` wird durch `SectionAddBtn` ersetzt
+- **Zahlungen** (Zeile 969): Bestehender `SectionPlusBtn` wird durch `SectionAddBtn` ersetzt
 
-### Technische Details
+**4. Globaler Button bleibt unberuehrt**
+Der "Aktion hinzufuegen"-Dropdown im Header (Zeile 476-504) bleibt vollstaendig erhalten.
 
-**Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
-
-- 6 neue `useState<boolean>` fuer Dialog-Sichtbarkeit (je ein Modal)
-- 6 `useState` fuer Formularwerte (angelehnt an die `defaultForm`-Objekte der jeweiligen Seiten)
-- 6 `useMutation`-Hooks fuer Insert-Operationen (identisch zur Logik in den jeweiligen Seiten)
-- Zusaetzliche Queries: `prices` (fuer Leistungen/Pruefungen), `vehicles` (fuer Pruefungen), `instructors` (fuer Pruefungen)
-- Import von `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuTrigger` aus `@/components/ui/dropdown-menu`
-- Import von `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogFooter`
-- Import von `useToast`, `useMutation`, `useQueryClient`
-- Neue Icons: `Plus`, `ChevronDown`
-
-**Query-Invalidierung nach Speichern:**
-- Fahrstunde: `driving_lessons`, `driving_lessons_saldo`
-- Schaltstunde: `gear_lessons`
-- Theorie: `theory_sessions`
-- Pruefung: `exams`, `exams_saldo`
-- Leistung: `services`, `services_saldo`
-- Zahlung: `payments`, `payments_saldo`
-
-**Aufbau im Header:**
+### Visuelles Ergebnis
 
 ```text
-[<- Zurueck]  Nachname, Vorname          [Aktion hinzufuegen v]
-              Fahrschueler-Details
+Fahrstunden Uebersicht                    [+ Fahrstunde hinzufuegen]
+Theorieunterricht                         [+ Theoriestunde hinzufuegen]
+Pruefungen (2)                            [+ Pruefung eintragen]
+Leistungen (3)                            [+ Leistung hinzufuegen]
+Zahlungen (1)                             [+ Zahlung hinzufuegen]
 ```
 
-**Aufbau der Sektions-Header (Beispiel Fahrstunden):**
-
-```text
-Fahrstunden (4 Einheiten)                              [+]
-```
+Buttons sind kleiner als der globale Header-Button, nutzen die Primary-Farbe (gelb) aber als Outline-Variante fuer einen dezenteren Look.
 
