@@ -1,44 +1,42 @@
 
 
-## Fahrstunden um `einheiten`-Spalte erweitern
+## Fahrstunden-Uebersicht im Schuelerprofil auf Einheiten umstellen
 
-### Datenbankänderung
+### Was aendert sich
 
-Neue Spalte `einheiten` (integer, NOT NULL, default 1) in `driving_lessons`. Ein Trigger berechnet den Wert automatisch beim Insert/Update:
+Die Sonderfahrten-Zaehlung im Schuelerprofil wird von "Anzahl Eintraege" (`lessons.filter(...).length`) auf "Summe der Einheiten" (`SUM(einheiten)`) umgestellt. Zusaetzlich werden Uebungsstunden und Gesamt-Fahrstunden als separate Zeilen angezeigt.
+
+### Aenderungen in `FahrschuelerDetail.tsx`
+
+#### 1. Berechnung (Zeilen 164-168)
+
+`sonderCounts` wird von `.length` auf `.reduce((s,l) => s + (l.einheiten || 1), 0)` umgestellt:
 
 ```text
-einheiten = FLOOR(dauer_minuten / 45)
+ueberland: SUM(einheiten) WHERE typ = ueberland
+autobahn:  SUM(einheiten) WHERE typ = autobahn
+nacht:     SUM(einheiten) WHERE typ = nacht
 ```
 
-Bestehende Daten werden per Migration nachberechnet. Der bestehende Preis-Trigger wird um die Einheiten-Berechnung erweitert (oder ein separater Trigger angelegt).
+#### 2. Neue Variablen hinzufuegen
 
-### Migration (SQL)
+- `uebungsstundenEinheiten`: SUM(einheiten) WHERE typ = uebungsstunde
+- `gesamtEinheiten`: SUM(einheiten) ueber alle driving_lessons
 
-1. Spalte hinzufuegen: `ALTER TABLE driving_lessons ADD COLUMN einheiten integer NOT NULL DEFAULT 1`
-2. Bestehende Daten aktualisieren: `UPDATE driving_lessons SET einheiten = FLOOR(dauer_minuten / 45)`
-3. Trigger-Funktion erweitern (oder neue erstellen), die bei INSERT/UPDATE automatisch `NEW.einheiten := FLOOR(NEW.dauer_minuten / 45)` setzt
+#### 3. Sonderfahrten-Block erweitern (ca. Zeile 390-443)
 
-### Code-Aenderungen
+Vor den bestehenden Sonderfahrten-Fortschrittsbalken zwei neue Zeilen einfuegen:
+
+- **Uebungsstunden**: Anzahl ohne Fortschrittsbalken (keine Pflichtanzahl)
+- **Gesamt-Fahrstunden**: Gesamtsumme aller Einheiten als Zusammenfassung am Ende des Blocks
+
+#### 4. Saldo-Uebersicht (Zeile 327)
+
+Vereinfachung: `(l as any).einheiten` wird zu `l.einheiten` -- das Feld existiert jetzt im Typ.
+
+### Betroffene Datei
 
 | Datei | Aenderung |
 |---|---|
-| `src/pages/dashboard/Fahrstunden.tsx` | DrivingLesson-Typ um `einheiten` erweitern. Statistik "Fahrstunden gesamt" zeigt Summe der Einheiten statt `filtered.length`. Durchschnittsdauer bleibt auf Minutenbasis. In der Tabelle optional Einheiten anzeigen. |
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Sonderfahrten-Zaehlung (`sonderCounts`) bleibt unveraendert (1 Eintrag = 1 Sonderfahrt, das ist korrekt). Aber die Gesamt-Fahrstundenzahl in der Saldo-Uebersicht koennte Einheiten nutzen. |
-| `src/pages/dashboard/Abrechnung.tsx` | Pruefen ob dort Fahrstunden gezaehlt werden -- ggf. auf `einheiten` umstellen. |
-
-### Wichtige Entscheidungen
-
-- **Sonderfahrten**: Die Zaehlung ueberland/autobahn/nacht bleibt bei Anzahl Eintraege, da 1 Sonderfahrt = 1 Eintrag (unabhaengig von Dauer). Das `einheiten`-Feld betrifft primaer Uebungsstunden-Statistiken.
-- **Schaltstunden (gear_lessons)**: Behalten die bestehende Minutenlogik (`FLOOR(SUM(dauer_minuten) / 45)`), da `gear_lessons` keine `einheiten`-Spalte bekommt (nicht Teil der Anforderung).
-- **Bestehende Daten**: `dauer_minuten` bleibt erhalten, `einheiten` wird zusaetzlich gespeichert.
-
-### Technische Details
-
-Der bestehende Trigger `calculate_driving_lesson_price` wird erweitert um eine Zeile:
-
-```text
-NEW.einheiten := FLOOR(NEW.dauer_minuten / 45);
-```
-
-So werden Preis und Einheiten in einem einzigen Trigger berechnet.
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | sonderCounts auf einheiten umstellen, Uebungsstunden + Gesamt hinzufuegen |
 
