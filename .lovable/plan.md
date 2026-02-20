@@ -1,46 +1,45 @@
 
+## Fahrlehrer-Statistik Seite
 
-## Pruefungen-Modal um Fahrlehrer-Auswahl erweitern
+Neue Dashboard-Seite unter `/dashboard/fahrlehrer-statistik`, die pro Fahrlehrer die Fahrpruefungs-Statistik anzeigt.
 
-### Aenderungen in `src/pages/dashboard/Pruefungen.tsx`
+### Neue Datei: `src/pages/dashboard/FahrlehrerStatistik.tsx`
 
-#### 1. Instructors-Query hinzufuegen
+Die Seite laedt zwei Queries parallel:
+1. **Aktive Fahrlehrer** aus `instructors` (alle, auch inaktive, damit historische Daten sichtbar bleiben)
+2. **Alle Fahrpruefungen** aus `exams` mit Filter `typ = 'praxis'` und `instructor_id IS NOT NULL`
 
-Neue `useQuery` fuer aktive Fahrlehrer:
+Daraus wird pro Fahrlehrer berechnet:
+- Gesamt (Anzahl Pruefungen)
+- Bestanden
+- Nicht bestanden
+- Durchfallquote in %
+
+**UI-Aufbau:**
+- `PageHeader` mit Titel "Fahrlehrer-Statistik" und Icon `UserCheck` (lucide)
+- Tabelle mit Spalten: Fahrlehrer | Gesamt | Bestanden | Nicht bestanden | Durchfallquote | Progressbar
+- Durchfallquote als Prozentwert + farbige Progressbar (gruen bei niedriger Quote, rot bei hoher)
+- Leer-Zustand wenn keine Daten vorhanden
+
+### Aenderung: `src/App.tsx`
+
+Neue Route hinzufuegen:
 ```text
-supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname")
+<Route path="fahrlehrer-statistik" element={<FahrlehrerStatistik />} />
 ```
 
-#### 2. ExamForm-Typ erweitern
+### Aenderung: `src/components/AppSidebar.tsx`
 
-Neues Feld `instructor_id: string` im `ExamForm`-Typ und in `defaultForm()` (default: `""`).
-
-#### 3. Bedingtes Fahrlehrer-Dropdown im Dialog
-
-Zwischen dem Pruefungstyp-Select und dem Fahrzeug-Select wird ein neues Feld eingefuegt:
-
-- Nur sichtbar wenn `form.typ === "praxis"`
-- Select-Dropdown mit allen aktiven Fahrlehrern (Nachname, Vorname)
-- Pflichtfeld: `canSave` wird erweitert um `(form.typ === "praxis" ? !!form.instructor_id : true)`
-
-#### 4. instructor_id beim Reset zuruecksetzen
-
-Wenn der Pruefungstyp auf "theorie" wechselt, wird `instructor_id` automatisch auf `""` gesetzt (per useEffect oder inline im onValueChange).
-
-#### 5. Mutation erweitern
-
-Im `saveMutation` wird `instructor_id` mitgeschickt:
+Neuen Navigationspunkt in der Gruppe "Schueler & Ausbildung" (oder alternativ bei "Verwaltung") einfuegen:
 ```text
-instructor_id: form.typ === "praxis" ? form.instructor_id : null
+{ title: "Fahrlehrer-Statistik", url: "/dashboard/fahrlehrer-statistik", icon: UserCheck }
 ```
 
-### Keine DB-Aenderungen noetig
+### Technische Details
 
-Die Spalte `instructor_id` und der Validierungs-Trigger existieren bereits.
-
-### Betroffene Datei
-
-| Datei | Aenderung |
-|---|---|
-| `src/pages/dashboard/Pruefungen.tsx` | Query, Form, Dialog, Mutation erweitern |
-
+- Beide Queries (`instructors`, `exams`) werden mit `useQuery` geladen
+- Berechnung per `useMemo`: Gruppierung der Exams nach `instructor_id`, dann Mapping auf Fahrlehrer-Namen
+- Progress-Komponente aus `@/components/ui/progress` fuer die Durchfallquote
+- Farbgebung der Progressbar: CSS-Klasse basierend auf Prozentwert (z.B. unter 20% gruen, 20-50% gelb, ueber 50% rot)
+- Bestehende Design-Patterns (Card-Style, Tabelle, PageHeader) werden wiederverwendet
+- Keine Datenbankaenderungen noetig
