@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Plus, Search, ChevronRight, ArrowUpDown } from "lucide-react";
@@ -61,6 +61,60 @@ const Fahrschueler = () => {
       return data as Student[];
     },
   });
+
+  const { data: lessons = [], isLoading: isLoadingLessons } = useQuery({
+    queryKey: ["driving_lessons_saldo"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("driving_lessons").select("student_id, preis");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: exams = [], isLoading: isLoadingExams } = useQuery({
+    queryKey: ["exams_saldo"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("exams").select("student_id, preis");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: services = [], isLoading: isLoadingServices } = useQuery({
+    queryKey: ["services_saldo"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("services").select("student_id, preis");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: payments = [], isLoading: isLoadingPayments } = useQuery({
+    queryKey: ["payments_saldo"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("payments").select("student_id, betrag");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const saldoMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const add = (items: { student_id: string; preis: number }[]) => {
+      for (const item of items) {
+        map[item.student_id] = (map[item.student_id] || 0) + Number(item.preis);
+      }
+    };
+    add(lessons);
+    add(exams);
+    add(services);
+    for (const p of payments) {
+      map[p.student_id] = (map[p.student_id] || 0) - Number(p.betrag);
+    }
+    return map;
+  }, [lessons, exams, services, payments]);
+
+  const allLoading = isLoading || isLoadingLessons || isLoadingExams || isLoadingServices || isLoadingPayments;
 
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
@@ -153,7 +207,7 @@ const Fahrschueler = () => {
         </div>
 
         {/* Rows */}
-        {isLoading ? (
+        {allLoading ? (
           <div className="flex flex-col gap-2 p-4">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="h-12 rounded-lg bg-secondary/40 animate-pulse" />
@@ -217,7 +271,15 @@ const Fahrschueler = () => {
 
                 {/* Saldo */}
                 <div>
-                  <span className="text-sm font-medium text-foreground">0,00 €</span>
+                  {(() => {
+                    const saldo = saldoMap[student.id] || 0;
+                    const color = saldo > 0 ? "text-amber-400" : saldo < 0 ? "text-emerald-400" : "text-foreground";
+                    return (
+                      <span className={`text-sm font-medium ${color}`}>
+                        {saldo.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Arrow */}
