@@ -1,13 +1,37 @@
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PFLICHT: Record<string, number> = { ueberland: 5, autobahn: 4, nacht: 3 };
@@ -18,7 +42,7 @@ const THEORIE_LABELS: Record<string, string> = {
   klassenspezifisch: "Klassenspezifisch",
 };
 
-const SCHALTSTUNDEN_PFLICHT = 10; // Stunden in Minuten × Einheiten egal – hier Einträge
+const SCHALTSTUNDEN_PFLICHT = 10;
 
 const SONDER_LABELS: Record<string, string> = {
   ueberland: "Überlandfahrt",
@@ -52,18 +76,68 @@ const SERVICE_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   erledigt: { label: "Erledigt", cls: "bg-muted text-muted-foreground border-border" },
 };
 
+const DAUER_OPTIONS = [45, 90, 135];
+const calculatePrice = (dauer: number) => Math.round(((dauer / 45) * 65) * 100) / 100;
+
+type DrivingLessonTyp = "uebungsstunde" | "ueberland" | "autobahn" | "nacht" | "fehlstunde" | "testfahrt_b197";
+type FahrzeugTyp = "automatik" | "schaltwagen";
+type ServiceStatus = "offen" | "bezahlt" | "erledigt";
+type Zahlungsart = "bar" | "ec" | "ueberweisung";
+
 // ── Component ─────────────────────────────────────────────────────────────────
 const FahrschuelerDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
+  // ── Dialog states ──
+  const [dlgFahrstunde, setDlgFahrstunde] = useState(false);
+  const [dlgSchaltstunde, setDlgSchaltstunde] = useState(false);
+  const [dlgTheorie, setDlgTheorie] = useState(false);
+  const [dlgPruefung, setDlgPruefung] = useState(false);
+  const [dlgLeistung, setDlgLeistung] = useState(false);
+  const [dlgZahlung, setDlgZahlung] = useState(false);
+
+  // ── Form states ──
+  const [fsFahrstunde, setFsFahrstunde] = useState({
+    typ: "uebungsstunde" as DrivingLessonTyp,
+    fahrzeug_typ: "automatik" as FahrzeugTyp,
+    dauer_minuten: 45,
+    datum: new Date().toISOString().slice(0, 16),
+  });
+  const [fsSchaltstunde, setFsSchaltstunde] = useState({
+    dauer_minuten: 45,
+    datum: new Date().toISOString().slice(0, 16),
+  });
+  const [fsTheorie, setFsTheorie] = useState({
+    typ: "grundstoff" as "grundstoff" | "klassenspezifisch",
+    datum: new Date().toISOString().slice(0, 16),
+  });
+  const [fsPruefung, setFsPruefung] = useState({
+    typ: "theorie" as "theorie" | "praxis",
+    fahrzeug_typ: "automatik" as FahrzeugTyp,
+    instructor_id: "",
+    datum: new Date().toISOString().slice(0, 10),
+    bestanden: false,
+    preis: "0",
+  });
+  const [fsLeistung, setFsLeistung] = useState({
+    preis_id: "",
+    bezeichnung: "",
+    preis: "",
+    status: "offen" as ServiceStatus,
+  });
+  const [fsZahlung, setFsZahlung] = useState({
+    betrag: "",
+    zahlungsart: "bar" as Zahlungsart,
+    datum: new Date().toISOString().slice(0, 10),
+  });
+
+  // ── Data queries ──
   const { data: student, isLoading: loadingStudent } = useQuery({
     queryKey: ["student", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("*")
-        .eq("id", id!)
-        .single();
+      const { data, error } = await supabase.from("students").select("*").eq("id", id!).single();
       if (error) throw error;
       return data;
     },
@@ -73,11 +147,7 @@ const FahrschuelerDetail = () => {
   const { data: lessons = [], isLoading: loadingLessons } = useQuery({
     queryKey: ["driving_lessons", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("driving_lessons")
-        .select("*")
-        .eq("student_id", id!)
-        .order("datum", { ascending: false });
+      const { data, error } = await supabase.from("driving_lessons").select("*").eq("student_id", id!).order("datum", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -87,11 +157,7 @@ const FahrschuelerDetail = () => {
   const { data: services = [], isLoading: loadingServices } = useQuery({
     queryKey: ["services", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .eq("student_id", id!)
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("services").select("*").eq("student_id", id!).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -101,11 +167,7 @@ const FahrschuelerDetail = () => {
   const { data: theorySessions = [], isLoading: loadingTheory } = useQuery({
     queryKey: ["theory_sessions", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("theory_sessions")
-        .select("*")
-        .eq("student_id", id!)
-        .order("datum", { ascending: false });
+      const { data, error } = await supabase.from("theory_sessions").select("*").eq("student_id", id!).order("datum", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -115,11 +177,7 @@ const FahrschuelerDetail = () => {
   const { data: gearLessons = [], isLoading: loadingGear } = useQuery({
     queryKey: ["gear_lessons", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("gear_lessons")
-        .select("*")
-        .eq("student_id", id!)
-        .order("datum", { ascending: false });
+      const { data, error } = await supabase.from("gear_lessons").select("*").eq("student_id", id!).order("datum", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -129,11 +187,7 @@ const FahrschuelerDetail = () => {
   const { data: exams = [], isLoading: loadingExams } = useQuery({
     queryKey: ["exams", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("exams")
-        .select("*")
-        .eq("student_id", id!)
-        .order("datum", { ascending: false });
+      const { data, error } = await supabase.from("exams").select("*").eq("student_id", id!).order("datum", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -143,15 +197,167 @@ const FahrschuelerDetail = () => {
   const { data: payments = [], isLoading: loadingPayments } = useQuery({
     queryKey: ["payments", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("student_id", id!)
-        .order("datum", { ascending: false });
+      const { data, error } = await supabase.from("payments").select("*").eq("student_id", id!).order("datum", { ascending: false });
       if (error) throw error;
       return data;
     },
     enabled: !!id,
+  });
+
+  // Additional queries for modals
+  const { data: prices = [] } = useQuery({
+    queryKey: ["prices", "active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("prices").select("*").eq("aktiv", true).order("kategorie").order("bezeichnung");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["instructors_active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Auto-fill exam price
+  useEffect(() => {
+    if (prices.length > 0 && dlgPruefung) {
+      const pruefPreise = prices.filter((p) => p.kategorie.toLowerCase().includes("prüfung"));
+      const match = pruefPreise.find((p) =>
+        fsPruefung.typ === "theorie"
+          ? p.bezeichnung.toLowerCase().includes("theorie")
+          : p.bezeichnung.toLowerCase().includes("fahr") || p.bezeichnung.toLowerCase().includes("praxis")
+      ) ?? pruefPreise[0];
+      if (match) setFsPruefung((f) => ({ ...f, preis: String(match.preis) }));
+    }
+  }, [fsPruefung.typ, dlgPruefung, prices]);
+
+  // ── Mutations ──
+  const mutFahrstunde = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("driving_lessons").insert({
+        student_id: id!,
+        typ: fsFahrstunde.typ,
+        fahrzeug_typ: fsFahrstunde.fahrzeug_typ,
+        dauer_minuten: fsFahrstunde.dauer_minuten,
+        datum: new Date(fsFahrstunde.datum).toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
+      setDlgFahrstunde(false);
+      setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
+      toast({ title: "Fahrstunde gespeichert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutSchaltstunde = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("gear_lessons").insert({
+        student_id: id!,
+        datum: new Date(fsSchaltstunde.datum).toISOString(),
+        dauer_minuten: fsSchaltstunde.dauer_minuten,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gear_lessons", id] });
+      queryClient.invalidateQueries({ queryKey: ["gear_lessons"] });
+      setDlgSchaltstunde(false);
+      setFsSchaltstunde({ dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
+      toast({ title: "Schaltstunde gespeichert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutTheorie = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("theory_sessions").insert({
+        student_id: id!,
+        datum: new Date(fsTheorie.datum).toISOString(),
+        typ: fsTheorie.typ,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
+      setDlgTheorie(false);
+      setFsTheorie({ typ: "grundstoff", datum: new Date().toISOString().slice(0, 16) });
+      toast({ title: "Theoriestunde gespeichert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutPruefung = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("exams").insert({
+        student_id: id!,
+        typ: fsPruefung.typ,
+        fahrzeug_typ: fsPruefung.fahrzeug_typ,
+        datum: new Date(fsPruefung.datum).toISOString(),
+        bestanden: fsPruefung.bestanden,
+        preis: parseFloat(fsPruefung.preis) || 0,
+        instructor_id: fsPruefung.typ === "praxis" && fsPruefung.instructor_id ? fsPruefung.instructor_id : null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams", id] });
+      queryClient.invalidateQueries({ queryKey: ["exams_all"] });
+      setDlgPruefung(false);
+      setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), bestanden: false, preis: "0" });
+      toast({ title: "Prüfung eingetragen" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutLeistung = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("services").insert({
+        student_id: id!,
+        preis_id: fsLeistung.preis_id || null,
+        bezeichnung: fsLeistung.bezeichnung,
+        preis: parseFloat(fsLeistung.preis) || 0,
+        status: fsLeistung.status,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["services", id] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      setDlgLeistung(false);
+      setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", status: "offen" });
+      toast({ title: "Leistung hinzugefügt" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutZahlung = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("payments").insert({
+        student_id: id!,
+        betrag: parseFloat(fsZahlung.betrag) || 0,
+        zahlungsart: fsZahlung.zahlungsart,
+        datum: new Date(fsZahlung.datum).toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      setDlgZahlung(false);
+      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10) });
+      toast({ title: "Zahlung erfasst" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -185,9 +391,8 @@ const FahrschuelerDetail = () => {
   const isB197 = student?.fuehrerscheinklasse === "B197";
   const isB78 = student?.fuehrerscheinklasse === "B78";
 
-  // Schaltstunden – Minuten-Berechnung (eine einzige Logik für alle Blöcke)
   const gearMinutesTotal = gearLessons.reduce((sum, g) => sum + Number(g.dauer_minuten), 0);
-  const gearHoursDone = Math.floor(gearMinutesTotal / 45); // 1 Einheit = 45 min
+  const gearHoursDone = Math.floor(gearMinutesTotal / 45);
   const gearHoursRequired = SCHALTSTUNDEN_PFLICHT;
   const gearPct = Math.min(100, Math.round((gearHoursDone / gearHoursRequired) * 100));
   const gearComplete = gearHoursDone >= gearHoursRequired;
@@ -197,9 +402,8 @@ const FahrschuelerDetail = () => {
     sonderCounts.ueberland >= PFLICHT.ueberland &&
     sonderCounts.autobahn >= PFLICHT.autobahn &&
     sonderCounts.nacht >= PFLICHT.nacht &&
-    (!isB197 || gearComplete); // B197: Schaltstunden müssen auch erfüllt sein
+    (!isB197 || gearComplete);
 
-  // B197 Schaltberechtigung
   const testfahrtVorhanden = lessons.some((l) => l.typ === "testfahrt_b197");
   const testfahrtPct = testfahrtVorhanden ? 100 : 0;
   const schaltberechtigungAktiv = isB197 && gearComplete && testfahrtVorhanden;
@@ -209,6 +413,15 @@ const FahrschuelerDetail = () => {
   const totalLeistungen  = services.reduce((sum, sv) => sum + Number(sv.preis), 0);
   const totalZahlungen   = payments.reduce((sum, p) => sum + Number(p.betrag), 0);
   const saldo            = totalFahrstunden + totalPruefungen + totalLeistungen - totalZahlungen;
+
+  const previewPrice = calculatePrice(fsFahrstunde.dauer_minuten);
+
+  // ── Section "+" Button helper ──
+  const SectionPlusBtn = ({ onClick }: { onClick: () => void }) => (
+    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={onClick}>
+      <Plus className="h-4 w-4" />
+    </Button>
+  );
 
   // ── Skeleton ────────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -246,16 +459,49 @@ const FahrschuelerDetail = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/fahrschueler"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {student.nachname}, {student.vorname}
-          </h1>
-          <p className="text-muted-foreground text-sm">Fahrschüler-Details</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/dashboard/fahrschueler"><ArrowLeft className="h-4 w-4" /></Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              {student.nachname}, {student.vorname}
+            </h1>
+            <p className="text-muted-foreground text-sm">Fahrschüler-Details</p>
+          </div>
         </div>
+
+        {/* ── Central Action Dropdown ── */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" className="gap-2">
+              <Plus className="h-4 w-4" />
+              Aktion hinzufügen
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => setDlgFahrstunde(true)}>
+              <Car className="h-4 w-4 mr-2" />Fahrstunde eintragen
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setDlgSchaltstunde(true)}>
+              <Settings className="h-4 w-4 mr-2" />Schaltstunde planen
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setDlgTheorie(true)}>
+              <BookOpen className="h-4 w-4 mr-2" />Theorieeinheit eintragen
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setDlgPruefung(true)}>
+              <GraduationCap className="h-4 w-4 mr-2" />Prüfung eintragen
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setDlgLeistung(true)}>
+              <CreditCard className="h-4 w-4 mr-2" />Leistung hinzufügen
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setDlgZahlung(true)}>
+              <CreditCard className="h-4 w-4 mr-2" />Zahlung erfassen
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -273,9 +519,7 @@ const FahrschuelerDetail = () => {
                 {student.vorname} {student.nachname}
               </p>
               <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
-                <span
-                  className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${KLASSE_COLORS[student.fuehrerscheinklasse]}`}
-                >
+                <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${KLASSE_COLORS[student.fuehrerscheinklasse]}`}>
                   Klasse {student.fuehrerscheinklasse}
                 </span>
                 {student.ist_umschreiber && (
@@ -416,7 +660,6 @@ const FahrschuelerDetail = () => {
                           {completed && <CheckCircle2 className="h-4 w-4 text-green-400" />}
                         </div>
                       </div>
-                      {/* Custom progress bar with conditional color */}
                       <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${
@@ -516,7 +759,6 @@ const FahrschuelerDetail = () => {
               </div>
 
               <div className="space-y-4">
-                {/* Schaltstunden Fortschritt */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">Schaltstunden absolviert</span>
@@ -536,7 +778,6 @@ const FahrschuelerDetail = () => {
                   <p className="text-xs text-muted-foreground">{gearPct}% · {gearMinutesTotal} min gesamt</p>
                 </div>
 
-                {/* Testfahrt B197 Fortschritt */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">Testfahrt B197</span>
@@ -556,7 +797,6 @@ const FahrschuelerDetail = () => {
                   <p className="text-xs text-muted-foreground">{testfahrtPct}%</p>
                 </div>
 
-                {/* Schaltberechtigung Status-Banner */}
                 <div className={`flex items-center gap-3 rounded-lg border p-3 ${
                   schaltberechtigungAktiv
                     ? "border-green-500/30 bg-green-500/10"
@@ -587,12 +827,15 @@ const FahrschuelerDetail = () => {
 
           {/* ── Prüfungen ── */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <GraduationCap className="h-5 w-5 text-muted-foreground" />
-              <h2 className="font-semibold text-foreground">
-                Prüfungen
-                <span className="ml-2 text-sm font-normal text-muted-foreground">({exams.length})</span>
-              </h2>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                <h2 className="font-semibold text-foreground">
+                  Prüfungen
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">({exams.length})</span>
+                </h2>
+              </div>
+              <SectionPlusBtn onClick={() => setDlgPruefung(true)} />
             </div>
             {exams.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Prüfungen eingetragen.</p>
@@ -640,10 +883,13 @@ const FahrschuelerDetail = () => {
 
           {/* ── Fahrstunden Liste ── */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="font-semibold text-foreground mb-4">
-              Fahrstunden
-              <span className="ml-2 text-sm font-normal text-muted-foreground">({lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einheiten)</span>
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-foreground">
+                Fahrstunden
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einheiten)</span>
+              </h2>
+              <SectionPlusBtn onClick={() => setDlgFahrstunde(true)} />
+            </div>
             {lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Fahrstunden eingetragen.</p>
             ) : (
@@ -674,10 +920,13 @@ const FahrschuelerDetail = () => {
 
           {/* ── Leistungen Liste ── */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="font-semibold text-foreground mb-4">
-              Leistungen
-              <span className="ml-2 text-sm font-normal text-muted-foreground">({services.length})</span>
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-foreground">
+                Leistungen
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({services.length})</span>
+              </h2>
+              <SectionPlusBtn onClick={() => setDlgLeistung(true)} />
+            </div>
             {services.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Leistungen erfasst.</p>
             ) : (
@@ -709,12 +958,15 @@ const FahrschuelerDetail = () => {
 
           {/* ── Zahlungen Liste ── */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-              <h2 className="font-semibold text-foreground">
-                Zahlungen
-                <span className="ml-2 text-sm font-normal text-muted-foreground">({payments.length})</span>
-              </h2>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                <h2 className="font-semibold text-foreground">
+                  Zahlungen
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">({payments.length})</span>
+                </h2>
+              </div>
+              <SectionPlusBtn onClick={() => setDlgZahlung(true)} />
             </div>
             {payments.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Zahlungen erfasst.</p>
@@ -740,9 +992,286 @@ const FahrschuelerDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODALS
+         ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── Modal: Fahrstunde ── */}
+      <Dialog open={dlgFahrstunde} onOpenChange={setDlgFahrstunde}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Neue Fahrstunde</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); mutFahrstunde.mutate(); }} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Typ</Label>
+              <Select value={fsFahrstunde.typ} onValueChange={(v) => setFsFahrstunde((f) => ({ ...f, typ: v as DrivingLessonTyp }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(TYP_LABELS).map(([val, label]) => (
+                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fahrzeugtyp</Label>
+              <Select value={fsFahrstunde.fahrzeug_typ} onValueChange={(v) => setFsFahrstunde((f) => ({ ...f, fahrzeug_typ: v as FahrzeugTyp }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automatik">Automatik</SelectItem>
+                  <SelectItem value="schaltwagen">Schaltwagen</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum & Uhrzeit</Label>
+              <Input type="datetime-local" value={fsFahrstunde.datum} onChange={(e) => setFsFahrstunde((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dauer (Minuten)</Label>
+              <div className="flex gap-2">
+                {DAUER_OPTIONS.map((d) => (
+                  <Button key={d} type="button" variant={fsFahrstunde.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setFsFahrstunde((f) => ({ ...f, dauer_minuten: d }))}>
+                    {d} min
+                  </Button>
+                ))}
+                <Input type="number" min={1} className="w-24" value={fsFahrstunde.dauer_minuten} onChange={(e) => setFsFahrstunde((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 45 }))} />
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Berechneter Preis</span>
+              <span className="font-semibold text-foreground text-lg">{previewPrice.toFixed(2)} €</span>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setDlgFahrstunde(false)}>Abbrechen</Button>
+              <Button type="submit" disabled={mutFahrstunde.isPending}>{mutFahrstunde.isPending ? "Speichern…" : "Speichern"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Schaltstunde ── */}
+      <Dialog open={dlgSchaltstunde} onOpenChange={setDlgSchaltstunde}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Neue Schaltstunde</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); mutSchaltstunde.mutate(); }} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Datum & Uhrzeit</Label>
+              <Input type="datetime-local" value={fsSchaltstunde.datum} onChange={(e) => setFsSchaltstunde((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dauer (Minuten)</Label>
+              <div className="flex gap-2">
+                {DAUER_OPTIONS.map((d) => (
+                  <Button key={d} type="button" variant={fsSchaltstunde.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setFsSchaltstunde((f) => ({ ...f, dauer_minuten: d }))}>
+                    {d} min
+                  </Button>
+                ))}
+                <Input type="number" min={1} className="w-24" value={fsSchaltstunde.dauer_minuten} onChange={(e) => setFsSchaltstunde((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 45 }))} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setDlgSchaltstunde(false)}>Abbrechen</Button>
+              <Button type="submit" disabled={mutSchaltstunde.isPending}>{mutSchaltstunde.isPending ? "Speichern…" : "Speichern"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Theorie ── */}
+      <Dialog open={dlgTheorie} onOpenChange={setDlgTheorie}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Neue Theoriestunde</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); mutTheorie.mutate(); }} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Typ</Label>
+              <Select value={fsTheorie.typ} onValueChange={(v) => setFsTheorie((f) => ({ ...f, typ: v as "grundstoff" | "klassenspezifisch" }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grundstoff">Grundstoff</SelectItem>
+                  <SelectItem value="klassenspezifisch">Klassenspezifisch</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum & Uhrzeit</Label>
+              <Input type="datetime-local" value={fsTheorie.datum} onChange={(e) => setFsTheorie((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setDlgTheorie(false)}>Abbrechen</Button>
+              <Button type="submit" disabled={mutTheorie.isPending}>{mutTheorie.isPending ? "Speichern…" : "Speichern"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Prüfung ── */}
+      <Dialog open={dlgPruefung} onOpenChange={(v) => { setDlgPruefung(v); if (!v) setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), bestanden: false, preis: "0" }); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Prüfung eintragen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Prüfungstyp</Label>
+              <Select value={fsPruefung.typ} onValueChange={(v) => setFsPruefung((f) => ({ ...f, typ: v as "theorie" | "praxis", instructor_id: v === "theorie" ? "" : f.instructor_id }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="theorie">Theorieprüfung</SelectItem>
+                  <SelectItem value="praxis">Fahrprüfung</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {fsPruefung.typ === "praxis" && (
+              <div className="space-y-1.5">
+                <Label>Fahrlehrer</Label>
+                <Select value={fsPruefung.instructor_id} onValueChange={(v) => setFsPruefung((f) => ({ ...f, instructor_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen…" /></SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Fahrzeugtyp</Label>
+              <Select value={fsPruefung.fahrzeug_typ} onValueChange={(v) => setFsPruefung((f) => ({ ...f, fahrzeug_typ: v as FahrzeugTyp }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automatik">Automatik</SelectItem>
+                  <SelectItem value="schaltwagen">Schaltwagen</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum</Label>
+              <Input type="date" value={fsPruefung.datum} onChange={(e) => setFsPruefung((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ergebnis</Label>
+              <Select value={fsPruefung.bestanden ? "ja" : "nein"} onValueChange={(v) => setFsPruefung((f) => ({ ...f, bestanden: v === "ja" }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ja">Bestanden</SelectItem>
+                  <SelectItem value="nein">Nicht bestanden</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Preis (€)</Label>
+              <Input type="number" step="0.01" min="0" value={fsPruefung.preis} onChange={(e) => setFsPruefung((f) => ({ ...f, preis: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDlgPruefung(false)}>Abbrechen</Button>
+              <Button disabled={mutPruefung.isPending} onClick={() => mutPruefung.mutate()}>
+                {mutPruefung.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Leistung ── */}
+      <Dialog open={dlgLeistung} onOpenChange={(v) => { setDlgLeistung(v); if (!v) setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", status: "offen" }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leistung hinzufügen</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!fsLeistung.bezeichnung) { toast({ title: "Bezeichnung ist Pflicht", variant: "destructive" }); return; }
+            mutLeistung.mutate();
+          }} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Aus Preisliste wählen</Label>
+              <Select value={fsLeistung.preis_id} onValueChange={(preisId) => {
+                const found = prices.find((p) => p.id === preisId);
+                if (found) setFsLeistung((f) => ({ ...f, preis_id: preisId, bezeichnung: found.bezeichnung, preis: String(found.preis) }));
+                else setFsLeistung((f) => ({ ...f, preis_id: preisId }));
+              }}>
+                <SelectTrigger><SelectValue placeholder="Leistung aus Preisliste..." /></SelectTrigger>
+                <SelectContent>
+                  {prices.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="text-xs text-muted-foreground mr-2">[{p.kategorie}]</span>
+                      {p.bezeichnung} – {Number(p.preis).toFixed(2)} €
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bezeichnung *</Label>
+              <Input placeholder="Leistungsbezeichnung" value={fsLeistung.bezeichnung} onChange={(e) => setFsLeistung((f) => ({ ...f, bezeichnung: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Preis (€)</Label>
+              <Input type="number" step="0.01" min="0" placeholder="0,00" value={fsLeistung.preis} onChange={(e) => setFsLeistung((f) => ({ ...f, preis: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={fsLeistung.status} onValueChange={(v) => setFsLeistung((f) => ({ ...f, status: v as ServiceStatus }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="offen">Offen</SelectItem>
+                  <SelectItem value="bezahlt">Bezahlt</SelectItem>
+                  <SelectItem value="erledigt">Erledigt</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDlgLeistung(false)}>Abbrechen</Button>
+              <Button type="submit" disabled={mutLeistung.isPending}>{mutLeistung.isPending ? "Speichern…" : "Zuordnen"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Zahlung ── */}
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10) }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Zahlung erfassen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Betrag (€)</Label>
+              <Input type="number" step="0.01" min="0.01" placeholder="0,00" value={fsZahlung.betrag} onChange={(e) => setFsZahlung((f) => ({ ...f, betrag: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Zahlungsart</Label>
+              <Select value={fsZahlung.zahlungsart} onValueChange={(v) => setFsZahlung((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bar">Bar</SelectItem>
+                  <SelectItem value="ec">EC-Karte</SelectItem>
+                  <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum</Label>
+              <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDlgZahlung(false)}>Abbrechen</Button>
+              <Button disabled={!fsZahlung.betrag || mutZahlung.isPending} onClick={() => mutZahlung.mutate()}>
+                {mutZahlung.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default FahrschuelerDetail;
-
