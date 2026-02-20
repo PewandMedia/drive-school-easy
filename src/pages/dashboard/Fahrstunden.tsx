@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Car, Plus, Trash2, Euro, Clock, TrendingUp } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Car, Plus, Trash2, Euro, Clock, TrendingUp, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +89,77 @@ const defaultForm = {
   datum: new Date().toISOString().slice(0, 16),
 };
 
+// --- Sub-components ---
+
+type LessonTableProps = {
+  lessons: DrivingLesson[];
+  studentMap: Record<string, string>;
+  showStudent?: boolean;
+  onDelete: (id: string) => void;
+  deleting: boolean;
+};
+
+const LessonTable = ({ lessons, studentMap, showStudent = true, onDelete, deleting }: LessonTableProps) => (
+  <Table>
+    <TableHeader>
+      <TableRow>
+        {showStudent && <TableHead>Schüler</TableHead>}
+        <TableHead>Datum</TableHead>
+        <TableHead>Typ</TableHead>
+        <TableHead>Fahrzeug</TableHead>
+        <TableHead>Dauer</TableHead>
+        <TableHead className="text-right">Preis</TableHead>
+        <TableHead className="w-12" />
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {lessons.length === 0 ? (
+        <TableRow>
+          <TableCell
+            colSpan={showStudent ? 7 : 6}
+            className="text-center py-12 text-muted-foreground"
+          >
+            <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            Keine Fahrstunden vorhanden
+          </TableCell>
+        </TableRow>
+      ) : (
+        lessons.map((lesson) => (
+          <TableRow key={lesson.id}>
+            {showStudent && (
+              <TableCell className="font-medium">
+                {studentMap[lesson.student_id] ?? "–"}
+              </TableCell>
+            )}
+            <TableCell className="text-muted-foreground">
+              {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })}
+            </TableCell>
+            <TableCell>{TYP_LABELS[lesson.typ]}</TableCell>
+            <TableCell>{FAHRZEUG_LABELS[lesson.fahrzeug_typ]}</TableCell>
+            <TableCell>{lesson.dauer_minuten} min</TableCell>
+            <TableCell className="text-right font-semibold">
+              {Number(lesson.preis).toFixed(2)} €
+            </TableCell>
+            <TableCell>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => onDelete(lesson.id)}
+                disabled={deleting}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))
+      )}
+    </TableBody>
+  </Table>
+);
+
+// --- Main component ---
+
 const Fahrstunden = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -95,6 +167,7 @@ const Fahrstunden = () => {
   const [form, setForm] = useState(defaultForm);
   const [filterTyp, setFilterTyp] = useState<string>("all");
   const [filterFahrzeug, setFilterFahrzeug] = useState<string>("all");
+  const [filterStudent, setFilterStudent] = useState<string>("all");
 
   // Students
   const { data: students = [] } = useQuery<Student[]>({
@@ -136,7 +209,7 @@ const Fahrstunden = () => {
     },
   });
 
-  // Insert mutation – preis wird durch DB-Trigger gesetzt
+  // Insert mutation
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
       const { error } = await supabase.from("driving_lessons").insert({
@@ -186,25 +259,46 @@ const Fahrstunden = () => {
     insertMutation.mutate(form);
   };
 
-  // Filtered lessons
-  const filtered = lessons.filter((l) => {
-    if (filterTyp !== "all" && l.typ !== filterTyp) return false;
-    if (filterFahrzeug !== "all" && l.fahrzeug_typ !== filterFahrzeug) return false;
-    return true;
-  });
-
-  // Stats
-  const gesamtumsatz = lessons.reduce((s, l) => s + Number(l.preis), 0);
-  const avgDauer =
-    lessons.length > 0
-      ? Math.round(lessons.reduce((s, l) => s + l.dauer_minuten, 0) / lessons.length)
-      : 0;
-
-  const studentMap = Object.fromEntries(
-    students.map((s) => [s.id, `${s.vorname} ${s.nachname}`])
+  const studentMap = useMemo(
+    () => Object.fromEntries(students.map((s) => [s.id, `${s.vorname} ${s.nachname}`])),
+    [students]
   );
 
+  // Filtered lessons (typ + fahrzeug + student)
+  const filtered = useMemo(() => {
+    return lessons.filter((l) => {
+      if (filterTyp !== "all" && l.typ !== filterTyp) return false;
+      if (filterFahrzeug !== "all" && l.fahrzeug_typ !== filterFahrzeug) return false;
+      if (filterStudent !== "all" && l.student_id !== filterStudent) return false;
+      return true;
+    });
+  }, [lessons, filterTyp, filterFahrzeug, filterStudent]);
+
+  // Stats based on filtered data
+  const gesamtumsatz = filtered.reduce((s, l) => s + Number(l.preis), 0);
+  const avgDauer =
+    filtered.length > 0
+      ? Math.round(filtered.reduce((s, l) => s + l.dauer_minuten, 0) / filtered.length)
+      : 0;
+
+  // Grouped by student (for "all" view)
+  const groupedByStudent = useMemo(() => {
+    const groups: Record<string, DrivingLesson[]> = {};
+    for (const l of filtered) {
+      if (!groups[l.student_id]) groups[l.student_id] = [];
+      groups[l.student_id].push(l);
+    }
+    // Sort groups alphabetically by student name
+    const sorted = Object.entries(groups).sort(([a], [b]) => {
+      const nameA = studentMap[a] ?? "";
+      const nameB = studentMap[b] ?? "";
+      return nameA.localeCompare(nameB, "de");
+    });
+    return sorted;
+  }, [filtered, studentMap]);
+
   const previewPrice = calculatePrice(form.dauer_minuten);
+  const hasActiveFilters = filterTyp !== "all" || filterFahrzeug !== "all" || filterStudent !== "all";
 
   return (
     <div className="space-y-6">
@@ -407,7 +501,7 @@ const Fahrstunden = () => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Fahrstunden gesamt</p>
-            <p className="text-xl font-bold text-foreground">{lessons.length}</p>
+            <p className="text-xl font-bold text-foreground">{filtered.length}</p>
           </div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
@@ -423,6 +517,20 @@ const Fahrstunden = () => {
 
       {/* Filter */}
       <div className="flex flex-wrap gap-3">
+        <Select value={filterStudent} onValueChange={setFilterStudent}>
+          <SelectTrigger className="w-52">
+            <Users className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Schüler filtern" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle Schüler</SelectItem>
+            {students.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.vorname} {s.nachname}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={filterTyp} onValueChange={setFilterTyp}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Typ filtern" />
@@ -453,13 +561,14 @@ const Fahrstunden = () => {
             )}
           </SelectContent>
         </Select>
-        {(filterTyp !== "all" || filterFahrzeug !== "all") && (
+        {hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
               setFilterTyp("all");
               setFilterFahrzeug("all");
+              setFilterStudent("all");
             }}
           >
             Filter zurücksetzen
@@ -467,65 +576,57 @@ const Fahrstunden = () => {
         )}
       </div>
 
-      {/* Tabelle */}
-      <div className="rounded-xl border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Schüler</TableHead>
-              <TableHead>Datum</TableHead>
-              <TableHead>Typ</TableHead>
-              <TableHead>Fahrzeug</TableHead>
-              <TableHead>Dauer</TableHead>
-              <TableHead className="text-right">Preis</TableHead>
-              <TableHead className="w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="text-center py-12 text-muted-foreground"
-                >
-                  <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  Noch keine Fahrstunden eingetragen
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((lesson) => (
-                <TableRow key={lesson.id}>
-                  <TableCell className="font-medium">
-                    {studentMap[lesson.student_id] ?? "–"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", {
-                      locale: de,
-                    })}
-                  </TableCell>
-                  <TableCell>{TYP_LABELS[lesson.typ]}</TableCell>
-                  <TableCell>{FAHRZEUG_LABELS[lesson.fahrzeug_typ]}</TableCell>
-                  <TableCell>{lesson.dauer_minuten} min</TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {Number(lesson.preis).toFixed(2)} €
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(lesson.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Content: Grouped or flat table */}
+      {filterStudent === "all" ? (
+        // Grouped view by student
+        <div className="space-y-4">
+          {groupedByStudent.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground">
+              <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              Noch keine Fahrstunden eingetragen
+            </div>
+          ) : (
+            groupedByStudent.map(([studentId, studentLessons]) => {
+              const total = studentLessons.reduce((s, l) => s + Number(l.preis), 0);
+              return (
+                <Card key={studentId}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-semibold">
+                        {studentMap[studentId] ?? "Unbekannt"}
+                      </CardTitle>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>{studentLessons.length} Stunde{studentLessons.length !== 1 ? "n" : ""}</span>
+                        <span className="font-semibold text-foreground">{total.toFixed(2)} €</span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <LessonTable
+                      lessons={studentLessons}
+                      studentMap={studentMap}
+                      showStudent={false}
+                      onDelete={(id) => deleteMutation.mutate(id)}
+                      deleting={deleteMutation.isPending}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        // Single student flat table
+        <div className="rounded-xl border border-border bg-card">
+          <LessonTable
+            lessons={filtered}
+            studentMap={studentMap}
+            showStudent={false}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            deleting={deleteMutation.isPending}
+          />
+        </div>
+      )}
     </div>
   );
 };
