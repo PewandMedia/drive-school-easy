@@ -1,42 +1,47 @@
 
 
-## Fahrstunden-Uebersicht im Schuelerprofil auf Einheiten umstellen
+## Pruefungen-Seite: Filter nach Pruefungstyp
 
-### Was aendert sich
+### Aenderungen in `src/pages/dashboard/Pruefungen.tsx`
 
-Die Sonderfahrten-Zaehlung im Schuelerprofil wird von "Anzahl Eintraege" (`lessons.filter(...).length`) auf "Summe der Einheiten" (`SUM(einheiten)`) umgestellt. Zusaetzlich werden Uebungsstunden und Gesamt-Fahrstunden als separate Zeilen angezeigt.
+#### 1. URL-basierter Filterstate
 
-### Aenderungen in `FahrschuelerDetail.tsx`
+- `useSearchParams` aus `react-router-dom` importieren
+- Filterwert aus URL-Parameter `typ` lesen (default: `"all"`)
+- Setter aktualisiert den URL-Parameter (`setSearchParams`)
 
-#### 1. Berechnung (Zeilen 164-168)
+#### 2. Filter-Dropdown oberhalb der Tabelle
 
-`sonderCounts` wird von `.length` auf `.reduce((s,l) => s + (l.einheiten || 1), 0)` umgestellt:
+Zwischen den Statistik-Karten und der Tabelle wird ein Filterbereich eingefuegt:
+
+- Select-Dropdown mit drei Optionen: "Alle Pruefungen", "Theoriepruefung", "Fahpruefung"
+- Icon: `Filter` aus lucide-react
+
+#### 3. Gefilterte Daten
+
+Neue Variable `filtered` per `useMemo`:
 
 ```text
-ueberland: SUM(einheiten) WHERE typ = ueberland
-autobahn:  SUM(einheiten) WHERE typ = autobahn
-nacht:     SUM(einheiten) WHERE typ = nacht
+all    -> exams (unveraendert)
+theorie -> exams.filter(e => e.typ === "theorie")
+praxis  -> exams.filter(e => e.typ === "praxis")
 ```
 
-#### 2. Neue Variablen hinzufuegen
+#### 4. Statistik-Karten dynamisch
 
-- `uebungsstundenEinheiten`: SUM(einheiten) WHERE typ = uebungsstunde
-- `gesamtEinheiten`: SUM(einheiten) ueber alle driving_lessons
+Die drei Statistik-Karten (Gesamt, Bestanden, Nicht bestanden) rechnen auf `filtered` statt auf `exams`.
 
-#### 3. Sonderfahrten-Block erweitern (ca. Zeile 390-443)
+#### 5. Tabelle nutzt `filtered`
 
-Vor den bestehenden Sonderfahrten-Fortschrittsbalken zwei neue Zeilen einfuegen:
+Die Tabellen-Schleife iteriert ueber `filtered` statt `exams`. Die Leer-Pruefung nutzt ebenfalls `filtered.length`.
 
-- **Uebungsstunden**: Anzahl ohne Fortschrittsbalken (keine Pflichtanzahl)
-- **Gesamt-Fahrstunden**: Gesamtsumme aller Einheiten als Zusammenfassung am Ende des Blocks
+### Neue Imports
 
-#### 4. Saldo-Uebersicht (Zeile 327)
+- `useSearchParams` aus `react-router-dom`
+- `useMemo` aus `react`
+- `Filter` Icon aus `lucide-react`
 
-Vereinfachung: `(l as any).einheiten` wird zu `l.einheiten` -- das Feld existiert jetzt im Typ.
+### Keine weiteren Dateien betroffen
 
-### Betroffene Datei
-
-| Datei | Aenderung |
-|---|---|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | sonderCounts auf einheiten umstellen, Uebungsstunden + Gesamt hinzufuegen |
+Alle Aenderungen erfolgen ausschliesslich in `Pruefungen.tsx`. Keine DB-Aenderungen noetig.
 
