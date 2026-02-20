@@ -324,7 +324,7 @@ const FahrschuelerDetail = () => {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Übersicht / Saldo</p>
             {[
-              { label: `Fahrstunden (${lessons.length})`, value: totalFahrstunden, sign: "" },
+              { label: `Fahrstunden (${lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einh.)`, value: totalFahrstunden, sign: "" },
               { label: `Prüfungen (${exams.length})`, value: totalPruefungen, sign: "" },
               { label: `Leistungen (${services.length})`, value: totalLeistungen, sign: "" },
               { label: `Zahlungen (${payments.length})`, value: totalZahlungen, sign: "−", cls: "text-green-400" },
@@ -624,7 +624,7 @@ const FahrschuelerDetail = () => {
           <div className="rounded-xl border border-border bg-card p-5">
             <h2 className="font-semibold text-foreground mb-4">
               Fahrstunden
-              <span className="ml-2 text-sm font-normal text-muted-foreground">({lessons.length})</span>
+              <span className="ml-2 text-sm font-normal text-muted-foreground">({lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einheiten)</span>
             </h2>
             {lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Fahrstunden eingetragen.</p>

@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           datum: string
           dauer_minuten: number
+          einheiten: number
           fahrzeug_typ: Database["public"]["Enums"]["fahrzeug_typ"]
           id: string
           preis: number
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string
           datum?: string
           dauer_minuten?: number
+          einheiten?: number
           fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
           id?: string
           preis?: number
@@ -39,6 +41,7 @@ export type Database = {
           created_at?: string
           datum?: string
           dauer_minuten?: number
+          einheiten?: number
           fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
           id?: string
           preis?: number
