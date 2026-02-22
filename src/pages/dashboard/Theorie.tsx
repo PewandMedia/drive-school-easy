@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import StudentCombobox from "@/components/StudentCombobox";
 import {
   Dialog,
   DialogContent,
@@ -170,21 +171,11 @@ const Theorie = () => {
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
                 <div className="space-y-1.5">
                   <Label>Schüler</Label>
-                  <Select
+                  <StudentCombobox
+                    students={students}
                     value={form.student_id}
                     onValueChange={(v) => setForm((f) => ({ ...f, student_id: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Schüler auswählen…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {students.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
 
                 <div className="space-y-1.5">

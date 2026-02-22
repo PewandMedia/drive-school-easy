@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import StudentCombobox from "@/components/StudentCombobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import PageHeader from "@/components/PageHeader";
@@ -333,18 +334,11 @@ const Leistungen = () => {
             {/* Student select */}
             <div className="space-y-2">
               <Label>Fahrschüler *</Label>
-              <Select value={form.student_id} onValueChange={(v) => setForm({ ...form, student_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Schüler auswählen..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StudentCombobox
+                students={students}
+                value={form.student_id}
+                onValueChange={(v) => setForm({ ...form, student_id: v })}
+              />
             </div>
 
             {/* Price select – auto-fills bezeichnung + preis */}
