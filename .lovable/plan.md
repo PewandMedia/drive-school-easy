@@ -1,63 +1,92 @@
 
 
-## Dashboard-Uebersicht mit echten Daten verknuepfen
+## Geburtsdatum-Feld fuer Fahrschueler hinzufuegen
 
 ### Uebersicht
-Die statische Dashboard-Uebersicht wird durch eine dynamische Version ersetzt, die echte Daten aus der Datenbank laedt und die wichtigsten Kennzahlen auf einen Blick zeigt.
+Das Feld `geburtsdatum` (date, Pflicht) wird zur `students`-Tabelle hinzugefuegt. Ueberall im System wird der Name einheitlich als **"Nachname, Vorname (TT.MM.JJJJ)"** dargestellt -- in Listen, Dropdowns und Profilansichten.
 
-### Aenderungen in `src/pages/dashboard/Dashboard.tsx`
+### 1. Datenbank-Migration
 
-**1. Daten laden via `useQuery` (gleiche Queries wie in Abrechnung.tsx)**
-- `students` -- alle Schueler (Anzahl aktiver Schueler)
-- `driving_lessons` -- alle Fahrstunden (heutige zaehlen, Umsatz berechnen)
-- `exams` -- alle Pruefungen (diesen Monat zaehlen)
-- `theory_sessions` -- alle Theorie-Einheiten (aktive zaehlen)
-- `services` -- alle Leistungen (fuer Saldo-Berechnung)
-- `payments` -- alle Zahlungen (fuer offene Zahlungen / Saldo)
-
-**2. KPI-Karten (oben) -- 6 Karten mit Echtdaten**
-
-| Karte | Berechnung |
-|-------|-----------|
-| Aktive Fahrschueler | `students.length` (Gesamtzahl) |
-| Fahrstunden heute | Fahrstunden mit `datum = heute` zaehlen |
-| Offene Zahlungen | Gesamtsaldo: Summe(Fahrstunden + Pruefungen + Leistungen) - Summe(Zahlungen), formatiert als EUR |
-| Pruefungen diesen Monat | Pruefungen mit `datum` im aktuellen Monat zaehlen |
-| Theoriestunden gesamt | `theory_sessions.length` |
-| Umsatz (Monat) | Summe der Zahlungen mit `datum` im aktuellen Monat, formatiert als EUR |
-
-**3. "Letzte Aktivitaeten" -- die 5 neuesten Eintraege ueber alle Tabellen**
-- Fahrstunden, Pruefungen, Leistungen und Zahlungen werden nach `created_at` sortiert
-- Jeder Eintrag zeigt: Typ-Icon, Schueler-Name, Beschreibung, Datum
-- Beispiel: "Fahrstunde -- Mustermann, Max -- Uebungsstunde 45 Min -- 20.02.2026"
-
-**4. "Naechste Pruefungen" -- kommende Pruefungen (Datum >= heute)**
-- Aus `exams` alle mit `datum >= heute` selektieren, nach Datum sortiert, max. 5
-- Zeigt: Schueler-Name, Pruefungstyp (Theorie/Praxis), Datum
-- Falls keine: "Keine Pruefungen geplant."
-
-**5. Neuer Bereich: "Schueler mit offenem Saldo" (Top 5)**
-- Die 5 Schueler mit dem hoechsten offenen Saldo
-- Zeigt: Name, Saldo-Betrag als Badge (Amber), klickbar zum Schueler-Profil
-- Nutzt `useNavigate` fuer Navigation
-
-### Layout-Struktur
-
-```text
-[KPI-Karte 1]  [KPI-Karte 2]  [KPI-Karte 3]
-[KPI-Karte 4]  [KPI-Karte 5]  [KPI-Karte 6]
-
-[Letzte Aktivitaeten (5)]    [Naechste Pruefungen (5)]
-
-[Schueler mit offenem Saldo (Top 5)]
+```sql
+ALTER TABLE students
+ADD COLUMN geburtsdatum date;
 ```
 
-### Technische Details
+Die Spalte wird zunaechst nullable angelegt, damit bestehende Schueler keinen Fehler verursachen. Im Formular wird das Feld als Pflicht validiert.
 
-- Imports: `useQuery` aus `@tanstack/react-query`, `supabase` aus Client, `useNavigate` aus react-router-dom, `format` aus `date-fns`
-- Waehrungsformatierung: `toLocaleString("de-DE", { style: "currency", currency: "EUR" })`
-- Datumsvergleiche: `date-fns` fuer "heute", "aktueller Monat", "Datum >= heute"
-- Schueler-Name wird ueber eine Map (ID -> Name) aufgeloest fuer die Aktivitaeten-/Pruefungslisten
-- Alle Karten bleiben im bestehenden Design (rounded-xl, border-border, bg-card)
-- Klick auf "Schueler mit offenem Saldo"-Zeilen navigiert zu `/dashboard/fahrschueler/:id`
+### 2. Hilfsfunktion fuer einheitliche Namensanzeige
+
+Eine kleine Utility-Funktion wird erstellt, die ueberall wiederverwendet wird:
+
+```typescript
+// z.B. in einer Datei oder inline
+const formatStudentName = (nachname: string, vorname: string, geburtsdatum?: string | null) => {
+  if (geburtsdatum) {
+    return `${nachname}, ${vorname} (${format(new Date(geburtsdatum), "dd.MM.yyyy")})`;
+  }
+  return `${nachname}, ${vorname}`;
+};
+```
+
+### 3. Aenderungen pro Datei
+
+**`src/pages/dashboard/Fahrschueler.tsx`** -- Schuelerliste
+- Student-Type um `geburtsdatum: string | null` erweitern
+- defaultForm um `geburtsdatum: ""` erweitern
+- Datepicker-Feld "Geburtsdatum *" im Anlege-Dialog hinzufuegen
+- Validierung: Geburtsdatum darf nicht leer sein
+- Neue Spalte "Geb.-Datum" in der Tabelle (grid-cols anpassen)
+- Namensanzeige in Zeilen: `Nachname, Vorname (TT.MM.JJJJ)`
+- Insert-Mutation: `geburtsdatum` mitsenden
+
+**`src/pages/dashboard/FahrschuelerDetail.tsx`** -- Schueler-Profil
+- Geburtsdatum im Profil-Header anzeigen (neben E-Mail, Telefon etc.)
+- Name im Header: `Nachname, Vorname`
+- Geburtsdatum als eigenes Info-Feld mit Calendar-Icon
+
+**`src/pages/dashboard/Fahrstunden.tsx`** -- Fahrstunden-Seite
+- Schueler-Query um `geburtsdatum` erweitern
+- Dropdown: `Nachname, Vorname (TT.MM.JJJJ)`
+- Tabellen-Anzeige: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Pruefungen.tsx`** -- Pruefungen
+- `students(vorname, nachname, fuehrerscheinklasse)` um `geburtsdatum` erweitern
+- Schueler-Dropdown und Tabelle: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Leistungen.tsx`** -- Leistungen
+- `students(vorname, nachname)` um `geburtsdatum` erweitern
+- Schueler-Dropdown und gruppierte Ansicht: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Zahlungen.tsx`** -- Zahlungen
+- `students(vorname, nachname)` um `geburtsdatum` erweitern
+- Schueler-Dropdown und Tabelle: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Theorie.tsx`** -- Theorie
+- Schueler-Query um `geburtsdatum` erweitern
+- studentMap und Dropdowns: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Schaltstunden.tsx`** -- Schaltstunden
+- Schueler-Query um `geburtsdatum` erweitern
+- studentMap und Dropdowns: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Abrechnung.tsx`** -- Abrechnung
+- Name in der Tabelle: `Nachname, Vorname (TT.MM.JJJJ)`
+
+**`src/pages/dashboard/Dashboard.tsx`** -- Dashboard-Uebersicht
+- nameMap und Saldo-Liste: `Nachname, Vorname (TT.MM.JJJJ)`
+
+### 4. Einheitliches Namensformat
+
+Ueberall im System gilt ab sofort:
+
+| Kontext | Format |
+|---------|--------|
+| Listen-Zeilen | Nachname, Vorname (TT.MM.JJJJ) |
+| Dropdowns / Select | Nachname, Vorname (TT.MM.JJJJ) |
+| Profil-Header | Nachname, Vorname (Geburtsdatum separat als Info-Zeile) |
+| Dashboard-Aktivitaeten | Nachname, Vorname (TT.MM.JJJJ) |
+
+### 5. Datepicker-Implementierung
+
+Im Anlege-Dialog wird ein Popover-basierter Datepicker (Shadcn Calendar) verwendet mit `pointer-events-auto` fuer korrekte Interaktion im Dialog.
 
