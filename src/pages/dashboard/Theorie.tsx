@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BookOpen, Plus, Trash2, Users, GraduationCap, BookMarked } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -33,7 +34,7 @@ import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type Student = { id: string; vorname: string; nachname: string };
+type Student = { id: string; vorname: string; nachname: string; geburtsdatum: string | null };
 type TheorySession = {
   id: string;
   student_id: string;
@@ -59,7 +60,7 @@ const Theorie = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, vorname, nachname")
+        .select("id, vorname, nachname, geburtsdatum")
         .order("nachname");
       if (error) throw error;
       return data ?? [];
@@ -122,7 +123,7 @@ const Theorie = () => {
   };
 
   const studentMap = Object.fromEntries(
-    students.map((s) => [s.id, `${s.vorname} ${s.nachname}`])
+    students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])
   );
 
   // Laufende Nummer pro Schüler (nach Datum aufsteigend)
@@ -179,7 +180,7 @@ const Theorie = () => {
                     <SelectContent>
                       {students.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
-                          {s.vorname} {s.nachname}
+                          {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -268,7 +269,7 @@ const Theorie = () => {
             <SelectItem value="all">Alle Schüler</SelectItem>
             {students.map((s) => (
               <SelectItem key={s.id} value={s.id}>
-                {s.vorname} {s.nachname}
+                {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
               </SelectItem>
             ))}
           </SelectContent>

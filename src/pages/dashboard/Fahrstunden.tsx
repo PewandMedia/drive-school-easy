@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Car, Plus, Trash2, Euro, Clock, TrendingUp, Users } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -60,6 +61,7 @@ type Student = {
   id: string;
   vorname: string;
   nachname: string;
+  geburtsdatum: string | null;
 };
 
 type Vehicle = {
@@ -176,7 +178,7 @@ const Fahrstunden = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, vorname, nachname")
+        .select("id, vorname, nachname, geburtsdatum")
         .order("nachname");
       if (error) throw error;
       return data ?? [];
@@ -261,7 +263,7 @@ const Fahrstunden = () => {
   };
 
   const studentMap = useMemo(
-    () => Object.fromEntries(students.map((s) => [s.id, `${s.vorname} ${s.nachname}`])),
+    () => Object.fromEntries(students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])),
     [students]
   );
 
@@ -333,7 +335,7 @@ const Fahrstunden = () => {
                     <SelectContent>
                       {students.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
-                          {s.vorname} {s.nachname}
+                          {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -527,7 +529,7 @@ const Fahrstunden = () => {
             <SelectItem value="all">Alle Schüler</SelectItem>
             {students.map((s) => (
               <SelectItem key={s.id} value={s.id}>
-                {s.vorname} {s.nachname}
+                {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
               </SelectItem>
             ))}
           </SelectContent>

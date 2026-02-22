@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, Search, ChevronRight, ArrowUpDown } from "lucide-react";
+import { Users, Plus, Search, ChevronRight, ArrowUpDown, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import PageHeader from "@/components/PageHeader";
+import { formatStudentName } from "@/lib/formatStudentName";
 
 type Student = {
   id: string;
@@ -24,6 +29,7 @@ type Student = {
   ist_umschreiber: boolean;
   status: string | null;
   fahrschule: string;
+  geburtsdatum: string | null;
 };
 
 const klasseColors: Record<string, string> = {
@@ -47,6 +53,7 @@ const defaultForm = {
   fahrschule: "riemke",
   ist_umschreiber: false,
   status: "",
+  geburtsdatum: undefined as Date | undefined,
 };
 
 const Fahrschueler = () => {
@@ -137,6 +144,7 @@ const Fahrschueler = () => {
           fahrschule: values.fahrschule,
           ist_umschreiber: values.ist_umschreiber,
           status: values.status || null,
+          geburtsdatum: values.geburtsdatum ? format(values.geburtsdatum, "yyyy-MM-dd") : null,
         },
       ]);
       if (error) throw error;
@@ -167,6 +175,10 @@ const Fahrschueler = () => {
     e.preventDefault();
     if (!form.vorname || !form.nachname) {
       setFormError("Vor- und Nachname sind Pflichtfelder.");
+      return;
+    }
+    if (!form.geburtsdatum) {
+      setFormError("Geburtsdatum ist ein Pflichtfeld.");
       return;
     }
     setFormError("");
@@ -217,10 +229,11 @@ const Fahrschueler = () => {
       {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Header */}
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <button className="flex items-center gap-1 text-left hover:text-foreground transition-colors">
             Name <ArrowUpDown className="h-3 w-3" />
           </button>
+          <span>Geb.-Datum</span>
           <span>Klasse</span>
           <span>Fahrschule</span>
           <span>Umschreiber</span>
@@ -259,16 +272,23 @@ const Fahrschueler = () => {
               <button
                 key={student.id}
                 onClick={() => navigate(`/dashboard/fahrschueler/${student.id}`)}
-                className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
+                className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
               >
                 {/* Name */}
                 <div className="min-w-0">
                   <p className="font-medium text-foreground truncate">
-                    {student.nachname}, {student.vorname}
+                    {formatStudentName(student.nachname, student.vorname, student.geburtsdatum)}
                   </p>
                   {student.email && (
                     <p className="text-xs text-muted-foreground truncate">{student.email}</p>
                   )}
+                </div>
+
+                {/* Geburtsdatum */}
+                <div>
+                  <span className="text-sm text-muted-foreground">
+                    {student.geburtsdatum ? format(new Date(student.geburtsdatum), "dd.MM.yyyy") : "–"}
+                  </span>
                 </div>
 
                 {/* Klasse */}
@@ -346,6 +366,36 @@ const Fahrschueler = () => {
                 />
               </div>
             </div>
+
+            {/* Geburtsdatum */}
+            <div className="space-y-2">
+              <Label>Geburtsdatum *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !form.geburtsdatum && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {form.geburtsdatum ? format(form.geburtsdatum, "dd.MM.yyyy") : "Geburtsdatum wählen"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={form.geburtsdatum}
+                    onSelect={(date) => setForm({ ...form, geburtsdatum: date })}
+                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">E-Mail</Label>
               <Input

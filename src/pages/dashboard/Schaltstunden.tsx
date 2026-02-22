@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ToggleLeft, Plus, Trash2, Clock, Users, TrendingUp } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -35,7 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 const DAUER_OPTIONS = [45, 90, 135];
 const SCHALTSTUNDEN_PFLICHT = 10;
 
-type Student = { id: string; vorname: string; nachname: string };
+type Student = { id: string; vorname: string; nachname: string; geburtsdatum: string | null };
 type GearLesson = {
   id: string;
   student_id: string;
@@ -62,7 +63,7 @@ const Schaltstunden = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, vorname, nachname")
+        .select("id, vorname, nachname, geburtsdatum")
         .order("nachname");
       if (error) throw error;
       return data ?? [];
@@ -131,7 +132,7 @@ const Schaltstunden = () => {
   };
 
   const studentMap = Object.fromEntries(
-    students.map((s) => [s.id, `${s.vorname} ${s.nachname}`])
+    students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])
   );
 
   // Einheiten gesamt
@@ -192,7 +193,7 @@ const Schaltstunden = () => {
                     <SelectContent>
                       {students.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
-                          {s.vorname} {s.nachname}
+                          {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -296,7 +297,7 @@ const Schaltstunden = () => {
             <SelectItem value="all">Alle Schüler</SelectItem>
             {students.map((s) => (
               <SelectItem key={s.id} value={s.id}>
-                {s.vorname} {s.nachname}
+                {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
               </SelectItem>
             ))}
           </SelectContent>

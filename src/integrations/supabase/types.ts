@@ -298,6 +298,7 @@ export type Database = {
           email: string | null
           fahrschule: string
           fuehrerscheinklasse: Database["public"]["Enums"]["fuehrerscheinklasse_enum"]
+          geburtsdatum: string | null
           id: string
           ist_umschreiber: boolean
           nachname: string
@@ -311,6 +312,7 @@ export type Database = {
           email?: string | null
           fahrschule?: string
           fuehrerscheinklasse: Database["public"]["Enums"]["fuehrerscheinklasse_enum"]
+          geburtsdatum?: string | null
           id?: string
           ist_umschreiber?: boolean
           nachname: string
@@ -324,6 +326,7 @@ export type Database = {
           email?: string | null
           fahrschule?: string
           fuehrerscheinklasse?: Database["public"]["Enums"]["fuehrerscheinklasse_enum"]
+          geburtsdatum?: string | null
           id?: string
           ist_umschreiber?: boolean
           nachname?: string

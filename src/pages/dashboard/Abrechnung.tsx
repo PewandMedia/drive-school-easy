@@ -1,4 +1,5 @@
 import { Receipt, TrendingUp, Wallet, AlertCircle } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import PageHeader from "@/components/PageHeader";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -169,7 +170,7 @@ const Abrechnung = () => {
                     onClick={() => navigate(`/dashboard/fahrschueler/${s.id}`)}
                   >
                     <TableCell className="font-medium">
-                      {s.nachname}, {s.vorname}
+                      {formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)}
                     </TableCell>
                     <TableCell>
                       <span className="text-xs font-semibold text-muted-foreground">
