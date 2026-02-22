@@ -71,31 +71,37 @@ const Schaltstunden = () => {
   const [form, setForm] = useState(defaultForm);
   const [filterStudentId, setFilterStudentId] = useState<string>("all");
 
-  // Students
+  // Nur B197-Schüler laden (datenbankseitig gefiltert)
   const { data: students = [] } = useQuery<Student[]>({
-    queryKey: ["students"],
+    queryKey: ["students", "b197"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
         .select("id, vorname, nachname, geburtsdatum")
+        .eq("fuehrerscheinklasse", "B197")
         .order("nachname");
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  // Schaltwagen-Fahrstunden aus driving_lessons
+  const b197StudentIds = students.map((s) => s.id);
+
+  // Schaltwagen-Fahrstunden nur für B197-Schüler
   const { data: lessons = [] } = useQuery<SchaltstundeRow[]>({
-    queryKey: ["driving_lessons", "schaltwagen"],
+    queryKey: ["driving_lessons", "schaltwagen", "b197", b197StudentIds],
     queryFn: async () => {
+      if (b197StudentIds.length === 0) return [];
       const { data, error } = await supabase
         .from("driving_lessons")
         .select("id, student_id, datum, dauer_minuten, einheiten, typ")
         .eq("fahrzeug_typ", "schaltwagen")
+        .in("student_id", b197StudentIds)
         .order("datum", { ascending: false });
       if (error) throw error;
       return (data ?? []) as SchaltstundeRow[];
     },
+    enabled: b197StudentIds.length > 0,
   });
 
   // Insert mutation – legt driving_lesson mit fahrzeug_typ=schaltwagen an
@@ -182,7 +188,7 @@ const Schaltstunden = () => {
     <div className="space-y-6">
       <PageHeader
         title="Schaltstunden"
-        description="Schaltstunden (Klasse A/manuelle Fahrzeuge) verwalten"
+        description="Schaltstunden für B197-Schüler (10 Pflichteinheiten)"
         icon={ToggleLeft}
         action={
           <Dialog open={open} onOpenChange={setOpen}>
