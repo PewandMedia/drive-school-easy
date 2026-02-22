@@ -1,71 +1,63 @@
 
 
-## Fahrschule-Feld fuer Schueler hinzufuegen
+## Dashboard-Uebersicht mit echten Daten verknuepfen
 
 ### Uebersicht
-Ein neues Pflichtfeld "Fahrschule" wird zur Schueler-Verwaltung hinzugefuegt, damit jeder Schueler einer der zwei Filialen zugeordnet werden kann. Zusaetzlich wird ein Filter in der Schuelerliste eingefuegt.
+Die statische Dashboard-Uebersicht wird durch eine dynamische Version ersetzt, die echte Daten aus der Datenbank laedt und die wichtigsten Kennzahlen auf einen Blick zeigt.
 
-### 1. Datenbank-Migration
+### Aenderungen in `src/pages/dashboard/Dashboard.tsx`
 
-Neue Spalte `fahrschule` in der Tabelle `students`:
-- Typ: `text`, NOT NULL, Default: `'riemke'`
-- Erlaubte Werte: `'riemke'` und `'rathaus'`
+**1. Daten laden via `useQuery` (gleiche Queries wie in Abrechnung.tsx)**
+- `students` -- alle Schueler (Anzahl aktiver Schueler)
+- `driving_lessons` -- alle Fahrstunden (heutige zaehlen, Umsatz berechnen)
+- `exams` -- alle Pruefungen (diesen Monat zaehlen)
+- `theory_sessions` -- alle Theorie-Einheiten (aktive zaehlen)
+- `services` -- alle Leistungen (fuer Saldo-Berechnung)
+- `payments` -- alle Zahlungen (fuer offene Zahlungen / Saldo)
 
-```sql
-ALTER TABLE students
-ADD COLUMN fahrschule text NOT NULL DEFAULT 'riemke';
-```
+**2. KPI-Karten (oben) -- 6 Karten mit Echtdaten**
 
-Der Default-Wert stellt sicher, dass bestehende Schueler keinen Fehler verursachen.
+| Karte | Berechnung |
+|-------|-----------|
+| Aktive Fahrschueler | `students.length` (Gesamtzahl) |
+| Fahrstunden heute | Fahrstunden mit `datum = heute` zaehlen |
+| Offene Zahlungen | Gesamtsaldo: Summe(Fahrstunden + Pruefungen + Leistungen) - Summe(Zahlungen), formatiert als EUR |
+| Pruefungen diesen Monat | Pruefungen mit `datum` im aktuellen Monat zaehlen |
+| Theoriestunden gesamt | `theory_sessions.length` |
+| Umsatz (Monat) | Summe der Zahlungen mit `datum` im aktuellen Monat, formatiert als EUR |
 
-### 2. Aenderungen in `src/pages/dashboard/Fahrschueler.tsx`
+**3. "Letzte Aktivitaeten" -- die 5 neuesten Eintraege ueber alle Tabellen**
+- Fahrstunden, Pruefungen, Leistungen und Zahlungen werden nach `created_at` sortiert
+- Jeder Eintrag zeigt: Typ-Icon, Schueler-Name, Beschreibung, Datum
+- Beispiel: "Fahrstunde -- Mustermann, Max -- Uebungsstunde 45 Min -- 20.02.2026"
 
-**Neues Formularfeld im "Neuer Schueler"-Dialog:**
-- Select-Dropdown "Fahrschule *" mit zwei Optionen:
-  - "Miro-Drive (Riemke Markt)" (Wert: `riemke`)
-  - "Miro-Drive (Rathaus)" (Wert: `rathaus`)
-- Platzierung: nach Fuehrerscheinklasse, vor Adresse
-- Default-Wert im Formular: `riemke`
+**4. "Naechste Pruefungen" -- kommende Pruefungen (Datum >= heute)**
+- Aus `exams` alle mit `datum >= heute` selektieren, nach Datum sortiert, max. 5
+- Zeigt: Schueler-Name, Pruefungstyp (Theorie/Praxis), Datum
+- Falls keine: "Keine Pruefungen geplant."
 
-**Filter in der Schuelerliste:**
-- Neuer `useState` fuer `filterFahrschule` mit Optionen: "Alle", "Riemke Markt", "Rathaus"
-- Filter-Buttons oder Select neben der Suchleiste
-- Die gefilterte Liste beruecksichtigt sowohl Suchtext als auch Fahrschul-Filter
+**5. Neuer Bereich: "Schueler mit offenem Saldo" (Top 5)**
+- Die 5 Schueler mit dem hoechsten offenen Saldo
+- Zeigt: Name, Saldo-Betrag als Badge (Amber), klickbar zum Schueler-Profil
+- Nutzt `useNavigate` fuer Navigation
 
-**Anzeige in der Tabelle:**
-- Neue Spalte "Fahrschule" im Table-Header
-- Badge-Anzeige pro Zeile: "Riemke Markt" oder "Rathaus"
+### Layout-Struktur
 
-**Student-Type erweitern:**
-- `fahrschule: string` zum lokalen `Student`-Type hinzufuegen
-
-**Insert-Mutation erweitern:**
-- `fahrschule: values.fahrschule` in den Insert aufnehmen
-
-**defaultForm erweitern:**
-- `fahrschule: "riemke"` als neues Feld
-
-### 3. Aenderungen in `src/pages/dashboard/FahrschuelerDetail.tsx`
-
-- Fahrschule im Profil-Header anzeigen (z.B. als Badge neben Fuehrerscheinklasse)
-- Label-Mapping: `riemke` -> "Miro-Drive (Riemke Markt)", `rathaus` -> "Miro-Drive (Rathaus)"
-
-### Visuelles Ergebnis
-
-**Schuelerliste mit Filter:**
 ```text
-[Suche...]     [Alle | Riemke Markt | Rathaus]     12 Schueler
+[KPI-Karte 1]  [KPI-Karte 2]  [KPI-Karte 3]
+[KPI-Karte 4]  [KPI-Karte 5]  [KPI-Karte 6]
 
-Name          | Klasse | Fahrschule     | Umschreiber | Saldo
-Mustermann, M | B      | Riemke Markt   | -           | 482,00 EUR
+[Letzte Aktivitaeten (5)]    [Naechste Pruefungen (5)]
+
+[Schueler mit offenem Saldo (Top 5)]
 ```
 
-**Neuer-Schueler-Dialog (neues Feld):**
-```text
-Telefon              Fuehrerscheinklasse *
-[+49...]             [Klasse B v]
+### Technische Details
 
-Fahrschule *
-[Miro-Drive (Riemke Markt) v]
-```
+- Imports: `useQuery` aus `@tanstack/react-query`, `supabase` aus Client, `useNavigate` aus react-router-dom, `format` aus `date-fns`
+- Waehrungsformatierung: `toLocaleString("de-DE", { style: "currency", currency: "EUR" })`
+- Datumsvergleiche: `date-fns` fuer "heute", "aktueller Monat", "Datum >= heute"
+- Schueler-Name wird ueber eine Map (ID -> Name) aufgeloest fuer die Aktivitaeten-/Pruefungslisten
+- Alle Karten bleiben im bestehenden Design (rounded-xl, border-border, bg-card)
+- Klick auf "Schueler mit offenem Saldo"-Zeilen navigiert zu `/dashboard/fahrschueler/:id`
 
