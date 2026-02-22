@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,7 +42,7 @@ type Payment = {
   betrag: number;
   zahlungsart: Zahlungsart;
   datum: string;
-  students: { vorname: string; nachname: string } | null;
+  students: { vorname: string; nachname: string; geburtsdatum: string | null } | null;
 };
 
 type PaymentForm = {
@@ -89,7 +90,7 @@ const Zahlungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
-        .select("*, students(vorname, nachname)")
+        .select("*, students(vorname, nachname, geburtsdatum)")
         .order("datum", { ascending: false });
       if (error) throw error;
       return data as Payment[];
@@ -101,7 +102,7 @@ const Zahlungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, vorname, nachname")
+        .select("id, vorname, nachname, geburtsdatum")
         .order("nachname");
       if (error) throw error;
       return data ?? [];
@@ -256,7 +257,7 @@ const Zahlungen = () => {
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">
-                      {st ? `${st.nachname}, ${st.vorname}` : "–"}
+                      {st ? formatStudentName(st.nachname, st.vorname, st.geburtsdatum) : "–"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {format(new Date(p.datum), "dd.MM.yyyy", { locale: de })}
@@ -310,7 +311,7 @@ const Zahlungen = () => {
                 <SelectContent>
                   {students.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.nachname}, {s.vorname}
+                      {formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)}
                     </SelectItem>
                   ))}
                 </SelectContent>

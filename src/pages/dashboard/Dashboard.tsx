@@ -1,4 +1,5 @@
 import { Users, Car, CreditCard, ClipboardCheck, BookOpen, TrendingUp } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +16,7 @@ const Dashboard = () => {
   const { data: students = [] } = useQuery({
     queryKey: ["dashboard-students"],
     queryFn: async () => {
-      const { data } = await supabase.from("students").select("id, vorname, nachname").order("nachname");
+      const { data } = await supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname");
       return data ?? [];
     },
   });
@@ -61,7 +62,7 @@ const Dashboard = () => {
   });
 
   // Student name map
-  const nameMap = new Map(students.map((s) => [s.id, `${s.nachname}, ${s.vorname}`]));
+  const nameMap = new Map(students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)]));
 
   // KPIs
   const lessonsToday = drivingLessons.filter((l) => isToday(new Date(l.datum))).length;
@@ -225,7 +226,7 @@ const Dashboard = () => {
                 onClick={() => navigate(`/dashboard/fahrschueler/${s.id}`)}
                 className="flex items-center justify-between text-sm cursor-pointer hover:bg-secondary/50 rounded-lg px-2 py-1.5 transition-colors"
               >
-                <span className="text-foreground">{s.nachname}, {s.vorname}</span>
+                <span className="text-foreground">{formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)}</span>
                 <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30">
                   {fmt(s.saldo)}
                 </Badge>

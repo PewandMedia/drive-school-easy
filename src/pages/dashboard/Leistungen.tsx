@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListChecks, Plus, ChevronRight, Search } from "lucide-react";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +21,7 @@ type Service = {
   bezeichnung: string;
   preis: number;
   status: ServiceStatus;
-  students: { vorname: string; nachname: string } | null;
+  students: { vorname: string; nachname: string; geburtsdatum: string | null } | null;
 };
 
 type Price = {
@@ -36,6 +37,7 @@ type Student = {
   id: string;
   vorname: string;
   nachname: string;
+  geburtsdatum: string | null;
 };
 
 const statusConfig: Record<ServiceStatus, { label: string; className: string }> = {
@@ -67,7 +69,7 @@ const Leistungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("services")
-        .select("*, students(vorname, nachname)")
+        .select("*, students(vorname, nachname, geburtsdatum)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Service[];
@@ -95,7 +97,7 @@ const Leistungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, vorname, nachname")
+        .select("id, vorname, nachname, geburtsdatum")
         .order("nachname");
       if (error) throw error;
       return data as Student[];
@@ -252,7 +254,7 @@ const Leistungen = () => {
       ) : (
         Object.entries(grouped).map(([studentId, items]) => {
           const student = items[0].students;
-          const studentName = student ? `${student.nachname}, ${student.vorname}` : "Unbekannt";
+          const studentName = student ? formatStudentName(student.nachname, student.vorname, student.geburtsdatum) : "Unbekannt";
           const saldo = items.filter((s) => s.status === "offen").reduce((sum, s) => sum + Number(s.preis), 0);
 
           return (
@@ -338,7 +340,7 @@ const Leistungen = () => {
                 <SelectContent>
                   {students.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.nachname}, {s.vorname}
+                      {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
                     </SelectItem>
                   ))}
                 </SelectContent>

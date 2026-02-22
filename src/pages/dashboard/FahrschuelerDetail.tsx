@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -565,6 +565,14 @@ const FahrschuelerDetail = () => {
                 Angemeldet {format(new Date(student.created_at), "dd. MMMM yyyy", { locale: de })}
               </span>
             </div>
+            {(student as any).geburtsdatum && (
+              <div className="flex items-center gap-3 text-sm">
+                <Cake className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-foreground">
+                  Geb. {format(new Date((student as any).geburtsdatum), "dd.MM.yyyy")}
+                </span>
+              </div>
+            )}
           </div>
 
           {(!student.email && !student.telefon && !student.adresse) && (

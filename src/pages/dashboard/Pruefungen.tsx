@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { formatStudentName } from "@/lib/formatStudentName";
 import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,7 @@ const Pruefungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("exams")
-        .select("*, students(vorname, nachname, fuehrerscheinklasse)")
+        .select("*, students(vorname, nachname, fuehrerscheinklasse, geburtsdatum)")
         .order("datum", { ascending: false });
       if (error) throw error;
       return data;
@@ -79,7 +80,7 @@ const Pruefungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("students")
-        .select("id, vorname, nachname, fuehrerscheinklasse")
+        .select("id, vorname, nachname, fuehrerscheinklasse, geburtsdatum")
         .order("nachname");
       if (error) throw error;
       return data;
@@ -263,12 +264,12 @@ const Pruefungen = () => {
         ) : (
           <div className="divide-y divide-border/50">
             {filtered.map((exam) => {
-              const st = exam.students as { vorname: string; nachname: string; fuehrerscheinklasse: string } | null;
+              const st = exam.students as { vorname: string; nachname: string; fuehrerscheinklasse: string; geburtsdatum: string | null } | null;
               return (
                 <div key={exam.id} className="grid grid-cols-6 gap-4 px-5 py-3 items-center text-sm">
                   <div className="col-span-2">
                     <span className="font-medium text-foreground">
-                      {st ? `${st.nachname}, ${st.vorname}` : "–"}
+                      {st ? formatStudentName(st.nachname, st.vorname, st.geburtsdatum) : "–"}
                     </span>
                     {st && (
                       <span className="ml-2 text-xs text-muted-foreground">Kl. {st.fuehrerscheinklasse}</span>
@@ -320,7 +321,7 @@ const Pruefungen = () => {
                 <SelectContent>
                   {students.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.nachname}, {s.vorname} – Kl. {s.fuehrerscheinklasse}
+                      {formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)} – Kl. {s.fuehrerscheinklasse}
                     </SelectItem>
                   ))}
                 </SelectContent>
