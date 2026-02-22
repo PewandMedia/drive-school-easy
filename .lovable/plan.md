@@ -1,60 +1,38 @@
 
-
-## Fehlstunden vom Lernfortschritt ausschliessen
+## Geburtsdatum-Feld: Texteingabe + Kalender kombinieren
 
 ### Uebersicht
-Fahrstunden vom Typ `fehlstunde` bleiben als Eintraege sichtbar und werden weiterhin bepreist (Abrechnung unveraendert). Sie werden jedoch aus allen Fortschritts-/Statistik-Berechnungen ausgeschlossen.
+Das Geburtsdatum-Feld im "Neuer Fahrschueler"-Modal wird so umgebaut, dass man das Datum direkt eintippen kann (Format TT.MM.JJJJ) UND optional ueber das Kalender-Icon einen Kalender oeffnen kann.
 
-### Betroffene Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`
+### Aenderung in `src/pages/dashboard/Fahrschueler.tsx` (Zeilen 370-397)
 
-Dies ist die Hauptdatei mit Fortschrittsanzeigen. Drei Stellen muessen angepasst werden:
+Das bisherige Popover-Button-Feld wird ersetzt durch eine Kombination aus:
+- Einem **Input-Feld** mit Placeholder `TT.MM.JJJJ` zum direkten Eintippen
+- Einem **Kalender-Icon-Button** links im Input, der bei Klick den Kalender-Popover oeffnet
 
-**1. `gesamtEinheiten` (Zeile 380)**
-Aktuell: Zaehlt ALLE Lessons inkl. Fehlstunden.
-Neu: Fehlstunden ausfiltern.
-
-```
-// Vorher
-const gesamtEinheiten = lessons.reduce((s, l) => s + (l.einheiten || 1), 0);
-
-// Nachher
-const gesamtEinheiten = lessons
-  .filter((l) => l.typ !== "fehlstunde")
-  .reduce((s, l) => s + (l.einheiten || 1), 0);
-```
-
-**2. `uebungsstundenEinheiten` (Zeile 376-378)**
-Aktuell: Filtert bereits auf `typ === "uebungsstunde"` -- bereits korrekt, keine Aenderung noetig.
-
-**3. `sonderCounts` (Zeile 370-374)**
-Aktuell: Filtert auf spezifische Typen (ueberland/autobahn/nacht) -- bereits korrekt, keine Aenderung noetig.
-
-### Betroffene Datei: `src/pages/dashboard/Fahrstunden.tsx`
-
-Die Statistik-Karten oben auf der Seite zeigen "Einheiten gesamt". Diese sollen Fehlstunden ebenfalls ausschliessen:
-
-**Einheiten-Statistik (ca. Zeile 300)**
-```
-// Vorher
-filtered.reduce((s, l) => s + (l.einheiten ?? Math.floor(l.dauer_minuten / 45)), 0)
-
-// Nachher
-filtered.filter(l => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten ?? Math.floor(l.dauer_minuten / 45)), 0)
+**Aufbau:**
+```text
++--------------------------------------+
+| [Kalender-Icon] | 15.03.1999         |
++--------------------------------------+
+         |
+         v (nur bei Klick auf Icon)
+  +------------------+
+  |    Kalender       |
+  +------------------+
 ```
 
-**Gesamtumsatz und Durchschnittsdauer** bleiben unveraendert (Abrechnung wie gewuenscht beibehalten).
+**Technische Details:**
 
-### Nicht betroffene Dateien
-- `Dashboard.tsx`: Zeigt nur Umsatz/Aktivitaeten, keine Fortschrittsbalken -- bleibt unveraendert
-- `Abrechnung.tsx`: Reine Abrechnungsdaten -- bleibt unveraendert
-- `FahrlehrerStatistik.tsx`: Basiert auf Pruefungen, nicht Fahrstunden -- bleibt unveraendert
-- `Auswertung.tsx`: Noch Platzhalter -- bleibt unveraendert
+1. Ein `Input`-Feld mit `placeholder="TT.MM.JJJJ"` zeigt den formatierten Datumswert oder ist leer
+2. Das Kalender-Icon links im Input ist in einen Popover-Trigger eingebettet
+3. Bei manueller Eingabe: `onChange`-Handler parst den eingegebenen Text im Format `dd.MM.yyyy` mit `date-fns/parse` und setzt `form.geburtsdatum` wenn gueltig
+4. Bei Kalender-Auswahl: wie bisher, `onSelect` setzt das Datum und schliesst den Popover
+5. Eingabevalidierung: Ungueltige Daten werden nicht uebernommen, das Feld bleibt aber editierbar (kein Fehler beim Tippen, erst beim Absenden)
 
-### Zusammenfassung der Aenderungen
+**Neuer State:**
+- `geburtsdatumText: string` -- haelt den aktuellen Textinhalt des Inputs (damit man frei tippen kann ohne sofortige Validierung)
+- Synchronisation: Kalenderauswahl setzt sowohl `geburtsdatum` als auch `geburtsdatumText`; Texteingabe setzt `geburtsdatumText` sofort und `geburtsdatum` nur wenn gueltig geparst
 
-| Datei | Was | Aenderung |
-|-------|-----|-----------|
-| `FahrschuelerDetail.tsx` | `gesamtEinheiten` | `.filter(l => l.typ !== "fehlstunde")` hinzufuegen |
-| `Fahrstunden.tsx` | Einheiten-Statistik-Karte | `.filter(l => l.typ !== "fehlstunde")` hinzufuegen |
-
-Nur 2 Zeilen in 2 Dateien muessen geaendert werden.
+### Keine weiteren Dateien betroffen
+Die Aenderung ist auf das Geburtsdatum-Feld im "Neuer Fahrschueler"-Dialog in `Fahrschueler.tsx` beschraenkt.
