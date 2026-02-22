@@ -89,7 +89,7 @@ const defaultForm = {
   typ: "uebungsstunde" as DrivingLessonTyp,
   fahrzeug_typ: "automatik" as FahrzeugTyp,
   vehicle_id: "",
-  dauer_minuten: 45,
+  dauer_minuten: 0,
   datum: new Date().toISOString().slice(0, 16),
 };
 
@@ -258,6 +258,10 @@ const Fahrstunden = () => {
     e.preventDefault();
     if (!form.student_id) {
       toast({ title: "Bitte einen Schüler auswählen", variant: "destructive" });
+      return;
+    }
+    if (form.dauer_minuten <= 0) {
+      toast({ title: "Bitte eine Dauer eingeben", variant: "destructive" });
       return;
     }
     insertMutation.mutate(form);
@@ -435,13 +439,14 @@ const Fahrstunden = () => {
                     ))}
                     <Input
                       type="number"
-                      min={1}
+                      min={0}
                       className="w-24"
-                      value={form.dauer_minuten}
+                      value={form.dauer_minuten || ""}
+                      placeholder="0"
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          dauer_minuten: parseInt(e.target.value) || 45,
+                          dauer_minuten: parseInt(e.target.value) || 0,
                         }))
                       }
                     />
@@ -454,7 +459,7 @@ const Fahrstunden = () => {
                     Berechneter Preis
                   </span>
                   <span className="font-semibold text-foreground text-lg">
-                    {previewPrice.toFixed(2)} €
+                    {form.dauer_minuten > 0 ? `${previewPrice.toFixed(2)} €` : "–"}
                   </span>
                 </div>
 
