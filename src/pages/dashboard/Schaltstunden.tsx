@@ -36,16 +36,30 @@ import { useToast } from "@/hooks/use-toast";
 const DAUER_OPTIONS = [45, 90, 135];
 const SCHALTSTUNDEN_PFLICHT = 10;
 
+const TYP_LABELS: Record<string, string> = {
+  uebungsstunde: "Übungsstunde",
+  ueberland: "Überlandfahrt",
+  autobahn: "Autobahnfahrt",
+  nacht: "Nachtfahrt",
+  fehlstunde: "Fehlstunde",
+  testfahrt_b197: "Testfahrt B197",
+};
+
+type DrivingLessonTyp = "uebungsstunde" | "ueberland" | "autobahn" | "nacht" | "fehlstunde" | "testfahrt_b197";
+
 type Student = { id: string; vorname: string; nachname: string; geburtsdatum: string | null };
-type GearLesson = {
+type SchaltstundeRow = {
   id: string;
   student_id: string;
   datum: string;
   dauer_minuten: number;
+  einheiten: number;
+  typ: string;
 };
 
 const defaultForm = {
   student_id: "",
+  typ: "uebungsstunde" as DrivingLessonTyp,
   dauer_minuten: 45,
   datum: new Date().toISOString().slice(0, 16),
 };
@@ -70,32 +84,34 @@ const Schaltstunden = () => {
     },
   });
 
-  // Gear lessons
-  const { data: lessons = [] } = useQuery<GearLesson[]>({
-    queryKey: ["gear_lessons"],
+  // Schaltwagen-Fahrstunden aus driving_lessons
+  const { data: lessons = [] } = useQuery<SchaltstundeRow[]>({
+    queryKey: ["driving_lessons", "schaltwagen"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("gear_lessons")
-        .select("id, student_id, datum, dauer_minuten")
+        .from("driving_lessons")
+        .select("id, student_id, datum, dauer_minuten, einheiten, typ")
+        .eq("fahrzeug_typ", "schaltwagen")
         .order("datum", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as GearLesson[];
+      return (data ?? []) as SchaltstundeRow[];
     },
   });
 
-  // Insert mutation
+  // Insert mutation – legt driving_lesson mit fahrzeug_typ=schaltwagen an
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
-      const { error } = await supabase.from("gear_lessons").insert({
+      const { error } = await supabase.from("driving_lessons").insert({
         student_id: values.student_id,
-        datum: new Date(values.datum).toISOString(),
+        typ: values.typ,
+        fahrzeug_typ: "schaltwagen" as const,
         dauer_minuten: values.dauer_minuten,
+        datum: new Date(values.datum).toISOString(),
       });
       if (error) throw error;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["gear_lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["gear_lessons", variables.student_id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       setForm(defaultForm);
       setOpen(false);
       toast({ title: "Schaltstunde gespeichert" });
@@ -105,16 +121,14 @@ const Schaltstunden = () => {
     },
   });
 
-  // Delete mutation
+  // Delete mutation – löscht aus driving_lessons
   const deleteMutation = useMutation({
-    mutationFn: async ({ id, student_id }: { id: string; student_id: string }) => {
-      const { error } = await supabase.from("gear_lessons").delete().eq("id", id);
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("driving_lessons").delete().eq("id", id);
       if (error) throw error;
-      return student_id;
     },
-    onSuccess: (student_id) => {
-      queryClient.invalidateQueries({ queryKey: ["gear_lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["gear_lessons", student_id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       toast({ title: "Schaltstunde gelöscht" });
     },
     onError: (e: Error) => {
@@ -135,9 +149,12 @@ const Schaltstunden = () => {
     students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])
   );
 
-  // Einheiten gesamt
-  const totalEinheiten = lessons.reduce(
-    (sum, l) => sum + Math.floor(l.dauer_minuten / 45), 0
+  // Nur Nicht-Fehlstunden für Statistiken
+  const statsLessons = lessons.filter((l) => l.typ !== "fehlstunde");
+
+  // Einheiten gesamt (aus einheiten-Feld)
+  const totalEinheiten = statsLessons.reduce(
+    (sum, l) => sum + (l.einheiten || Math.floor(l.dauer_minuten / 45)), 0
   );
 
   // Filter
@@ -146,16 +163,16 @@ const Schaltstunden = () => {
       ? lessons
       : lessons.filter((l) => l.student_id === filterStudentId);
 
-  // Stats
+  // Ø Dauer (alle Schaltwagen-Fahrstunden)
   const avgDauer =
     lessons.length > 0
       ? Math.round(lessons.reduce((s, l) => s + l.dauer_minuten, 0) / lessons.length)
       : 0;
 
-  // Einheiten pro Schüler summieren
+  // Einheiten pro Schüler (ohne Fehlstunden)
   const einheitenPerStudent: Record<string, number> = {};
-  for (const l of lessons) {
-    einheitenPerStudent[l.student_id] = (einheitenPerStudent[l.student_id] ?? 0) + Math.floor(l.dauer_minuten / 45);
+  for (const l of statsLessons) {
+    einheitenPerStudent[l.student_id] = (einheitenPerStudent[l.student_id] ?? 0) + (l.einheiten || Math.floor(l.dauer_minuten / 45));
   }
 
   const studentsCompleted = Object.values(einheitenPerStudent)
@@ -194,6 +211,26 @@ const Schaltstunden = () => {
                       {students.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
                           {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Typ */}
+                <div className="space-y-1.5">
+                  <Label>Typ</Label>
+                  <Select
+                    value={form.typ}
+                    onValueChange={(v) => setForm((f) => ({ ...f, typ: v as DrivingLessonTyp }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(["uebungsstunde", "ueberland", "autobahn", "nacht", "testfahrt_b197"] as const).map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {TYP_LABELS[t]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -319,6 +356,7 @@ const Schaltstunden = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Schüler</TableHead>
+              <TableHead>Typ</TableHead>
               <TableHead>Datum</TableHead>
               <TableHead>Dauer</TableHead>
               <TableHead>Einheit</TableHead>
@@ -328,7 +366,7 @@ const Schaltstunden = () => {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                   <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   Noch keine Schaltstunden eingetragen
                 </TableCell>
@@ -339,24 +377,20 @@ const Schaltstunden = () => {
                   <TableCell className="font-medium">
                     {studentMap[lesson.student_id] ?? "–"}
                   </TableCell>
+                  <TableCell>{TYP_LABELS[lesson.typ] ?? lesson.typ}</TableCell>
                   <TableCell>
                     {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })}
                   </TableCell>
                   <TableCell>{lesson.dauer_minuten} min</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {lesson.dauer_minuten} min ({Math.floor(lesson.dauer_minuten / 45)}E)
+                    {lesson.einheiten || Math.floor(lesson.dauer_minuten / 45)}E
                   </TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="text-muted-foreground hover:text-destructive"
-                      onClick={() =>
-                        deleteMutation.mutate({
-                          id: lesson.id,
-                          student_id: lesson.student_id,
-                        })
-                      }
+                      onClick={() => deleteMutation.mutate(lesson.id)}
                       disabled={deleteMutation.isPending}
                     >
                       <Trash2 className="h-4 w-4" />
