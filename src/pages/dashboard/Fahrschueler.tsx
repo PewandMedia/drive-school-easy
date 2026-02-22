@@ -23,12 +23,18 @@ type Student = {
   fuehrerscheinklasse: "B" | "B78" | "B197";
   ist_umschreiber: boolean;
   status: string | null;
+  fahrschule: string;
 };
 
 const klasseColors: Record<string, string> = {
   B: "bg-blue-500/15 text-blue-400 border-blue-500/30",
   B78: "bg-purple-500/15 text-purple-400 border-purple-500/30",
   B197: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+};
+
+const FAHRSCHULE_LABELS: Record<string, string> = {
+  riemke: "Riemke Markt",
+  rathaus: "Rathaus",
 };
 
 const defaultForm = {
@@ -38,6 +44,7 @@ const defaultForm = {
   telefon: "",
   adresse: "",
   fuehrerscheinklasse: "B" as "B" | "B78" | "B197",
+  fahrschule: "riemke",
   ist_umschreiber: false,
   status: "",
 };
@@ -46,6 +53,7 @@ const Fahrschueler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
@@ -126,6 +134,7 @@ const Fahrschueler = () => {
           telefon: values.telefon || null,
           adresse: values.adresse || null,
           fuehrerscheinklasse: values.fuehrerscheinklasse,
+          fahrschule: values.fahrschule,
           ist_umschreiber: values.ist_umschreiber,
           status: values.status || null,
         },
@@ -144,6 +153,7 @@ const Fahrschueler = () => {
   });
 
   const filtered = students.filter((s) => {
+    if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
     const q = search.toLowerCase();
     return (
       s.vorname.toLowerCase().includes(q) ||
@@ -177,8 +187,8 @@ const Fahrschueler = () => {
         }
       />
 
-      {/* Search */}
-      <div className="flex gap-3">
+      {/* Search + Filter */}
+      <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -188,6 +198,17 @@ const Fahrschueler = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+          {([["alle", "Alle"], ["riemke", "Riemke Markt"], ["rathaus", "Rathaus"]] as const).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setFilterFahrschule(val)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filterFahrschule === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="ml-auto flex items-center text-sm text-muted-foreground">
           {filtered.length} Schüler
         </div>
@@ -196,11 +217,12 @@ const Fahrschueler = () => {
       {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         {/* Header */}
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <button className="flex items-center gap-1 text-left hover:text-foreground transition-colors">
             Name <ArrowUpDown className="h-3 w-3" />
           </button>
           <span>Klasse</span>
+          <span>Fahrschule</span>
           <span>Umschreiber</span>
           <span>Saldo</span>
           <span />
@@ -237,7 +259,7 @@ const Fahrschueler = () => {
               <button
                 key={student.id}
                 onClick={() => navigate(`/dashboard/fahrschueler/${student.id}`)}
-                className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
+                className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
               >
                 {/* Name */}
                 <div className="min-w-0">
@@ -256,6 +278,13 @@ const Fahrschueler = () => {
                   >
                     Klasse {student.fuehrerscheinklasse}
                   </span>
+                </div>
+
+                {/* Fahrschule */}
+                <div>
+                  <Badge variant="outline" className="text-xs font-medium">
+                    {FAHRSCHULE_LABELS[student.fahrschule] || student.fahrschule}
+                  </Badge>
                 </div>
 
                 {/* Umschreiber */}
@@ -355,6 +384,21 @@ const Fahrschueler = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Fahrschule *</Label>
+              <Select
+                value={form.fahrschule}
+                onValueChange={(v) => setForm({ ...form, fahrschule: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="riemke">Miro-Drive (Riemke Markt)</SelectItem>
+                  <SelectItem value="rathaus">Miro-Drive (Rathaus)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="adresse">Adresse</Label>
