@@ -1,70 +1,50 @@
 
-## Schaltstunden als abgeleitete Ansicht aus Fahrstunden
+## Schaltstunden nur fuer B197-Schueler
 
 ### Uebersicht
-Statt einer separaten `gear_lessons`-Tabelle werden Schaltstunden direkt aus `driving_lessons` abgeleitet: Jede Fahrstunde mit `fahrzeug_typ = 'schaltwagen'` und `typ != 'fehlstunde'` zaehlt automatisch als Schaltstunde. Die separate Erfassung entfaellt.
+Der Schaltstunden-Bereich wird so eingeschraenkt, dass ausschliesslich Fahrschueler mit `fuehrerscheinklasse = 'B197'` angezeigt und beruecksichtigt werden. Keine Datenbank-Aenderungen noetig -- das Feld `fuehrerscheinklasse` existiert bereits auf der `students`-Tabelle mit den Werten B, B78, B197.
 
-### Aenderung 1: `src/pages/dashboard/Schaltstunden.tsx` (kompletter Umbau)
+### Aenderung: `src/pages/dashboard/Schaltstunden.tsx`
 
-**Datenquelle aendern:**
-- Statt `gear_lessons`-Tabelle wird `driving_lessons` abgefragt mit Filter `fahrzeug_typ = 'schaltwagen'`
-- In der UI werden nur Eintraege mit `typ != 'fehlstunde'` fuer Statistiken gezaehlt
-- Typ-Spalte wird angezeigt (Uebungsstunde, Ueberlandfahrt, etc.)
+**1. Students-Query: Nur B197 laden (Zeile 76-84)**
+- Filter `.eq("fuehrerscheinklasse", "B197")` zur Supabase-Query hinzufuegen
+- Damit werden nur B197-Schueler im Dropdown und in der Tabelle angezeigt
+- Die Filterung erfolgt datenbankseitig (nicht nur Frontend)
 
-**"Stunde planen"-Button:**
-- Oeffnet ein vereinfachtes Formular, das eine Fahrstunde mit voreingestelltem `fahrzeug_typ = 'schaltwagen'` in `driving_lessons` anlegt
-- Typ-Auswahl (Uebungsstunde, Sonderfahrten) wird angeboten
-- Insert geht in `driving_lessons` statt `gear_lessons`
+**2. Driving-Lessons-Query: Nur B197-Schueler (Zeile 88-98)**
+- Die `fuehrerscheinklasse` ist auf der `students`-Tabelle, nicht auf `driving_lessons`
+- Loesung: Erst B197-Student-IDs sammeln, dann Fahrstunden nur fuer diese IDs laden
+- Alternativ: Join ueber Supabase `.in("student_id", b197StudentIds)` Filter
 
-**Loeschen:**
-- Loescht aus `driving_lessons` statt `gear_lessons`
+**3. Statistiken (Zeilen 152-179)**
+- Bleiben unveraendert, da sie bereits auf den gefilterten Daten basieren
+- Durch die eingeschraenkte Query kommen nur B197-Schueler-Daten an
 
-**Statistiken:**
-- Einheiten gesamt: Summe der `einheiten` aus gefilterten Fahrstunden (ohne Fehlstunden)
-- Schueler abgeschlossen: basierend auf Einheiten >= 10 pro Schueler (ohne Fehlstunden)
-- Durchschnittliche Dauer: alle Schaltwagen-Fahrstunden
+**4. Modal "Stunde planen" (Zeilen 199-217)**
+- Dropdown zeigt bereits nur die geladenen `students` -- da diese jetzt auf B197 gefiltert sind, erscheinen automatisch nur B197-Schueler
 
-**Query-Keys:**
-- Werden auf `driving_lessons` umgestellt, damit Invalidierung korrekt funktioniert
+**5. Beschreibungstext aktualisieren (Zeile 185)**
+- Von "Schaltstunden (Klasse A/manuelle Fahrzeuge) verwalten" zu "Schaltstunden fuer B197-Schueler (10 Pflichteinheiten)"
 
-### Aenderung 2: `src/pages/dashboard/FahrschuelerDetail.tsx`
+### Technische Umsetzung
 
-**gear_lessons-Query entfernen (Zeilen 177-185):**
-- Die Query auf `gear_lessons` wird entfernt
-- `loadingGear` wird entfernt
+```text
+// Schritt 1: Students-Query mit B197-Filter
+students query + .eq("fuehrerscheinklasse", "B197")
 
-**Schaltstunden-Berechnung umstellen (Zeilen 394-398):**
-- `gearMinutesTotal` wird aus `lessons` (driving_lessons) berechnet:
-  ```
-  const schaltLessons = lessons.filter(
-    l => l.fahrzeug_typ === "schaltwagen" && l.typ !== "fehlstunde"
-  );
-  const gearMinutesTotal = schaltLessons.reduce(
-    (sum, l) => sum + l.dauer_minuten, 0
-  );
-  const gearHoursDone = Math.floor(gearMinutesTotal / 45);
-  ```
-
-**Schaltstunden-Erfassungs-Modal und Mutation entfernen (Zeilen 261-278):**
-- `mutSchaltstunde`, `fsSchaltstunde`, `dlgSchaltstunde` State und zugehoeriges Dialog werden entfernt
-- Stattdessen kann der bestehende Fahrstunden-Dialog genutzt werden (bereits vorhanden)
-
-**isLoading anpassen (Zeile 364):**
-- `loadingGear` aus der Bedingung entfernen
-
-### Aenderung 3: `src/pages/dashboard/Fahrstunden.tsx`
-
-Keine Aenderung noetig -- die Fahrstunden-Seite zeigt bereits alle Fahrstunden inklusive Schaltwagen.
+// Schritt 2: Driving-Lessons mit student_id-Filter
+- Query haengt von students ab (enabled: students.length > 0)
+- .in("student_id", b197StudentIds) filtert serverseitig
+```
 
 ### Zusammenfassung
 
-| Datei | Was | Aenderung |
-|-------|-----|-----------|
-| `Schaltstunden.tsx` | Datenquelle | `gear_lessons` -> `driving_lessons` mit Filter `fahrzeug_typ = 'schaltwagen'` |
-| `Schaltstunden.tsx` | Insert | Legt `driving_lessons`-Eintrag mit `fahrzeug_typ = 'schaltwagen'` an |
-| `Schaltstunden.tsx` | Statistiken | Fehlstunden ausschliessen, Einheiten aus `einheiten`-Feld |
-| `FahrschuelerDetail.tsx` | gear_lessons Query | Entfernen, stattdessen aus `lessons` (driving_lessons) ableiten |
-| `FahrschuelerDetail.tsx` | Schaltstunden-Modal | Entfernen (Fahrstunden-Modal reicht) |
-| `FahrschuelerDetail.tsx` | Progress-Berechnung | Aus `lessons` filtern statt `gearLessons` |
+| Stelle | Aenderung |
+|--------|-----------|
+| Students-Query | `.eq("fuehrerscheinklasse", "B197")` hinzufuegen |
+| Lessons-Query | `.in("student_id", b197Ids)` hinzufuegen, abhaengig von Students |
+| Beschreibung | Text auf B197 aktualisieren |
+| Statistiken | Keine Aenderung (basieren auf gefilterten Daten) |
+| Modal | Keine Aenderung (nutzt gefilterte Students-Liste) |
 
-Die `gear_lessons`-Tabelle wird nicht geloescht (keine Datenverluste), aber nicht mehr genutzt.
+Nur eine Datei betroffen: `Schaltstunden.tsx`. Alles andere (FahrschuelerDetail, Fahrstunden) bleibt unveraendert.
