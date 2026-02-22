@@ -500,7 +500,7 @@ const Fahrstunden = () => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Einheiten gesamt</p>
-            <p className="text-xl font-bold text-foreground">{filtered.reduce((s, l) => s + (l.einheiten ?? Math.floor(l.dauer_minuten / 45)), 0)}</p>
+            <p className="text-xl font-bold text-foreground">{filtered.filter(l => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten ?? Math.floor(l.dauer_minuten / 45)), 0)}</p>
           </div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">

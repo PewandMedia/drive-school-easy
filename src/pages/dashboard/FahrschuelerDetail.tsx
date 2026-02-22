@@ -377,7 +377,7 @@ const FahrschuelerDetail = () => {
     .filter((l) => l.typ === "uebungsstunde")
     .reduce((s, l) => s + (l.einheiten || 1), 0);
 
-  const gesamtEinheiten = lessons.reduce((s, l) => s + (l.einheiten || 1), 0);
+  const gesamtEinheiten = lessons.filter((l) => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten || 1), 0);
 
   const theoryCounts = {
     grundstoff: theorySessions.filter((s) => s.typ === "grundstoff").length,
