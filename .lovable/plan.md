@@ -1,92 +1,80 @@
 
 
-## Geburtsdatum-Feld fuer Fahrschueler hinzufuegen
+## Searchable Student Dropdowns (Combobox) im gesamten System
 
 ### Uebersicht
-Das Feld `geburtsdatum` (date, Pflicht) wird zur `students`-Tabelle hinzugefuegt. Ueberall im System wird der Name einheitlich als **"Nachname, Vorname (TT.MM.JJJJ)"** dargestellt -- in Listen, Dropdowns und Profilansichten.
+Alle Fahrschueler-Dropdowns werden durch eine wiederverwendbare Combobox-Komponente ersetzt, die Tippen zum Filtern unterstuetzt. Die bestehende `cmdk`-Bibliothek und die Shadcn `Command`-Komponente sind bereits installiert.
 
-### 1. Datenbank-Migration
+### 1. Neue Komponente: `src/components/StudentCombobox.tsx`
 
-```sql
-ALTER TABLE students
-ADD COLUMN geburtsdatum date;
+Eine wiederverwendbare Combobox-Komponente mit folgenden Props:
+- `students: { id, vorname, nachname, geburtsdatum }[]`
+- `value: string` (ausgewaehlte student_id)
+- `onValueChange: (id: string) => void`
+- `placeholder?: string` (Default: "Schueler auswaehlen...")
+- `allowAll?: boolean` (fuer Filter-Dropdowns mit "Alle Schueler"-Option)
+
+Technische Umsetzung:
+- Basiert auf Popover + Command (cmdk) -- gleicher Ansatz wie Shadcn Combobox-Pattern
+- Suchfeld filtert nach Name UND Geburtsdatum
+- Anzeige immer im Format `Nachname, Vorname (TT.MM.JJJJ)` via `formatStudentName`
+- `pointer-events-auto` auf dem PopoverContent damit es in Dialogen funktioniert
+- Feste `bg-popover` Hintergrundfarbe, hoher z-index
+
+```text
++------------------------------+
+| Schueler auswaehlen...   [v] |
++------------------------------+
+| [Suche tippen...]            |
+| Mustermann, Max (01.01.2000) |
+| Schmidt, Anna (15.03.1999)   |
+| ...                          |
++------------------------------+
 ```
 
-Die Spalte wird zunaechst nullable angelegt, damit bestehende Schueler keinen Fehler verursachen. Im Formular wird das Feld als Pflicht validiert.
+### 2. Aenderungen in 6 Dateien
 
-### 2. Hilfsfunktion fuer einheitliche Namensanzeige
+Jede Datei wird wie folgt angepasst:
+- Import von `StudentCombobox` statt `Select/SelectContent/SelectItem` (nur fuer Schueler-Selects)
+- Ersetzung des Schueler-Select durch `<StudentCombobox>`
+- Alle anderen Selects (Typ, Fahrzeug, Status etc.) bleiben unveraendert
 
-Eine kleine Utility-Funktion wird erstellt, die ueberall wiederverwendet wird:
+| Datei | Stellen | Typ |
+|-------|---------|-----|
+| `Fahrstunden.tsx` | 1. Filter "Alle Schueler" (Z.523-536) | Filter mit `allowAll` |
+| `Fahrstunden.tsx` | 2. Modal "Schueler" (Z.328-343) | Formular |
+| `Theorie.tsx` | 3. Modal "Schueler" | Formular |
+| `Pruefungen.tsx` | 4. Modal "Schueler" (Z.314-328) | Formular |
+| `Leistungen.tsx` | 5. Modal "Fahrschueler" (Z.336-347) | Formular |
+| `Zahlungen.tsx` | 6. Modal "Schueler" (Z.304-318) | Formular |
 
-```typescript
-// z.B. in einer Datei oder inline
-const formatStudentName = (nachname: string, vorname: string, geburtsdatum?: string | null) => {
-  if (geburtsdatum) {
-    return `${nachname}, ${vorname} (${format(new Date(geburtsdatum), "dd.MM.yyyy")})`;
-  }
-  return `${nachname}, ${vorname}`;
-};
+### 3. Technische Details
+
+**Verwendete Bibliotheken (bereits installiert):**
+- `cmdk` -- Command/Combobox-Primitive
+- `@radix-ui/react-popover` -- Popover-Container
+- `lucide-react` -- Check/ChevronsUpDown Icons
+
+**Combobox-Struktur:**
+```
+Popover
+  PopoverTrigger (Button mit aktuellem Wert oder Placeholder)
+  PopoverContent (pointer-events-auto, bg-popover, z-50)
+    Command
+      CommandInput (Suchfeld)
+      CommandList
+        CommandEmpty ("Kein Schueler gefunden")
+        CommandGroup
+          [allowAll && CommandItem "Alle Schueler"]
+          students.map -> CommandItem mit formatStudentName
 ```
 
-### 3. Aenderungen pro Datei
+**Filter-Logik:**
+- cmdk filtert automatisch ueber den angezeigten Text
+- Zusaetzlich wird `keywords` auf jedem CommandItem gesetzt (email falls vorhanden)
+- Kein Server-Side-Query noetig da Schuelerzahlen typischerweise unter 1000 liegen
 
-**`src/pages/dashboard/Fahrschueler.tsx`** -- Schuelerliste
-- Student-Type um `geburtsdatum: string | null` erweitern
-- defaultForm um `geburtsdatum: ""` erweitern
-- Datepicker-Feld "Geburtsdatum *" im Anlege-Dialog hinzufuegen
-- Validierung: Geburtsdatum darf nicht leer sein
-- Neue Spalte "Geb.-Datum" in der Tabelle (grid-cols anpassen)
-- Namensanzeige in Zeilen: `Nachname, Vorname (TT.MM.JJJJ)`
-- Insert-Mutation: `geburtsdatum` mitsenden
-
-**`src/pages/dashboard/FahrschuelerDetail.tsx`** -- Schueler-Profil
-- Geburtsdatum im Profil-Header anzeigen (neben E-Mail, Telefon etc.)
-- Name im Header: `Nachname, Vorname`
-- Geburtsdatum als eigenes Info-Feld mit Calendar-Icon
-
-**`src/pages/dashboard/Fahrstunden.tsx`** -- Fahrstunden-Seite
-- Schueler-Query um `geburtsdatum` erweitern
-- Dropdown: `Nachname, Vorname (TT.MM.JJJJ)`
-- Tabellen-Anzeige: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Pruefungen.tsx`** -- Pruefungen
-- `students(vorname, nachname, fuehrerscheinklasse)` um `geburtsdatum` erweitern
-- Schueler-Dropdown und Tabelle: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Leistungen.tsx`** -- Leistungen
-- `students(vorname, nachname)` um `geburtsdatum` erweitern
-- Schueler-Dropdown und gruppierte Ansicht: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Zahlungen.tsx`** -- Zahlungen
-- `students(vorname, nachname)` um `geburtsdatum` erweitern
-- Schueler-Dropdown und Tabelle: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Theorie.tsx`** -- Theorie
-- Schueler-Query um `geburtsdatum` erweitern
-- studentMap und Dropdowns: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Schaltstunden.tsx`** -- Schaltstunden
-- Schueler-Query um `geburtsdatum` erweitern
-- studentMap und Dropdowns: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Abrechnung.tsx`** -- Abrechnung
-- Name in der Tabelle: `Nachname, Vorname (TT.MM.JJJJ)`
-
-**`src/pages/dashboard/Dashboard.tsx`** -- Dashboard-Uebersicht
-- nameMap und Saldo-Liste: `Nachname, Vorname (TT.MM.JJJJ)`
-
-### 4. Einheitliches Namensformat
-
-Ueberall im System gilt ab sofort:
-
-| Kontext | Format |
-|---------|--------|
-| Listen-Zeilen | Nachname, Vorname (TT.MM.JJJJ) |
-| Dropdowns / Select | Nachname, Vorname (TT.MM.JJJJ) |
-| Profil-Header | Nachname, Vorname (Geburtsdatum separat als Info-Zeile) |
-| Dashboard-Aktivitaeten | Nachname, Vorname (TT.MM.JJJJ) |
-
-### 5. Datepicker-Implementierung
-
-Im Anlege-Dialog wird ein Popover-basierter Datepicker (Shadcn Calendar) verwendet mit `pointer-events-auto` fuer korrekte Interaktion im Dialog.
+**Dialog-Kompatibilitaet:**
+- `PopoverContent` erhaelt `className="pointer-events-auto"` damit es innerhalb von Radix-Dialogen korrekt funktioniert
+- `onOpenAutoFocus={(e) => e.preventDefault()}` verhindert Fokus-Konflikte
 
