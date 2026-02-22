@@ -283,7 +283,9 @@ const Pruefungen = () => {
                     {exam.fahrzeug_typ === "automatik" ? "Automatik" : "Schaltwagen"}
                   </span>
                   <span className="text-muted-foreground">
-                    {format(new Date(exam.datum), "dd.MM.yyyy", { locale: de })}
+                    {exam.datum && !isNaN(new Date(exam.datum).getTime())
+                      ? format(new Date(exam.datum), "dd.MM.yyyy", { locale: de })
+                      : "–"}
                   </span>
                   <span
                     className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold w-fit ${statusBadge(exam.bestanden)}`}
