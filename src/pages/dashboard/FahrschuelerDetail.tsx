@@ -92,7 +92,7 @@ const FahrschuelerDetail = () => {
 
   // ── Dialog states ──
   const [dlgFahrstunde, setDlgFahrstunde] = useState(false);
-  const [dlgSchaltstunde, setDlgSchaltstunde] = useState(false);
+  // dlgSchaltstunde removed – use Fahrstunden-Dialog with fahrzeug_typ=schaltwagen
   const [dlgTheorie, setDlgTheorie] = useState(false);
   const [dlgPruefung, setDlgPruefung] = useState(false);
   const [dlgLeistung, setDlgLeistung] = useState(false);
@@ -105,10 +105,7 @@ const FahrschuelerDetail = () => {
     dauer_minuten: 45,
     datum: new Date().toISOString().slice(0, 16),
   });
-  const [fsSchaltstunde, setFsSchaltstunde] = useState({
-    dauer_minuten: 45,
-    datum: new Date().toISOString().slice(0, 16),
-  });
+  // fsSchaltstunde removed – Fahrstunden-Dialog handles schaltwagen
   const [fsTheorie, setFsTheorie] = useState({
     typ: "grundstoff" as "grundstoff" | "klassenspezifisch",
     datum: new Date().toISOString().slice(0, 16),
@@ -174,15 +171,7 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
-  const { data: gearLessons = [], isLoading: loadingGear } = useQuery({
-    queryKey: ["gear_lessons", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("gear_lessons").select("*").eq("student_id", id!).order("datum", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!id,
-  });
+  // gear_lessons query removed – Schaltstunden derived from driving_lessons
 
   const { data: exams = [], isLoading: loadingExams } = useQuery({
     queryKey: ["exams", id],
@@ -258,24 +247,7 @@ const FahrschuelerDetail = () => {
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
-  const mutSchaltstunde = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("gear_lessons").insert({
-        student_id: id!,
-        datum: new Date(fsSchaltstunde.datum).toISOString(),
-        dauer_minuten: fsSchaltstunde.dauer_minuten,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["gear_lessons", id] });
-      queryClient.invalidateQueries({ queryKey: ["gear_lessons"] });
-      setDlgSchaltstunde(false);
-      setFsSchaltstunde({ dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
-      toast({ title: "Schaltstunde gespeichert" });
-    },
-    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
-  });
+  // mutSchaltstunde removed – Fahrstunden-Dialog handles schaltwagen entries
 
   const mutTheorie = useMutation({
     mutationFn: async () => {
@@ -361,7 +333,7 @@ const FahrschuelerDetail = () => {
   });
 
   // ── Derived data ────────────────────────────────────────────────────────────
-  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingGear || loadingExams || loadingPayments;
+  const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingExams || loadingPayments;
 
   const initials = student
     ? `${student.vorname[0]}${student.nachname[0]}`.toUpperCase()
@@ -391,8 +363,13 @@ const FahrschuelerDetail = () => {
   const isB197 = student?.fuehrerscheinklasse === "B197";
   const isB78 = student?.fuehrerscheinklasse === "B78";
 
-  const gearMinutesTotal = gearLessons.reduce((sum, g) => sum + Number(g.dauer_minuten), 0);
-  const gearHoursDone = Math.floor(gearMinutesTotal / 45);
+  const schaltLessons = lessons.filter(
+    (l) => l.fahrzeug_typ === "schaltwagen" && l.typ !== "fehlstunde"
+  );
+  const gearEinheitenTotal = schaltLessons.reduce(
+    (sum, l) => sum + (l.einheiten || Math.floor(l.dauer_minuten / 45)), 0
+  );
+  const gearHoursDone = gearEinheitenTotal;
   const gearHoursRequired = SCHALTSTUNDEN_PFLICHT;
   const gearPct = Math.min(100, Math.round((gearHoursDone / gearHoursRequired) * 100));
   const gearComplete = gearHoursDone >= gearHoursRequired;
@@ -485,7 +462,10 @@ const FahrschuelerDetail = () => {
             <DropdownMenuItem onClick={() => setDlgFahrstunde(true)}>
               <Car className="h-4 w-4 mr-2" />Fahrstunde eintragen
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgSchaltstunde(true)}>
+            <DropdownMenuItem onClick={() => {
+              setFsFahrstunde((f) => ({ ...f, fahrzeug_typ: "schaltwagen" }));
+              setDlgFahrstunde(true);
+            }}>
               <Settings className="h-4 w-4 mr-2" />Schaltstunde planen
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setDlgTheorie(true)}>
@@ -792,7 +772,7 @@ const FahrschuelerDetail = () => {
                       style={{ width: `${gearPct}%` }}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">{gearPct}% · {gearMinutesTotal} min gesamt</p>
+                  <p className="text-xs text-muted-foreground">{gearPct}% · {gearHoursDone} Einheiten gesamt</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1069,35 +1049,7 @@ const FahrschuelerDetail = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Modal: Schaltstunde ── */}
-      <Dialog open={dlgSchaltstunde} onOpenChange={setDlgSchaltstunde}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Neue Schaltstunde</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); mutSchaltstunde.mutate(); }} className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <Label>Datum & Uhrzeit</Label>
-              <Input type="datetime-local" value={fsSchaltstunde.datum} onChange={(e) => setFsSchaltstunde((f) => ({ ...f, datum: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Dauer (Minuten)</Label>
-              <div className="flex gap-2">
-                {DAUER_OPTIONS.map((d) => (
-                  <Button key={d} type="button" variant={fsSchaltstunde.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setFsSchaltstunde((f) => ({ ...f, dauer_minuten: d }))}>
-                    {d} min
-                  </Button>
-                ))}
-                <Input type="number" min={1} className="w-24" value={fsSchaltstunde.dauer_minuten} onChange={(e) => setFsSchaltstunde((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 45 }))} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button type="button" variant="outline" onClick={() => setDlgSchaltstunde(false)}>Abbrechen</Button>
-              <Button type="submit" disabled={mutSchaltstunde.isPending}>{mutSchaltstunde.isPending ? "Speichern…" : "Speichern"}</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Schaltstunden-Modal entfernt – Fahrstunden-Dialog reicht */}
 
       {/* ── Modal: Theorie ── */}
       <Dialog open={dlgTheorie} onOpenChange={setDlgTheorie}>
