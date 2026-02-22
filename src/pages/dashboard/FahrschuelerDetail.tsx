@@ -522,6 +522,9 @@ const FahrschuelerDetail = () => {
                 <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${KLASSE_COLORS[student.fuehrerscheinklasse]}`}>
                   Klasse {student.fuehrerscheinklasse}
                 </span>
+                <Badge variant="outline" className="text-xs">
+                  {(student as any).fahrschule === "rathaus" ? "Miro-Drive (Rathaus)" : "Miro-Drive (Riemke Markt)"}
+                </Badge>
                 {student.ist_umschreiber && (
                   <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 text-xs">
                     Umschreiber
