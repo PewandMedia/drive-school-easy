@@ -1,50 +1,71 @@
 
 
-## Sektions-Aktionsbuttons im Schuelerprofil verbessern
+## Fahrschule-Feld fuer Schueler hinzufuegen
 
 ### Uebersicht
-Die bestehenden kleinen Icon-only "+"-Buttons in den Sektions-Headern werden durch beschriftete, dezente Buttons im Primary-Stil ersetzt. Zusaetzlich erhalten die Sektionen "Fahrstunden Uebersicht" und "Theorieunterricht" erstmals eigene Buttons.
+Ein neues Pflichtfeld "Fahrschule" wird zur Schueler-Verwaltung hinzugefuegt, damit jeder Schueler einer der zwei Filialen zugeordnet werden kann. Zusaetzlich wird ein Filter in der Schuelerliste eingefuegt.
 
-### Aenderungen in `src/pages/dashboard/FahrschuelerDetail.tsx`
+### 1. Datenbank-Migration
 
-**1. `SectionPlusBtn`-Komponente ersetzen**
-Die bestehende Icon-only-Komponente (Zeile 420-424) wird durch eine beschriftete Button-Variante ersetzt:
-- Stil: `variant="outline"`, kleiner (`size="sm"`), mit Primary-Textfarbe und dezenter Primary-Border
-- Klassen: `text-xs h-7 px-2.5 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary`
-- Jeder Button bekommt ein eigenes Label als Prop
+Neue Spalte `fahrschule` in der Tabelle `students`:
+- Typ: `text`, NOT NULL, Default: `'riemke'`
+- Erlaubte Werte: `'riemke'` und `'rathaus'`
 
-**2. Buttons in allen 5 Sektionen platzieren**
+```sql
+ALTER TABLE students
+ADD COLUMN fahrschule text NOT NULL DEFAULT 'riemke';
+```
 
-| Sektion | Button-Label | Oeffnet Dialog |
-|---------|-------------|----------------|
-| Fahrstunden Uebersicht (Zeile ~626) | + Fahrstunde hinzufuegen | `dlgFahrstunde` |
-| Theorieunterricht (Zeile ~711) | + Theoriestunde hinzufuegen | `dlgTheorie` |
-| Pruefungen (Zeile ~838) | + Pruefung eintragen | `dlgPruefung` |
-| Leistungen (Zeile ~928) | + Leistung hinzufuegen | `dlgLeistung` |
-| Zahlungen (Zeile ~969) | + Zahlung hinzufuegen | `dlgZahlung` |
+Der Default-Wert stellt sicher, dass bestehende Schueler keinen Fehler verursachen.
 
-**3. Konkrete Code-Aenderungen**
+### 2. Aenderungen in `src/pages/dashboard/Fahrschueler.tsx`
 
-- **SectionPlusBtn** wird zu `SectionAddBtn` mit `label`-Prop und `onClick`-Prop
-- **Fahrstunden Uebersicht** (Zeile 631): Neben "Alle Pflichtfahrten absolviert" wird der Button eingefuegt
-- **Theorieunterricht** (Zeile 716): Neben "Pflicht erfuellt" wird der Button eingefuegt
-- **Pruefungen** (Zeile 838): Bestehender `SectionPlusBtn` wird durch `SectionAddBtn` ersetzt
-- **Fahrstunden-Liste** (Zeile 891): Wird entfernt, da Fahrstunden Uebersicht bereits den Button hat
-- **Leistungen** (Zeile 928): Bestehender `SectionPlusBtn` wird durch `SectionAddBtn` ersetzt
-- **Zahlungen** (Zeile 969): Bestehender `SectionPlusBtn` wird durch `SectionAddBtn` ersetzt
+**Neues Formularfeld im "Neuer Schueler"-Dialog:**
+- Select-Dropdown "Fahrschule *" mit zwei Optionen:
+  - "Miro-Drive (Riemke Markt)" (Wert: `riemke`)
+  - "Miro-Drive (Rathaus)" (Wert: `rathaus`)
+- Platzierung: nach Fuehrerscheinklasse, vor Adresse
+- Default-Wert im Formular: `riemke`
 
-**4. Globaler Button bleibt unberuehrt**
-Der "Aktion hinzufuegen"-Dropdown im Header (Zeile 476-504) bleibt vollstaendig erhalten.
+**Filter in der Schuelerliste:**
+- Neuer `useState` fuer `filterFahrschule` mit Optionen: "Alle", "Riemke Markt", "Rathaus"
+- Filter-Buttons oder Select neben der Suchleiste
+- Die gefilterte Liste beruecksichtigt sowohl Suchtext als auch Fahrschul-Filter
+
+**Anzeige in der Tabelle:**
+- Neue Spalte "Fahrschule" im Table-Header
+- Badge-Anzeige pro Zeile: "Riemke Markt" oder "Rathaus"
+
+**Student-Type erweitern:**
+- `fahrschule: string` zum lokalen `Student`-Type hinzufuegen
+
+**Insert-Mutation erweitern:**
+- `fahrschule: values.fahrschule` in den Insert aufnehmen
+
+**defaultForm erweitern:**
+- `fahrschule: "riemke"` als neues Feld
+
+### 3. Aenderungen in `src/pages/dashboard/FahrschuelerDetail.tsx`
+
+- Fahrschule im Profil-Header anzeigen (z.B. als Badge neben Fuehrerscheinklasse)
+- Label-Mapping: `riemke` -> "Miro-Drive (Riemke Markt)", `rathaus` -> "Miro-Drive (Rathaus)"
 
 ### Visuelles Ergebnis
 
+**Schuelerliste mit Filter:**
 ```text
-Fahrstunden Uebersicht                    [+ Fahrstunde hinzufuegen]
-Theorieunterricht                         [+ Theoriestunde hinzufuegen]
-Pruefungen (2)                            [+ Pruefung eintragen]
-Leistungen (3)                            [+ Leistung hinzufuegen]
-Zahlungen (1)                             [+ Zahlung hinzufuegen]
+[Suche...]     [Alle | Riemke Markt | Rathaus]     12 Schueler
+
+Name          | Klasse | Fahrschule     | Umschreiber | Saldo
+Mustermann, M | B      | Riemke Markt   | -           | 482,00 EUR
 ```
 
-Buttons sind kleiner als der globale Header-Button, nutzen die Primary-Farbe (gelb) aber als Outline-Variante fuer einen dezenteren Look.
+**Neuer-Schueler-Dialog (neues Feld):**
+```text
+Telefon              Fuehrerscheinklasse *
+[+49...]             [Klasse B v]
+
+Fahrschule *
+[Miro-Drive (Riemke Markt) v]
+```
 
