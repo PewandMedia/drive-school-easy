@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Plus, Search, ChevronRight, ArrowUpDown, CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ const Fahrschueler = () => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
+  const [geburtsdatumText, setGeburtsdatumText] = useState("");
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students"],
@@ -153,6 +154,7 @@ const Fahrschueler = () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setOpen(false);
       setForm(defaultForm);
+      setGeburtsdatumText("");
       setFormError("");
     },
     onError: (err: Error) => {
@@ -370,30 +372,48 @@ const Fahrschueler = () => {
             {/* Geburtsdatum */}
             <div className="space-y-2">
               <Label>Geburtsdatum *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !form.geburtsdatum && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.geburtsdatum ? format(form.geburtsdatum, "dd.MM.yyyy") : "Geburtsdatum wählen"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={form.geburtsdatum}
-                    onSelect={(date) => setForm({ ...form, geburtsdatum: date })}
-                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="relative">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={form.geburtsdatum}
+                      onSelect={(date) => {
+                        setForm({ ...form, geburtsdatum: date });
+                        setGeburtsdatumText(date ? format(date, "dd.MM.yyyy") : "");
+                      }}
+                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Input
+                  placeholder="TT.MM.JJJJ"
+                  className="pl-9"
+                  value={geburtsdatumText}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setGeburtsdatumText(val);
+                    if (val.length === 10) {
+                      const parsed = parse(val, "dd.MM.yyyy", new Date());
+                      if (isValid(parsed) && parsed <= new Date() && parsed >= new Date("1900-01-01")) {
+                        setForm((f) => ({ ...f, geburtsdatum: parsed }));
+                      }
+                    } else {
+                      setForm((f) => ({ ...f, geburtsdatum: undefined }));
+                    }
+                  }}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -484,7 +504,7 @@ const Fahrschueler = () => {
             )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(defaultForm); setFormError(""); }}>
+              <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(defaultForm); setGeburtsdatumText(""); setFormError(""); }}>
                 Abbrechen
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
