@@ -1,4 +1,6 @@
-import { Receipt, TrendingUp, Wallet, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Receipt, TrendingUp, Wallet, AlertCircle, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { formatStudentName } from "@/lib/formatStudentName";
 import PageHeader from "@/components/PageHeader";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +16,7 @@ const fmt = (v: number) =>
 
 const Abrechnung = () => {
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
@@ -136,13 +139,30 @@ const Abrechnung = () => {
 
       {/* ── Schüler-Tabelle ── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-semibold text-foreground">Salden pro Schüler</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Sortiert nach offenstem Saldo · Klick auf Zeile öffnet Schülerdetail
-          </p>
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-foreground">Salden pro Schüler</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Sortiert nach offenstem Saldo · Klick auf Zeile öffnet Schülerdetail
+            </p>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Schüler suchen…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-full sm:w-64"
+            />
+          </div>
         </div>
-        {sorted.length === 0 ? (
+        {(() => {
+          const filtered = sorted.filter((s) => {
+            if (!searchTerm) return true;
+            const name = `${s.nachname} ${s.vorname}`.toLowerCase();
+            return name.includes(searchTerm.toLowerCase());
+          });
+          return filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Receipt className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">Noch keine Schüler vorhanden.</p>
@@ -161,7 +181,7 @@ const Abrechnung = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.map((s) => {
+              {filtered.map((s) => {
                 const ausgeglichen = s.saldo <= 0;
                 return (
                   <TableRow
@@ -205,7 +225,8 @@ const Abrechnung = () => {
               })}
             </TableBody>
           </Table>
-        )}
+        );
+        })()}
       </div>
     </div>
   );
