@@ -1,50 +1,50 @@
 
-## Schaltstunden nur fuer B197-Schueler
+
+## Schüler-Suche in Zahlungen und Abrechnung
 
 ### Uebersicht
-Der Schaltstunden-Bereich wird so eingeschraenkt, dass ausschliesslich Fahrschueler mit `fuehrerscheinklasse = 'B197'` angezeigt und beruecksichtigt werden. Keine Datenbank-Aenderungen noetig -- das Feld `fuehrerscheinklasse` existiert bereits auf der `students`-Tabelle mit den Werten B, B78, B197.
+Beide Seiten erhalten ein Suchfeld oberhalb der Tabelle, mit dem die angezeigte Liste nach Schülernamen gefiltert werden kann. So bleibt die Übersicht auch bei vielen Schülern gewährleistet.
 
-### Aenderung: `src/pages/dashboard/Schaltstunden.tsx`
+### Aenderung 1: `src/pages/dashboard/Zahlungen.tsx`
 
-**1. Students-Query: Nur B197 laden (Zeile 76-84)**
-- Filter `.eq("fuehrerscheinklasse", "B197")` zur Supabase-Query hinzufuegen
-- Damit werden nur B197-Schueler im Dropdown und in der Tabelle angezeigt
-- Die Filterung erfolgt datenbankseitig (nicht nur Frontend)
+- Neuen State `searchTerm` (useState) hinzufuegen
+- Suchfeld (Input mit Search-Icon) oberhalb der Tabelle einfuegen, innerhalb des Tabellen-Containers
+- Die `payments`-Liste vor dem Rendern filtern: Nur Zahlungen anzeigen, deren Schülername (Nachname + Vorname) den Suchbegriff enthaelt (case-insensitive)
+- Statistiken (KPI-Karten oben) bleiben ungeaendert und beziehen sich weiterhin auf alle Zahlungen
 
-**2. Driving-Lessons-Query: Nur B197-Schueler (Zeile 88-98)**
-- Die `fuehrerscheinklasse` ist auf der `students`-Tabelle, nicht auf `driving_lessons`
-- Loesung: Erst B197-Student-IDs sammeln, dann Fahrstunden nur fuer diese IDs laden
-- Alternativ: Join ueber Supabase `.in("student_id", b197StudentIds)` Filter
+### Aenderung 2: `src/pages/dashboard/Abrechnung.tsx`
 
-**3. Statistiken (Zeilen 152-179)**
-- Bleiben unveraendert, da sie bereits auf den gefilterten Daten basieren
-- Durch die eingeschraenkte Query kommen nur B197-Schueler-Daten an
+- Neuen State `searchTerm` (useState) hinzufuegen
+- Suchfeld im Tabellen-Header-Bereich (neben "Salden pro Schüler") einfuegen
+- Die `sorted`-Liste vor dem Rendern filtern: Nur Schüler anzeigen, deren Name den Suchbegriff enthaelt (case-insensitive)
+- Statistiken (Gesamtforderungen, Zahlungen, Saldo) bleiben ungeaendert und beziehen sich weiterhin auf alle Schüler
 
-**4. Modal "Stunde planen" (Zeilen 199-217)**
-- Dropdown zeigt bereits nur die geladenen `students` -- da diese jetzt auf B197 gefiltert sind, erscheinen automatisch nur B197-Schueler
+### Technische Details
 
-**5. Beschreibungstext aktualisieren (Zeile 185)**
-- Von "Schaltstunden (Klasse A/manuelle Fahrzeuge) verwalten" zu "Schaltstunden fuer B197-Schueler (10 Pflichteinheiten)"
-
-### Technische Umsetzung
+Beide Seiten verwenden dasselbe Muster:
 
 ```text
-// Schritt 1: Students-Query mit B197-Filter
-students query + .eq("fuehrerscheinklasse", "B197")
+// State
+const [searchTerm, setSearchTerm] = useState("");
 
-// Schritt 2: Driving-Lessons mit student_id-Filter
-- Query haengt von students ab (enabled: students.length > 0)
-- .in("student_id", b197StudentIds) filtert serverseitig
+// Filter-Logik (Beispiel Abrechnung)
+const filtered = sorted.filter((s) => {
+  if (!searchTerm) return true;
+  const name = `${s.nachname} ${s.vorname}`.toLowerCase();
+  return name.includes(searchTerm.toLowerCase());
+});
+
+// Suchfeld: Input mit placeholder "Schüler suchen…" und Search-Icon
 ```
+
+Das Suchfeld wird als einfaches Textfeld mit Lupen-Icon umgesetzt -- keine Combobox noetig, da es nur zum Filtern der bestehenden Liste dient.
 
 ### Zusammenfassung
 
-| Stelle | Aenderung |
-|--------|-----------|
-| Students-Query | `.eq("fuehrerscheinklasse", "B197")` hinzufuegen |
-| Lessons-Query | `.in("student_id", b197Ids)` hinzufuegen, abhaengig von Students |
-| Beschreibung | Text auf B197 aktualisieren |
-| Statistiken | Keine Aenderung (basieren auf gefilterten Daten) |
-| Modal | Keine Aenderung (nutzt gefilterte Students-Liste) |
+| Datei | Aenderung |
+|-------|-----------|
+| `Zahlungen.tsx` | State `searchTerm`, Suchfeld ueber Tabelle, payments-Filter nach Schülername |
+| `Abrechnung.tsx` | State `searchTerm`, Suchfeld im Tabellen-Header, sorted-Filter nach Schülername |
 
-Nur eine Datei betroffen: `Schaltstunden.tsx`. Alles andere (FahrschuelerDetail, Fahrstunden) bleibt unveraendert.
+Statistiken/KPIs bleiben in beiden Seiten unberuehrt (beziehen sich auf Gesamtdaten).
+
