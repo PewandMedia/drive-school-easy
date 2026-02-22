@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import StudentCombobox from "@/components/StudentCombobox";
 import {
   Dialog,
   DialogContent,
@@ -325,21 +326,11 @@ const Fahrstunden = () => {
                 {/* Schüler */}
                 <div className="space-y-1.5">
                   <Label>Schüler</Label>
-                  <Select
+                  <StudentCombobox
+                    students={students}
                     value={form.student_id}
                     onValueChange={(v) => setForm((f) => ({ ...f, student_id: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Schüler auswählen…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {students.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
 
                 {/* Typ */}
@@ -520,20 +511,15 @@ const Fahrstunden = () => {
 
       {/* Filter */}
       <div className="flex flex-wrap gap-3">
-        <Select value={filterStudent} onValueChange={setFilterStudent}>
-          <SelectTrigger className="w-52">
-            <Users className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Schüler filtern" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Alle Schüler</SelectItem>
-            {students.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {formatStudentName(s.nachname, s.vorname, s.geburtsdatum)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="w-52">
+          <StudentCombobox
+            students={students}
+            value={filterStudent}
+            onValueChange={setFilterStudent}
+            allowAll
+            placeholder="Schüler filtern"
+          />
+        </div>
         <Select value={filterTyp} onValueChange={setFilterTyp}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Typ filtern" />

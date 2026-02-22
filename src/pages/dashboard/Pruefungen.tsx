@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import StudentCombobox from "@/components/StudentCombobox";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type ExamForm = {
@@ -311,21 +312,12 @@ const Pruefungen = () => {
             {/* Schüler */}
             <div className="space-y-1.5">
               <Label>Schüler</Label>
-              <Select
+              <StudentCombobox
+                students={students}
                 value={form.student_id}
                 onValueChange={(v) => setForm((f) => ({ ...f, student_id: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Schüler wählen…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)} – Kl. {s.fuehrerscheinklasse}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Schüler wählen…"
+              />
 
               {/* B78 Hinweis */}
               {klasse === "B78" && (

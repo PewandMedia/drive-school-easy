@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import StudentCombobox from "@/components/StudentCombobox";
 import {
   Table,
   TableBody,
@@ -301,21 +302,12 @@ const Zahlungen = () => {
             {/* Schüler */}
             <div className="space-y-1.5">
               <Label>Schüler</Label>
-              <Select
+              <StudentCombobox
+                students={students}
                 value={form.student_id}
                 onValueChange={(v) => setForm((f) => ({ ...f, student_id: v, service_id: "" }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Schüler wählen…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Schüler wählen…"
+              />
             </div>
 
             {/* Offene Leistung (optional) */}
