@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark } from "lucide-react";
+import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark, Search } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +82,7 @@ const eur = (v: number) =>
 const Zahlungen = () => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PaymentForm>(defaultForm());
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -228,6 +229,17 @@ const Zahlungen = () => {
 
       {/* Table */}
       <div className="rounded-xl border border-border bg-card">
+        <div className="p-4 border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Schüler suchen…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 max-w-sm"
+            />
+          </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -245,7 +257,13 @@ const Zahlungen = () => {
                   <div className="h-4 w-48 bg-secondary/60 rounded animate-pulse mx-auto" />
                 </TableCell>
               </TableRow>
-            ) : payments.length === 0 ? (
+            ) : payments.filter((p) => {
+                if (!searchTerm) return true;
+                const st = p.students;
+                if (!st) return false;
+                const name = `${st.nachname} ${st.vorname}`.toLowerCase();
+                return name.includes(searchTerm.toLowerCase());
+              }).length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                   <TrendingDown className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -253,7 +271,13 @@ const Zahlungen = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              payments.map((p) => {
+              payments.filter((p) => {
+                if (!searchTerm) return true;
+                const st = p.students;
+                if (!st) return false;
+                const name = `${st.nachname} ${st.vorname}`.toLowerCase();
+                return name.includes(searchTerm.toLowerCase());
+              }).map((p) => {
                 const st = p.students;
                 return (
                   <TableRow key={p.id}>
