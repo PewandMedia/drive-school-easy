@@ -1,38 +1,70 @@
 
-## Geburtsdatum-Feld: Texteingabe + Kalender kombinieren
+## Schaltstunden als abgeleitete Ansicht aus Fahrstunden
 
 ### Uebersicht
-Das Geburtsdatum-Feld im "Neuer Fahrschueler"-Modal wird so umgebaut, dass man das Datum direkt eintippen kann (Format TT.MM.JJJJ) UND optional ueber das Kalender-Icon einen Kalender oeffnen kann.
+Statt einer separaten `gear_lessons`-Tabelle werden Schaltstunden direkt aus `driving_lessons` abgeleitet: Jede Fahrstunde mit `fahrzeug_typ = 'schaltwagen'` und `typ != 'fehlstunde'` zaehlt automatisch als Schaltstunde. Die separate Erfassung entfaellt.
 
-### Aenderung in `src/pages/dashboard/Fahrschueler.tsx` (Zeilen 370-397)
+### Aenderung 1: `src/pages/dashboard/Schaltstunden.tsx` (kompletter Umbau)
 
-Das bisherige Popover-Button-Feld wird ersetzt durch eine Kombination aus:
-- Einem **Input-Feld** mit Placeholder `TT.MM.JJJJ` zum direkten Eintippen
-- Einem **Kalender-Icon-Button** links im Input, der bei Klick den Kalender-Popover oeffnet
+**Datenquelle aendern:**
+- Statt `gear_lessons`-Tabelle wird `driving_lessons` abgefragt mit Filter `fahrzeug_typ = 'schaltwagen'`
+- In der UI werden nur Eintraege mit `typ != 'fehlstunde'` fuer Statistiken gezaehlt
+- Typ-Spalte wird angezeigt (Uebungsstunde, Ueberlandfahrt, etc.)
 
-**Aufbau:**
-```text
-+--------------------------------------+
-| [Kalender-Icon] | 15.03.1999         |
-+--------------------------------------+
-         |
-         v (nur bei Klick auf Icon)
-  +------------------+
-  |    Kalender       |
-  +------------------+
-```
+**"Stunde planen"-Button:**
+- Oeffnet ein vereinfachtes Formular, das eine Fahrstunde mit voreingestelltem `fahrzeug_typ = 'schaltwagen'` in `driving_lessons` anlegt
+- Typ-Auswahl (Uebungsstunde, Sonderfahrten) wird angeboten
+- Insert geht in `driving_lessons` statt `gear_lessons`
 
-**Technische Details:**
+**Loeschen:**
+- Loescht aus `driving_lessons` statt `gear_lessons`
 
-1. Ein `Input`-Feld mit `placeholder="TT.MM.JJJJ"` zeigt den formatierten Datumswert oder ist leer
-2. Das Kalender-Icon links im Input ist in einen Popover-Trigger eingebettet
-3. Bei manueller Eingabe: `onChange`-Handler parst den eingegebenen Text im Format `dd.MM.yyyy` mit `date-fns/parse` und setzt `form.geburtsdatum` wenn gueltig
-4. Bei Kalender-Auswahl: wie bisher, `onSelect` setzt das Datum und schliesst den Popover
-5. Eingabevalidierung: Ungueltige Daten werden nicht uebernommen, das Feld bleibt aber editierbar (kein Fehler beim Tippen, erst beim Absenden)
+**Statistiken:**
+- Einheiten gesamt: Summe der `einheiten` aus gefilterten Fahrstunden (ohne Fehlstunden)
+- Schueler abgeschlossen: basierend auf Einheiten >= 10 pro Schueler (ohne Fehlstunden)
+- Durchschnittliche Dauer: alle Schaltwagen-Fahrstunden
 
-**Neuer State:**
-- `geburtsdatumText: string` -- haelt den aktuellen Textinhalt des Inputs (damit man frei tippen kann ohne sofortige Validierung)
-- Synchronisation: Kalenderauswahl setzt sowohl `geburtsdatum` als auch `geburtsdatumText`; Texteingabe setzt `geburtsdatumText` sofort und `geburtsdatum` nur wenn gueltig geparst
+**Query-Keys:**
+- Werden auf `driving_lessons` umgestellt, damit Invalidierung korrekt funktioniert
 
-### Keine weiteren Dateien betroffen
-Die Aenderung ist auf das Geburtsdatum-Feld im "Neuer Fahrschueler"-Dialog in `Fahrschueler.tsx` beschraenkt.
+### Aenderung 2: `src/pages/dashboard/FahrschuelerDetail.tsx`
+
+**gear_lessons-Query entfernen (Zeilen 177-185):**
+- Die Query auf `gear_lessons` wird entfernt
+- `loadingGear` wird entfernt
+
+**Schaltstunden-Berechnung umstellen (Zeilen 394-398):**
+- `gearMinutesTotal` wird aus `lessons` (driving_lessons) berechnet:
+  ```
+  const schaltLessons = lessons.filter(
+    l => l.fahrzeug_typ === "schaltwagen" && l.typ !== "fehlstunde"
+  );
+  const gearMinutesTotal = schaltLessons.reduce(
+    (sum, l) => sum + l.dauer_minuten, 0
+  );
+  const gearHoursDone = Math.floor(gearMinutesTotal / 45);
+  ```
+
+**Schaltstunden-Erfassungs-Modal und Mutation entfernen (Zeilen 261-278):**
+- `mutSchaltstunde`, `fsSchaltstunde`, `dlgSchaltstunde` State und zugehoeriges Dialog werden entfernt
+- Stattdessen kann der bestehende Fahrstunden-Dialog genutzt werden (bereits vorhanden)
+
+**isLoading anpassen (Zeile 364):**
+- `loadingGear` aus der Bedingung entfernen
+
+### Aenderung 3: `src/pages/dashboard/Fahrstunden.tsx`
+
+Keine Aenderung noetig -- die Fahrstunden-Seite zeigt bereits alle Fahrstunden inklusive Schaltwagen.
+
+### Zusammenfassung
+
+| Datei | Was | Aenderung |
+|-------|-----|-----------|
+| `Schaltstunden.tsx` | Datenquelle | `gear_lessons` -> `driving_lessons` mit Filter `fahrzeug_typ = 'schaltwagen'` |
+| `Schaltstunden.tsx` | Insert | Legt `driving_lessons`-Eintrag mit `fahrzeug_typ = 'schaltwagen'` an |
+| `Schaltstunden.tsx` | Statistiken | Fehlstunden ausschliessen, Einheiten aus `einheiten`-Feld |
+| `FahrschuelerDetail.tsx` | gear_lessons Query | Entfernen, stattdessen aus `lessons` (driving_lessons) ableiten |
+| `FahrschuelerDetail.tsx` | Schaltstunden-Modal | Entfernen (Fahrstunden-Modal reicht) |
+| `FahrschuelerDetail.tsx` | Progress-Berechnung | Aus `lessons` filtern statt `gearLessons` |
+
+Die `gear_lessons`-Tabelle wird nicht geloescht (keine Datenverluste), aber nicht mehr genutzt.
