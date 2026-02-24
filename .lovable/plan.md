@@ -1,90 +1,72 @@
 
 
-## Redesign: Helles Premium-Theme mit roter Branding-Farbe
+## Theme-Toggle: Glocke durch Dark/Light-Umschalter ersetzen
 
 ### Uebersicht
 
-Das gesamte Design wird von einem dunklen Navy/Amber-Theme auf ein helles, serioes-modernes Theme mit roter Branding-Akzentfarbe umgestellt. Keine Logik oder Funktionen werden veraendert -- nur CSS-Variablen, Farbklassen und das Copyright-Jahr.
+Die Glocke (Bell-Icon) im Header wird durch einen Theme-Toggle-Button ersetzt. Nutzer koennen damit zwischen hellem und dunklem Theme wechseln. Das Projekt hat `next-themes` bereits installiert und `darkMode: ["class"]` ist in der Tailwind-Config aktiv.
 
 ---
 
-### 1. CSS-Variablen komplett umstellen (src/index.css)
+### 1. Dark-Theme CSS-Variablen hinzufuegen (src/index.css)
 
-Die `:root`-Variablen werden von dunkel auf hell geaendert:
+Unter den bestehenden `:root`-Variablen wird ein `.dark`-Block ergaenzt mit invertierten Farben:
 
 ```text
-Vorher (Dark):                    Nachher (Light):
---background: 220 25% 7%         --background: 0 0% 98%
---foreground: 210 20% 94%        --foreground: 220 20% 10%
---card: 220 22% 10%              --card: 0 0% 100%
---primary: 38 95% 52% (Amber)    --primary: 0 80% 50% (Rot)
---secondary: 220 18% 14%         --secondary: 220 14% 96%
---muted: 220 18% 14%             --muted: 220 14% 96%
---border: 220 18% 16%            --border: 220 13% 91%
---sidebar-background: dunkel     --sidebar-background: hell/weiss
+.dark {
+  --background: 220 25% 7%
+  --foreground: 210 20% 94%
+  --card: 220 22% 10%
+  --card-foreground: 210 20% 94%
+  --primary: 0 78% 50%  (Rot bleibt gleich)
+  --secondary: 220 18% 14%
+  --muted: 220 18% 14%
+  --muted-foreground: 215 15% 55%
+  --border: 220 18% 16%
+  --input: 220 18% 16%
+  --sidebar-background: 220 22% 10%
+  ... etc
+}
 ```
 
-Die Gradient-Variablen werden ebenfalls angepasst:
-- `--gradient-hero`: Heller Gradient (weiss zu hellgrau)
-- `--gradient-accent`: Rot-Gradient statt Amber
-- `--shadow-glow`: Roter Schimmer statt Amber
+Die rote Primaerfarbe bleibt in beiden Themes gleich fuer konsistentes Branding.
 
 ---
 
-### 2. Hardcoded Farben in Komponenten anpassen
+### 2. ThemeProvider einbinden (src/App.tsx)
 
-Alle Stellen mit `text-amber-400`, `text-blue-400`, `text-green-400` etc. werden auf Farben umgestellt, die im hellen Theme funktionieren (dunklere Varianten wie `-600` oder `-700`):
+`next-themes` ThemeProvider um die App wrappen:
+
+```text
+import { ThemeProvider } from "next-themes"
+
+<ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+  ... bestehender App-Inhalt ...
+</ThemeProvider>
+```
+
+---
+
+### 3. Header: Glocke durch Theme-Toggle ersetzen (src/components/DashboardLayout.tsx)
+
+- `Bell` Import entfernen, `Sun` und `Moon` importieren
+- `useTheme()` Hook von `next-themes` verwenden
+- Button zeigt Sun-Icon im Dark-Mode, Moon-Icon im Light-Mode
+- Klick wechselt zwischen `"light"` und `"dark"`
+
+```text
+Vorher:  <Bell />  (keine Funktion)
+Nachher: <Sun />   oder  <Moon />  (wechselt Theme)
+```
+
+---
+
+### Zusammenfassung
 
 | Datei | Aenderung |
 |-------|-----------|
-| `Dashboard.tsx` | Stats-Icon-Farben: `text-blue-400` wird `text-blue-600`, `text-amber-400` wird `text-red-600`, etc. Saldo-Badge von amber auf rot umstellen |
-| `Fahrschueler.tsx` | `klasseColors` von `/15 + -400` auf `/10 + -600` Varianten |
-| `FahrschuelerDetail.tsx` | Gleiche Farbanpassungen fuer Klasse-Badges, Saldo, Fortschrittsbalken, Sonderfahrten |
-| `Leistungen.tsx` | Status-Farben von `-400` auf `-600` |
-| `Zahlungen.tsx` | Statistik-Karten Farben |
-| `Tagesabrechnung.tsx` | Falls amber/dark-Farben vorhanden |
+| `src/index.css` | `.dark` Block mit Dark-Theme CSS-Variablen |
+| `src/App.tsx` | ThemeProvider wrappen |
+| `src/components/DashboardLayout.tsx` | Bell durch Sun/Moon Theme-Toggle ersetzen |
 
----
-
-### 3. Sidebar anpassen (AppSidebar.tsx)
-
-- Copyright von "2025" auf "2026" aendern
-- Die Sidebar nutzt CSS-Variablen (`sidebar-background`, etc.) die automatisch durch die CSS-Aenderung hell werden
-
----
-
-### 4. Login-Seite (Login.tsx)
-
-- Der Glow-Effekt wird dezenter/hell angepasst (nutzt `hsl(var(--primary))`, wird automatisch rot)
-- Keine strukturellen Aenderungen noetig
-
----
-
-### 5. Index/Landing Page (Index.tsx)
-
-- Nutzt `--gradient-hero` und `--gradient-accent` -- wird automatisch durch CSS-Variablen-Aenderung hell
-- Grid-Overlay Opacity ggf. leicht anpassen
-
----
-
-### Zusammenfassung der Dateiaenderungen
-
-| Datei | Was wird geaendert |
-|-------|-------------------|
-| `src/index.css` | Alle CSS-Variablen auf helles Theme + rote Primaerfarbe |
-| `src/components/AppSidebar.tsx` | Copyright 2025 auf 2026 |
-| `src/pages/dashboard/Dashboard.tsx` | Icon-Farben und Badge-Farben fuer helles Theme |
-| `src/pages/dashboard/Fahrschueler.tsx` | `klasseColors` Farbanpassung |
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Farbanpassungen fuer Badges, Saldo, Fortschritt |
-| `src/pages/dashboard/Leistungen.tsx` | Status-Farben |
-| `src/pages/dashboard/Zahlungen.tsx` | Statistik-Farben |
-
-### Design-Richtung
-
-- **Hintergrund**: Fast-weiss (#FAFAFA / hsl(0 0% 98%))
-- **Cards**: Reines Weiss mit subtilen Borders
-- **Primaerfarbe**: Modernes Rot (hsl(0 80% 50%) -- kraeftiges, aber nicht aggressives Rot)
-- **Text**: Dunkles Anthrazit statt Weiss
-- **Sidebar**: Heller Hintergrund, dunkler Text
-- **Serioes und Clean**: Wenig Schatten, klare Linien, professionell
-
+Keine Logik oder Funktionen werden veraendert -- nur die Glocke wird durch den Theme-Umschalter ersetzt.
