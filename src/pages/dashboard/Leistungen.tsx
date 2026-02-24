@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StudentCombobox from "@/components/StudentCombobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import PageHeader from "@/components/PageHeader";
 
@@ -53,6 +54,7 @@ const defaultForm = {
   bezeichnung: "",
   preis: "",
   status: "offen" as ServiceStatus,
+  notiz: "",
 };
 
 const Leistungen = () => {
@@ -134,26 +136,46 @@ const Leistungen = () => {
   });
 
   // When a price is selected, auto-fill bezeichnung and preis
+  const isSonstiges = form.preis_id === "sonstiges";
+
   const handlePreisSelect = (preisId: string) => {
-    const found = prices.find((p) => p.id === preisId);
-    if (found) {
+    if (preisId === "sonstiges") {
       setForm((f) => ({
         ...f,
-        preis_id: preisId,
-        bezeichnung: found.bezeichnung,
-        preis: found.preis.toString(),
+        preis_id: "sonstiges",
+        bezeichnung: "Sonstiges",
+        preis: "",
+        notiz: "",
       }));
     } else {
-      setForm((f) => ({ ...f, preis_id: preisId }));
+      const found = prices.find((p) => p.id === preisId);
+      if (found) {
+        setForm((f) => ({
+          ...f,
+          preis_id: preisId,
+          bezeichnung: found.bezeichnung,
+          preis: found.preis.toString(),
+          notiz: "",
+        }));
+      } else {
+        setForm((f) => ({ ...f, preis_id: preisId, notiz: "" }));
+      }
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.student_id) { setFormError("Bitte einen Schüler auswählen."); return; }
+    if (isSonstiges && !form.notiz.trim()) { setFormError("Bitte eine Beschreibung eingeben."); return; }
+    if (isSonstiges && (!form.preis || parseFloat(form.preis) <= 0)) { setFormError("Bitte einen Preis eingeben."); return; }
     if (!form.bezeichnung) { setFormError("Bezeichnung ist ein Pflichtfeld."); return; }
     setFormError("");
-    createMutation.mutate(form);
+    const submitForm = {
+      ...form,
+      bezeichnung: isSonstiges && form.notiz.trim() ? `Sonstiges – ${form.notiz.trim()}` : form.bezeichnung,
+      preis_id: isSonstiges ? "" : form.preis_id,
+    };
+    createMutation.mutate(submitForm);
   };
 
   // Stats
@@ -358,20 +380,40 @@ const Leistungen = () => {
                       </span>
                     </SelectItem>
                   ))}
+                  <SelectItem value="sonstiges">
+                    <span className="text-xs text-muted-foreground mr-2">[Sonstiges]</span>
+                    Sonstiges (individuell)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Bezeichnung (editable, pre-filled) */}
-            <div className="space-y-2">
-              <Label htmlFor="bezeichnung">Bezeichnung *</Label>
-              <Input
-                id="bezeichnung"
-                placeholder="Leistungsbezeichnung"
-                value={form.bezeichnung}
-                onChange={(e) => setForm({ ...form, bezeichnung: e.target.value })}
-              />
-            </div>
+            {/* Notizfeld bei Sonstiges */}
+            {isSonstiges && (
+              <div className="space-y-2">
+                <Label htmlFor="notiz">Notiz / Beschreibung *</Label>
+                <Textarea
+                  id="notiz"
+                  placeholder="z.B. Straßenverkehrsamt Gebühren..."
+                  value={form.notiz}
+                  onChange={(e) => setForm({ ...form, notiz: e.target.value })}
+                  rows={3}
+                />
+              </div>
+            )}
+
+            {/* Bezeichnung (editable, pre-filled) – hidden when Sonstiges */}
+            {!isSonstiges && (
+              <div className="space-y-2">
+                <Label htmlFor="bezeichnung">Bezeichnung *</Label>
+                <Input
+                  id="bezeichnung"
+                  placeholder="Leistungsbezeichnung"
+                  value={form.bezeichnung}
+                  onChange={(e) => setForm({ ...form, bezeichnung: e.target.value })}
+                />
+              </div>
+            )}
 
             {/* Preis (editable, pre-filled) */}
             <div className="space-y-2">
