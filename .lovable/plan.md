@@ -1,44 +1,24 @@
 
+## Browser-Header und -Footer beim PDF-Druck entfernen
 
-## "Sonstiges" Option in der Preisliste mit Notizfeld
+### Problem
 
-### Was wird geaendert
+Beim PDF-Export ueber `window.print()` fuegt der Browser automatisch hinzu:
+- **Oben**: Datum/Uhrzeit und "Lovable App" (Seitentitel)
+- **Unten**: Die URL und Seitenzahl
 
-In der "Leistung zuordnen"-Dialog wird eine neue Option **"Sonstiges"** in der Preisliste-Auswahl ergaenzt. Wenn "Sonstiges" gewaehlt wird, erscheint ein Notizfeld (Textarea) fuer eine Beschreibung (z.B. "Strassenverkehrsamt Gebuehren") und das Preisfeld bleibt leer zum manuellen Eintragen.
+### Loesung
 
-### Aenderungen in `src/pages/dashboard/Leistungen.tsx`
+In `src/index.css` wird innerhalb des bestehenden `@media print` Blocks eine `@page`-Regel ergaenzt, die die Browser-Raender auf 0 setzt und so Header/Footer entfernt. Zusaetzlich wird ein kleines Padding auf dem Body gesetzt, damit der Inhalt nicht am Seitenrand klebt.
 
-**1. Formular-State erweitern**
+### Aenderung in `src/index.css`
 
-- Neues Feld `notiz` im `defaultForm` hinzufuegen (leerer String)
+Im `@media print` Block (Zeile 77-93) wird folgendes ergaenzt:
 
-**2. "Sonstiges" in der Preisliste-Auswahl**
+```css
+@page {
+  margin: 0;
+}
+```
 
-- Nach den bestehenden Preisen aus der Datenbank wird ein zusaetzlicher Eintrag **"Sonstiges"** mit dem Wert `"sonstiges"` angezeigt (Kategorie: `[Sonstiges]`)
-- Wenn "Sonstiges" gewaehlt wird:
-  - `bezeichnung` wird auf "Sonstiges" gesetzt
-  - `preis` bleibt leer (manuell eintragbar)
-  - `preis_id` wird auf leer gesetzt (kein Preis-Datensatz)
-
-**3. Notizfeld anzeigen**
-
-- Ein Textarea-Feld erscheint **nur wenn "Sonstiges" gewaehlt** ist (oder generell nuetzlich: immer sichtbar als optionales Feld)
-- Label: "Notiz / Beschreibung"
-- Placeholder: "z.B. Strassenverkehrsamt Gebuehren..."
-- Der Notiz-Text wird an die Bezeichnung angehaengt beim Speichern: `"Sonstiges - Strassenverkehrsamt Gebuehren"`
-
-**4. Submit-Logik anpassen**
-
-- Wenn "Sonstiges" gewaehlt und eine Notiz vorhanden: `bezeichnung` = `"Sonstiges – " + notiz`
-- Preis muss manuell eingetragen werden (Validierung: Preis > 0 bei Sonstiges)
-
-### Technische Details
-
-| Bereich | Detail |
-|---------|--------|
-| Datei | `src/pages/dashboard/Leistungen.tsx` |
-| Neue Komponente | Textarea aus `@/components/ui/textarea` (bereits vorhanden) |
-| Neuer State | `notiz: string` im Formular |
-| Sonstiges-Erkennung | `form.preis_id === "sonstiges"` |
-| Bezeichnung-Logik | Bei Sonstiges: Notiz wird Teil der Bezeichnung |
-
+Und auf `.print-area` wird ein eigenes Padding gesetzt (z.B. `padding: 20mm`), damit der Inhalt trotzdem korrekt positioniert ist.
