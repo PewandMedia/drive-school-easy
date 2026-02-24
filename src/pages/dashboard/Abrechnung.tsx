@@ -27,70 +27,31 @@ const Abrechnung = () => {
     },
   });
 
-  const { data: drivingLessons = [] } = useQuery({
-    queryKey: ["driving_lessons_all"],
+  const { data: openItems = [] } = useQuery({
+    queryKey: ["open_items_all"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("driving_lessons").select("student_id, preis");
+      const { data, error } = await supabase.from("open_items").select("student_id, betrag_gesamt, betrag_bezahlt") as any;
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
   });
 
-  const { data: exams = [] } = useQuery({
-    queryKey: ["exams_all"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("exams").select("student_id, preis");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: services = [] } = useQuery({
-    queryKey: ["services_all"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("services").select("student_id, preis");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: payments = [] } = useQuery({
-    queryKey: ["payments_all"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("payments").select("student_id, betrag");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // ── Saldo pro Schüler berechnen ──────────────────────────────────────────────
+  // ── Saldo pro Schüler berechnen (aus open_items) ─────────────────────────────
   const saldoMap = students.map((s) => {
-    const fahrstunden = drivingLessons
-      .filter((l) => l.student_id === s.id)
-      .reduce((acc, l) => acc + Number(l.preis), 0);
-    const pruefungen = exams
-      .filter((e) => e.student_id === s.id)
-      .reduce((acc, e) => acc + Number(e.preis), 0);
-    const leistungen = services
-      .filter((sv) => sv.student_id === s.id)
-      .reduce((acc, sv) => acc + Number(sv.preis), 0);
-    const zahlungen = payments
-      .filter((p) => p.student_id === s.id)
-      .reduce((acc, p) => acc + Number(p.betrag), 0);
-    const saldo = fahrstunden + pruefungen + leistungen - zahlungen;
-    return { ...s, fahrstunden, pruefungen, leistungen, zahlungen, saldo };
+    const items = openItems.filter((oi: any) => oi.student_id === s.id);
+    const forderungen = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_gesamt), 0);
+    const bezahlt = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_bezahlt), 0);
+    const saldo = forderungen - bezahlt;
+    return { ...s, forderungen, bezahlt, saldo };
   });
 
   // Sortiert: höchster Saldo zuerst
   const sorted = [...saldoMap].sort((a, b) => b.saldo - a.saldo);
 
   // ── Gesamtstatistiken ────────────────────────────────────────────────────────
-  const gesamtForderungen = saldoMap.reduce(
-    (acc, s) => acc + s.fahrstunden + s.pruefungen + s.leistungen,
-    0,
-  );
-  const gesamtZahlungen = saldoMap.reduce((acc, s) => acc + s.zahlungen, 0);
-  const gesamtSaldo = gesamtForderungen - gesamtZahlungen;
+  const gesamtForderungen = saldoMap.reduce((acc, s) => acc + s.forderungen, 0);
+  const gesamtBezahlt = saldoMap.reduce((acc, s) => acc + s.bezahlt, 0);
+  const gesamtSaldo = gesamtForderungen - gesamtBezahlt;
 
   const stats = [
     {
@@ -102,7 +63,7 @@ const Abrechnung = () => {
     },
     {
       label: "Eingegangene Zahlungen",
-      value: fmt(gesamtZahlungen),
+      value: fmt(gesamtBezahlt),
       icon: Wallet,
       cls: "text-green-400",
       bg: "bg-green-500/10 border-green-500/20",
@@ -173,10 +134,8 @@ const Abrechnung = () => {
               <TableRow>
                 <TableHead>Schüler</TableHead>
                 <TableHead>Klasse</TableHead>
-                <TableHead className="text-right">Fahrstunden</TableHead>
-                <TableHead className="text-right">Prüfungen</TableHead>
-                <TableHead className="text-right">Leistungen</TableHead>
-                <TableHead className="text-right">Zahlungen</TableHead>
+                <TableHead className="text-right">Forderungen</TableHead>
+                <TableHead className="text-right">Bezahlt</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
               </TableRow>
             </TableHeader>
@@ -198,16 +157,10 @@ const Abrechnung = () => {
                       </span>
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums">
-                      {fmt(s.fahrstunden)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {fmt(s.pruefungen)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {fmt(s.leistungen)}
+                      {fmt(s.forderungen)}
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums text-green-400">
-                      −{fmt(s.zahlungen)}
+                      −{fmt(s.bezahlt)}
                     </TableCell>
                     <TableCell className="text-right">
                       {ausgeglichen ? (

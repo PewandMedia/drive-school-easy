@@ -171,6 +171,92 @@ export type Database = {
         }
         Relationships: []
       }
+      open_items: {
+        Row: {
+          beschreibung: string
+          betrag_bezahlt: number
+          betrag_gesamt: number
+          created_at: string
+          datum: string
+          id: string
+          referenz_id: string
+          status: string
+          student_id: string
+          typ: string
+        }
+        Insert: {
+          beschreibung: string
+          betrag_bezahlt?: number
+          betrag_gesamt: number
+          created_at?: string
+          datum?: string
+          id?: string
+          referenz_id: string
+          status?: string
+          student_id: string
+          typ: string
+        }
+        Update: {
+          beschreibung?: string
+          betrag_bezahlt?: number
+          betrag_gesamt?: number
+          created_at?: string
+          datum?: string
+          id?: string
+          referenz_id?: string
+          status?: string
+          student_id?: string
+          typ?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "open_items_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_allocations: {
+        Row: {
+          betrag: number
+          created_at: string
+          id: string
+          open_item_id: string
+          payment_id: string
+        }
+        Insert: {
+          betrag: number
+          created_at?: string
+          id?: string
+          open_item_id: string
+          payment_id: string
+        }
+        Update: {
+          betrag?: number
+          created_at?: string
+          id?: string
+          open_item_id?: string
+          payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_allocations_open_item_id_fkey"
+            columns: ["open_item_id"]
+            isOneToOne: false
+            referencedRelation: "open_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           betrag: number

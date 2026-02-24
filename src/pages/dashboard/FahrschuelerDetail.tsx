@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +130,7 @@ const FahrschuelerDetail = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     datum: new Date().toISOString().slice(0, 10),
+    selectedOpenItems: [] as string[],
   });
 
   // ── Data queries ──
@@ -194,6 +196,21 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
+  // Open items query
+  const { data: openItems = [] } = useQuery({
+    queryKey: ["open_items", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("open_items")
+        .select("*")
+        .eq("student_id", id!)
+        .order("datum", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // Additional queries for modals
   const { data: prices = [] } = useQuery({
     queryKey: ["prices", "active"],
@@ -241,6 +258,7 @@ const FahrschuelerDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       setDlgFahrstunde(false);
       setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
       toast({ title: "Fahrstunde gespeichert" });
@@ -287,6 +305,7 @@ const FahrschuelerDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exams", id] });
       queryClient.invalidateQueries({ queryKey: ["exams_all"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       setDlgPruefung(false);
       setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), bestanden: false, preis: "0" });
       toast({ title: "Prüfung eingetragen" });
@@ -308,6 +327,7 @@ const FahrschuelerDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services", id] });
       queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       setDlgLeistung(false);
       setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", status: "offen" });
       toast({ title: "Leistung hinzugefügt" });
@@ -317,19 +337,43 @@ const FahrschuelerDetail = () => {
 
   const mutZahlung = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("payments").insert({
+      const betrag = parseFloat(fsZahlung.betrag) || 0;
+      // Insert payment
+      const { data: paymentData, error: paymentError } = await supabase.from("payments").insert({
         student_id: id!,
-        betrag: parseFloat(fsZahlung.betrag) || 0,
+        betrag,
         zahlungsart: fsZahlung.zahlungsart,
         datum: new Date(fsZahlung.datum).toISOString(),
-      });
-      if (error) throw error;
+      }).select("id").single();
+      if (paymentError) throw paymentError;
+
+      // Allocate to selected open items
+      if (fsZahlung.selectedOpenItems.length > 0) {
+        const selectedItems = openItems
+          .filter((oi: any) => fsZahlung.selectedOpenItems.includes(oi.id))
+          .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
+
+        let remaining = betrag;
+        const allocations: { payment_id: string; open_item_id: string; betrag: number }[] = [];
+        for (const item of selectedItems) {
+          if (remaining <= 0) break;
+          const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
+          const zuordnung = Math.min(remaining, offen);
+          allocations.push({ payment_id: paymentData.id, open_item_id: item.id, betrag: zuordnung });
+          remaining -= zuordnung;
+        }
+        if (allocations.length > 0) {
+          const { error: allocError } = await supabase.from("payment_allocations").insert(allocations as any);
+          if (allocError) throw allocError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments", id] });
       queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       setDlgZahlung(false);
-      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10) });
+      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [] });
       toast({ title: "Zahlung erfasst" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -404,7 +448,11 @@ const FahrschuelerDetail = () => {
   const totalPruefungen  = exams.reduce((sum, e) => sum + Number(e.preis), 0);
   const totalLeistungen  = services.reduce((sum, sv) => sum + Number(sv.preis), 0);
   const totalZahlungen   = payments.reduce((sum, p) => sum + Number(p.betrag), 0);
-  const saldo            = totalFahrstunden + totalPruefungen + totalLeistungen - totalZahlungen;
+
+  // Saldo aus open_items berechnen
+  const totalForderungen = openItems.reduce((sum: number, oi: any) => sum + Number(oi.betrag_gesamt), 0);
+  const totalBezahlt = openItems.reduce((sum: number, oi: any) => sum + Number(oi.betrag_bezahlt), 0);
+  const saldo = totalForderungen - totalBezahlt;
 
   const previewPrice = calculatePrice(fsFahrstunde.dauer_minuten);
 
@@ -580,10 +628,8 @@ const FahrschuelerDetail = () => {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Übersicht / Saldo</p>
             {[
-              { label: `Fahrstunden (${gesamtEinheiten} Einh.)`, value: totalFahrstunden, sign: "" },
-              { label: `Prüfungen (${exams.length})`, value: totalPruefungen, sign: "" },
-              { label: `Leistungen (${services.length})`, value: totalLeistungen, sign: "" },
-              { label: `Zahlungen (${payments.length})`, value: totalZahlungen, sign: "−", cls: "text-green-400" },
+              { label: `Forderungen gesamt`, value: totalForderungen, sign: "" },
+              { label: `Davon bezahlt`, value: totalBezahlt, sign: "−", cls: "text-green-400" },
             ].map(({ label, value, sign, cls }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
@@ -1278,15 +1324,15 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10) }); }}>
-        <DialogContent className="max-w-md">
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [] }); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Zahlung erfassen</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label>Betrag (€)</Label>
-              <Input type="number" step="0.01" min="0.01" placeholder="0,00" value={fsZahlung.betrag} onChange={(e) => setFsZahlung((f) => ({ ...f, betrag: e.target.value }))} />
+              <Label>Datum</Label>
+              <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
@@ -1300,9 +1346,86 @@ const FahrschuelerDetail = () => {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Datum</Label>
-              <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
+              <Label>Betrag (€)</Label>
+              <Input type="number" step="0.01" min="0.01" placeholder="0,00" value={fsZahlung.betrag} onChange={(e) => setFsZahlung((f) => ({ ...f, betrag: e.target.value }))} />
             </div>
+
+            {/* Offene Posten */}
+            {(() => {
+              const offenePosten = openItems.filter((oi: any) => oi.status !== "bezahlt");
+              if (offenePosten.length === 0) return null;
+
+              const betragNum = parseFloat(fsZahlung.betrag) || 0;
+              const selectedItems = offenePosten
+                .filter((oi: any) => fsZahlung.selectedOpenItems.includes(oi.id))
+                .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
+
+              // Calculate allocations for preview
+              let remaining = betragNum;
+              const allocMap = new Map<string, number>();
+              for (const item of selectedItems) {
+                if (remaining <= 0) break;
+                const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
+                const zuordnung = Math.min(remaining, offen);
+                allocMap.set(item.id, zuordnung);
+                remaining -= zuordnung;
+              }
+
+              return (
+                <div className="space-y-2">
+                  <Label>Offene Posten zuordnen</Label>
+                  <div className="rounded-lg border border-border divide-y divide-border max-h-60 overflow-y-auto">
+                    {offenePosten.map((oi: any) => {
+                      const offen = Number(oi.betrag_gesamt) - Number(oi.betrag_bezahlt);
+                      const checked = fsZahlung.selectedOpenItems.includes(oi.id);
+                      const alloc = allocMap.get(oi.id);
+                      return (
+                        <label key={oi.id} className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) => {
+                              setFsZahlung((f) => ({
+                                ...f,
+                                selectedOpenItems: c
+                                  ? [...f.selectedOpenItems, oi.id]
+                                  : f.selectedOpenItems.filter((x) => x !== oi.id),
+                              }));
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(oi.datum), "dd.MM.yyyy", { locale: de })}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {oi.typ === "fahrstunde" ? "Fahrstunde" : oi.typ === "pruefung" ? "Prüfung" : "Leistung"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-foreground truncate">{oi.beschreibung}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-foreground">{offen.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</p>
+                            {checked && alloc != null && alloc > 0 && (
+                              <p className="text-xs text-green-400">
+                                → {alloc.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {fsZahlung.selectedOpenItems.length > 0 && betragNum > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Verteilung: {Array.from(allocMap.values()).reduce((s, v) => s + v, 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })} zugeordnet
+                      {remaining > 0 && ` · ${remaining.toLocaleString("de-DE", { style: "currency", currency: "EUR" })} Restbetrag`}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDlgZahlung(false)}>Abbrechen</Button>
               <Button disabled={!fsZahlung.betrag || mutZahlung.isPending} onClick={() => mutZahlung.mutate()}>

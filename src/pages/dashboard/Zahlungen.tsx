@@ -4,6 +4,8 @@ import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import PageHeader from "@/components/PageHeader";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,30 +38,20 @@ import {
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Zahlungsart = "bar" | "ec" | "ueberweisung";
 
-type Payment = {
-  id: string;
-  student_id: string;
-  service_id: string | null;
-  betrag: number;
-  zahlungsart: Zahlungsart;
-  datum: string;
-  students: { vorname: string; nachname: string; geburtsdatum: string | null } | null;
-};
-
 type PaymentForm = {
   student_id: string;
-  service_id: string;
   betrag: string;
   zahlungsart: Zahlungsart;
   datum: string;
+  selectedOpenItems: string[];
 };
 
 const defaultForm = (): PaymentForm => ({
   student_id: "",
-  service_id: "",
   betrag: "",
   zahlungsart: "bar",
   datum: new Date().toISOString().slice(0, 10),
+  selectedOpenItems: [],
 });
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -87,7 +79,7 @@ const Zahlungen = () => {
   const qc = useQueryClient();
 
   // ── Queries ──────────────────────────────────────────────────────────────────
-  const { data: payments = [], isLoading } = useQuery<Payment[]>({
+  const { data: payments = [], isLoading } = useQuery({
     queryKey: ["payments"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -95,7 +87,19 @@ const Zahlungen = () => {
         .select("*, students(vorname, nachname, geburtsdatum)")
         .order("datum", { ascending: false });
       if (error) throw error;
-      return data as Payment[];
+      return data as any[];
+    },
+  });
+
+  // Payment allocations for display
+  const { data: allAllocations = [] } = useQuery({
+    queryKey: ["payment_allocations_all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_allocations")
+        .select("*, open_items(beschreibung, typ, datum)") as any;
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -111,15 +115,17 @@ const Zahlungen = () => {
     },
   });
 
-  const { data: openServices = [] } = useQuery({
-    queryKey: ["services_offen", form.student_id],
+  // Open items for selected student in dialog
+  const { data: openItemsForStudent = [] } = useQuery({
+    queryKey: ["open_items_student", form.student_id],
     queryFn: async () => {
       if (!form.student_id) return [];
       const { data, error } = await supabase
-        .from("services")
-        .select("id, bezeichnung, preis")
+        .from("open_items")
+        .select("*")
         .eq("student_id", form.student_id)
-        .eq("status", "offen");
+        .neq("status", "bezahlt")
+        .order("datum", { ascending: true }) as any;
       if (error) throw error;
       return data ?? [];
     },
@@ -129,17 +135,44 @@ const Zahlungen = () => {
   // ── Mutation ─────────────────────────────────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("payments").insert({
-        student_id: form.student_id,
-        service_id: form.service_id || null,
-        betrag: parseFloat(form.betrag) || 0,
-        zahlungsart: form.zahlungsart,
-        datum: new Date(form.datum).toISOString(),
-      });
-      if (error) throw error;
+      const betrag = parseFloat(form.betrag) || 0;
+      const { data: paymentData, error: paymentError } = await supabase
+        .from("payments")
+        .insert({
+          student_id: form.student_id,
+          betrag,
+          zahlungsart: form.zahlungsart,
+          datum: new Date(form.datum).toISOString(),
+        })
+        .select("id")
+        .single();
+      if (paymentError) throw paymentError;
+
+      // Allocate to selected open items
+      if (form.selectedOpenItems.length > 0) {
+        const selectedItems = openItemsForStudent
+          .filter((oi: any) => form.selectedOpenItems.includes(oi.id))
+          .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
+
+        let remaining = betrag;
+        const allocations: { payment_id: string; open_item_id: string; betrag: number }[] = [];
+        for (const item of selectedItems) {
+          if (remaining <= 0) break;
+          const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
+          const zuordnung = Math.min(remaining, offen);
+          allocations.push({ payment_id: paymentData.id, open_item_id: item.id, betrag: zuordnung });
+          remaining -= zuordnung;
+        }
+        if (allocations.length > 0) {
+          const { error: allocError } = await supabase.from("payment_allocations").insert(allocations as any);
+          if (allocError) throw allocError;
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payments"] });
+      qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
+      qc.invalidateQueries({ queryKey: ["open_items_student", form.student_id] });
       toast({ title: "Zahlung gespeichert" });
       setOpen(false);
       setForm(defaultForm());
@@ -156,6 +189,7 @@ const Zahlungen = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payments"] });
+      qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
       toast({ title: "Zahlung gelöscht" });
     },
     onError: (e: Error) => {
@@ -169,32 +203,23 @@ const Zahlungen = () => {
   const monthEnd = endOfMonth(now);
 
   const eingegangeneMonat = payments
-    .filter((p) => {
+    .filter((p: any) => {
       const d = new Date(p.datum);
       return d >= monthStart && d <= monthEnd;
     })
-    .reduce((s, p) => s + Number(p.betrag), 0);
+    .reduce((s: number, p: any) => s + Number(p.betrag), 0);
 
-  const gesamtEingegangen = payments.reduce((s, p) => s + Number(p.betrag), 0);
-
-  // Offene Leistungen (services mit status=offen) – separate query for total
-  const { data: alleOffenen = [] } = useQuery({
-    queryKey: ["services_all_offen"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("preis")
-        .eq("status", "offen");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const totalOffen = alleOffenen.reduce((s, sv) => s + Number(sv.preis), 0);
-  // Saldo = offene Leistungen - eingegangene Zahlungen (vereinfacht)
-  const saldo = totalOffen - gesamtEingegangen;
+  const gesamtEingegangen = payments.reduce((s: number, p: any) => s + Number(p.betrag), 0);
 
   const canSave = form.student_id && form.betrag && parseFloat(form.betrag) > 0;
+
+  // Build allocation map for display
+  const allocationsByPayment = new Map<string, any[]>();
+  for (const alloc of allAllocations) {
+    const list = allocationsByPayment.get(alloc.payment_id) || [];
+    list.push(alloc);
+    allocationsByPayment.set(alloc.payment_id, list);
+  }
 
   return (
     <div className="space-y-6">
@@ -210,7 +235,7 @@ const Zahlungen = () => {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-2xl font-bold text-green-400">{eur(eingegangeneMonat)}</p>
           <p className="text-sm text-muted-foreground mt-1">Eingegangen (dieser Monat)</p>
@@ -218,12 +243,6 @@ const Zahlungen = () => {
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-2xl font-bold text-foreground">{eur(gesamtEingegangen)}</p>
           <p className="text-sm text-muted-foreground mt-1">Gesamt eingegangen</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <p className={`text-2xl font-bold ${saldo > 0 ? "text-amber-400" : "text-green-400"}`}>
-            {eur(Math.max(0, saldo))}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">Offener Saldo</p>
         </div>
       </div>
 
@@ -246,6 +265,7 @@ const Zahlungen = () => {
               <TableHead>Schüler</TableHead>
               <TableHead>Datum</TableHead>
               <TableHead>Zahlungsart</TableHead>
+              <TableHead>Zuordnung</TableHead>
               <TableHead className="text-right">Betrag</TableHead>
               <TableHead className="w-12" />
             </TableRow>
@@ -253,11 +273,11 @@ const Zahlungen = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12">
+                <TableCell colSpan={6} className="text-center py-12">
                   <div className="h-4 w-48 bg-secondary/60 rounded animate-pulse mx-auto" />
                 </TableCell>
               </TableRow>
-            ) : payments.filter((p) => {
+            ) : payments.filter((p: any) => {
                 if (!searchTerm) return true;
                 const st = p.students;
                 if (!st) return false;
@@ -265,20 +285,21 @@ const Zahlungen = () => {
                 return name.includes(searchTerm.toLowerCase());
               }).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                   <TrendingDown className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   Noch keine Zahlungen erfasst
                 </TableCell>
               </TableRow>
             ) : (
-              payments.filter((p) => {
+              payments.filter((p: any) => {
                 if (!searchTerm) return true;
                 const st = p.students;
                 if (!st) return false;
                 const name = `${st.nachname} ${st.vorname}`.toLowerCase();
                 return name.includes(searchTerm.toLowerCase());
-              }).map((p) => {
+              }).map((p: any) => {
                 const st = p.students;
+                const allocations = allocationsByPayment.get(p.id) || [];
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">
@@ -289,9 +310,23 @@ const Zahlungen = () => {
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground">
-                        {ZAHLUNGSART_ICONS[p.zahlungsart]}
-                        {ZAHLUNGSART_LABELS[p.zahlungsart]}
+                        {ZAHLUNGSART_ICONS[p.zahlungsart as Zahlungsart]}
+                        {ZAHLUNGSART_LABELS[p.zahlungsart as Zahlungsart]}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {allocations.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {allocations.map((a: any) => (
+                            <p key={a.id} className="text-xs text-muted-foreground">
+                              {a.open_items?.beschreibung ?? "–"}{" "}
+                              <span className="text-foreground font-medium">{eur(Number(a.betrag))}</span>
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Freie Zahlung</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-green-400">
                       +{eur(Number(p.betrag))}
@@ -317,7 +352,7 @@ const Zahlungen = () => {
 
       {/* Dialog */}
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setForm(defaultForm()); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Zahlung erfassen</DialogTitle>
           </DialogHeader>
@@ -329,51 +364,18 @@ const Zahlungen = () => {
               <StudentCombobox
                 students={students}
                 value={form.student_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, student_id: v, service_id: "" }))}
+                onValueChange={(v) => setForm((f) => ({ ...f, student_id: v, selectedOpenItems: [] }))}
                 placeholder="Schüler wählen…"
               />
             </div>
 
-            {/* Offene Leistung (optional) */}
-            {openServices.length > 0 && (
-              <div className="space-y-1.5">
-                <Label>Leistung zuordnen <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Select
-                  value={form.service_id}
-                  onValueChange={(v) => {
-                    const svc = openServices.find((s) => s.id === v);
-                    setForm((f) => ({
-                      ...f,
-                      service_id: v,
-                      betrag: svc ? String(svc.preis) : f.betrag,
-                    }));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Leistung wählen…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Keine Zuordnung</SelectItem>
-                    {openServices.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.bezeichnung} · {eur(Number(s.preis))}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Betrag */}
+            {/* Datum */}
             <div className="space-y-1.5">
-              <Label>Betrag (€)</Label>
+              <Label>Datum</Label>
               <Input
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="0,00"
-                value={form.betrag}
-                onChange={(e) => setForm((f) => ({ ...f, betrag: e.target.value }))}
+                type="date"
+                value={form.datum}
+                onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
               />
             </div>
 
@@ -395,15 +397,88 @@ const Zahlungen = () => {
               </Select>
             </div>
 
-            {/* Datum */}
+            {/* Betrag */}
             <div className="space-y-1.5">
-              <Label>Datum</Label>
+              <Label>Betrag (€)</Label>
               <Input
-                type="date"
-                value={form.datum}
-                onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="0,00"
+                value={form.betrag}
+                onChange={(e) => setForm((f) => ({ ...f, betrag: e.target.value }))}
               />
             </div>
+
+            {/* Offene Posten */}
+            {form.student_id && openItemsForStudent.length > 0 && (() => {
+              const betragNum = parseFloat(form.betrag) || 0;
+              const selectedItems = openItemsForStudent
+                .filter((oi: any) => form.selectedOpenItems.includes(oi.id))
+                .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
+
+              let remaining = betragNum;
+              const allocMap = new Map<string, number>();
+              for (const item of selectedItems) {
+                if (remaining <= 0) break;
+                const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
+                const zuordnung = Math.min(remaining, offen);
+                allocMap.set(item.id, zuordnung);
+                remaining -= zuordnung;
+              }
+
+              return (
+                <div className="space-y-2">
+                  <Label>Offene Posten zuordnen</Label>
+                  <div className="rounded-lg border border-border divide-y divide-border max-h-60 overflow-y-auto">
+                    {openItemsForStudent.map((oi: any) => {
+                      const offen = Number(oi.betrag_gesamt) - Number(oi.betrag_bezahlt);
+                      const checked = form.selectedOpenItems.includes(oi.id);
+                      const alloc = allocMap.get(oi.id);
+                      return (
+                        <label key={oi.id} className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) => {
+                              setForm((f) => ({
+                                ...f,
+                                selectedOpenItems: c
+                                  ? [...f.selectedOpenItems, oi.id]
+                                  : f.selectedOpenItems.filter((x) => x !== oi.id),
+                              }));
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(oi.datum), "dd.MM.yyyy", { locale: de })}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {oi.typ === "fahrstunde" ? "Fahrstunde" : oi.typ === "pruefung" ? "Prüfung" : "Leistung"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-foreground truncate">{oi.beschreibung}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-semibold text-foreground">{eur(offen)}</p>
+                            {checked && alloc != null && alloc > 0 && (
+                              <p className="text-xs text-green-400">→ {eur(alloc)}</p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {form.selectedOpenItems.length > 0 && betragNum > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Verteilung: {eur(Array.from(allocMap.values()).reduce((s, v) => s + v, 0))} zugeordnet
+                      {remaining > 0 && ` · ${eur(remaining)} Restbetrag`}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-2">
