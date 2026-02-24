@@ -63,12 +63,12 @@ const Dashboard = () => {
   const openBalance = totalCharges - totalPayments;
 
   const stats = [
-    { label: "Aktive Fahrschüler", value: String(students.length), icon: Users, color: "text-blue-400" },
-    { label: "Fahrstunden heute", value: String(lessonsToday), icon: Car, color: "text-green-400" },
-    { label: "Offene Zahlungen", value: fmt(openBalance), icon: CreditCard, color: "text-amber-400" },
-    { label: "Prüfungen diesen Monat", value: String(examsThisMonth), icon: ClipboardCheck, color: "text-purple-400" },
-    { label: "Theoriestunden gesamt", value: String(theorySessions.length), icon: BookOpen, color: "text-cyan-400" },
-    { label: "Umsatz (Monat)", value: fmt(monthlyRevenue), icon: TrendingUp, color: "text-emerald-400" },
+    { label: "Aktive Fahrschüler", value: String(students.length), icon: Users, color: "text-blue-600" },
+    { label: "Fahrstunden heute", value: String(lessonsToday), icon: Car, color: "text-green-600" },
+    { label: "Offene Zahlungen", value: fmt(openBalance), icon: CreditCard, color: "text-red-600" },
+    { label: "Prüfungen diesen Monat", value: String(examsThisMonth), icon: ClipboardCheck, color: "text-purple-600" },
+    { label: "Theoriestunden gesamt", value: String(theorySessions.length), icon: BookOpen, color: "text-cyan-600" },
+    { label: "Umsatz (Monat)", value: fmt(monthlyRevenue), icon: TrendingUp, color: "text-emerald-600" },
   ];
 
   // Recent activities (5 newest across tables)
@@ -210,7 +210,7 @@ const Dashboard = () => {
                 className="flex items-center justify-between text-sm cursor-pointer hover:bg-secondary/50 rounded-lg px-2 py-1.5 transition-colors"
               >
                 <span className="text-foreground">{formatStudentName(s.nachname, s.vorname, (s as any).geburtsdatum)}</span>
-                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30">
+                <Badge className="bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/15">
                   {fmt(s.saldo)}
                 </Badge>
               </div>

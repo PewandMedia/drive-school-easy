@@ -67,14 +67,14 @@ const FAHRZEUG_LABELS: Record<string, string> = {
 };
 
 const KLASSE_COLORS: Record<string, string> = {
-  B: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  B78: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  B197: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+  B: "bg-blue-500/10 text-blue-700 border-blue-500/20",
+  B78: "bg-purple-500/10 text-purple-700 border-purple-500/20",
+  B197: "bg-cyan-500/10 text-cyan-700 border-cyan-500/20",
 };
 
 const SERVICE_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
-  offen: { label: "Offen", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  bezahlt: { label: "Bezahlt", cls: "bg-green-500/15 text-green-400 border-green-500/30" },
+  offen: { label: "Offen", cls: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+  bezahlt: { label: "Bezahlt", cls: "bg-green-500/10 text-green-700 border-green-500/20" },
   erledigt: { label: "Erledigt", cls: "bg-muted text-muted-foreground border-border" },
 };
 
@@ -569,7 +569,7 @@ const FahrschuelerDetail = () => {
                   {(student as any).fahrschule === "rathaus" ? "Miro-Drive (Rathaus)" : "Miro-Drive (Riemke Markt)"}
                 </Badge>
                 {student.ist_umschreiber && (
-                  <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 text-xs">
+                  <Badge className="bg-amber-500/10 text-amber-700 border border-amber-500/20 hover:bg-amber-500/15 text-xs">
                     Umschreiber
                   </Badge>
                 )}
@@ -629,7 +629,7 @@ const FahrschuelerDetail = () => {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Übersicht / Saldo</p>
             {[
               { label: `Forderungen gesamt`, value: totalForderungen, sign: "" },
-              { label: `Davon bezahlt`, value: totalBezahlt, sign: "−", cls: "text-green-400" },
+              { label: `Davon bezahlt`, value: totalBezahlt, sign: "−", cls: "text-green-600" },
             ].map(({ label, value, sign, cls }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
@@ -642,7 +642,7 @@ const FahrschuelerDetail = () => {
               <span className="font-semibold text-foreground">
                 {saldo > 0 ? "Offener Saldo" : "Ausgeglichen"}
               </span>
-              <span className={`font-bold ${saldo > 0 ? "text-amber-400" : "text-green-400"}`}>
+              <span className={`font-bold ${saldo > 0 ? "text-red-600" : "text-green-600"}`}>
                 {saldo.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
               </span>
             </div>
@@ -676,8 +676,8 @@ const FahrschuelerDetail = () => {
                           </span>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                             istTeilbezahlt
-                              ? "bg-orange-500/15 text-orange-400 border border-orange-500/30"
-                              : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                              ? "bg-orange-500/10 text-orange-600 border border-orange-500/20"
+                              : "bg-amber-500/10 text-amber-700 border border-amber-500/20"
                           }`}>
                             {istTeilbezahlt
                               ? `${Number(oi.betrag_bezahlt).toLocaleString("de-DE", { minimumFractionDigits: 0 })}€ bez.`
@@ -698,9 +698,9 @@ const FahrschuelerDetail = () => {
 
           {/* ── B78 Info-Banner ── */}
           {isB78 && (
-            <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4 flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-purple-400 shrink-0" />
-              <p className="text-sm text-purple-300">
+            <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-purple-600 shrink-0" />
+              <p className="text-sm text-purple-700">
                 <span className="font-semibold">Klasse B78</span> – Nur Automatik, keine Schaltberechtigung
               </p>
             </div>
@@ -708,11 +708,11 @@ const FahrschuelerDetail = () => {
 
           {/* ── Sonderfahrten Fortschritt ── */}
           {student.ist_umschreiber ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
               <div className="flex items-center gap-2">
-                <Car className="h-5 w-5 text-amber-400" />
+                <Car className="h-5 w-5 text-amber-600" />
                 <span className="font-semibold text-foreground">Sonderfahrten</span>
-                <Badge className="ml-auto bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 text-xs">
+                <Badge className="ml-auto bg-amber-500/10 text-amber-700 border border-amber-500/20 hover:bg-amber-500/15 text-xs">
                   Umschreiber – keine Sonderfahrten erforderlich
                 </Badge>
               </div>
@@ -726,7 +726,7 @@ const FahrschuelerDetail = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   {allSonderComplete && (
-                    <div className="flex items-center gap-1.5 text-sm text-green-400">
+                    <div className="flex items-center gap-1.5 text-sm text-green-600">
                       <CheckCircle2 className="h-4 w-4" />
                       <span>Alle Pflichtfahrten absolviert</span>
                     </div>
@@ -753,10 +753,10 @@ const FahrschuelerDetail = () => {
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium text-foreground">{SONDER_LABELS[typ]}</span>
                         <div className="flex items-center gap-2">
-                          <span className={completed ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                          <span className={completed ? "text-green-600 font-semibold" : "text-muted-foreground"}>
                             {done} / {required}
                           </span>
-                          {completed && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                          {completed && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                         </div>
                       </div>
                       <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -778,10 +778,10 @@ const FahrschuelerDetail = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-foreground">Schaltstunden</span>
                       <div className="flex items-center gap-2">
-                      <span className={gearComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                      <span className={gearComplete ? "text-green-600 font-semibold" : "text-muted-foreground"}>
                           {gearHoursDone} / {SCHALTSTUNDEN_PFLICHT}
                         </span>
-                        {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                        {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                       </div>
                     </div>
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -814,7 +814,7 @@ const FahrschuelerDetail = () => {
               </div>
               <div className="flex items-center gap-2">
                 {allTheorieComplete && (
-                  <div className="flex items-center gap-1.5 text-sm text-green-400">
+                  <div className="flex items-center gap-1.5 text-sm text-green-600">
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Pflicht erfüllt</span>
                   </div>
@@ -833,10 +833,10 @@ const FahrschuelerDetail = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-foreground">{THEORIE_LABELS[typ]}</span>
                       <div className="flex items-center gap-2">
-                        <span className={completed ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                        <span className={completed ? "text-green-600 font-semibold" : "text-muted-foreground"}>
                           {done} / {required}
                         </span>
-                        {completed && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                        {completed && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                       </div>
                     </div>
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -862,7 +862,7 @@ const FahrschuelerDetail = () => {
                           key={l.nr}
                           className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
                             done
-                              ? "border-green-500/30 bg-green-500/10 text-green-400"
+                              ? "border-green-500/20 bg-green-500/10 text-green-700"
                               : "border-border bg-muted/30 text-muted-foreground"
                           }`}
                         >
@@ -883,7 +883,7 @@ const FahrschuelerDetail = () => {
                           key={l.nr}
                           className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
                             done
-                              ? "border-green-500/30 bg-green-500/10 text-green-400"
+                              ? "border-green-500/20 bg-green-500/10 text-green-700"
                               : "border-border bg-muted/30 text-muted-foreground"
                           }`}
                         >
@@ -911,10 +911,10 @@ const FahrschuelerDetail = () => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">Schaltstunden absolviert</span>
                     <div className="flex items-center gap-2">
-                      <span className={gearComplete ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                      <span className={gearComplete ? "text-green-600 font-semibold" : "text-muted-foreground"}>
                         {gearHoursDone} / {gearHoursRequired}
                       </span>
-                      {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                      {gearComplete && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                     </div>
                   </div>
                   <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -930,10 +930,10 @@ const FahrschuelerDetail = () => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">Testfahrt B197</span>
                     <div className="flex items-center gap-2">
-                      <span className={testfahrtVorhanden ? "text-green-400 font-semibold" : "text-muted-foreground"}>
+                      <span className={testfahrtVorhanden ? "text-green-600 font-semibold" : "text-muted-foreground"}>
                         {testfahrtVorhanden ? 1 : 0} / 1
                       </span>
-                      {testfahrtVorhanden && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+                      {testfahrtVorhanden && <CheckCircle2 className="h-4 w-4 text-green-600" />}
                     </div>
                   </div>
                   <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -947,16 +947,16 @@ const FahrschuelerDetail = () => {
 
                 <div className={`flex items-center gap-3 rounded-lg border p-3 ${
                   schaltberechtigungAktiv
-                    ? "border-green-500/30 bg-green-500/10"
-                    : "border-amber-500/30 bg-amber-500/10"
+                    ? "border-green-500/20 bg-green-500/10"
+                    : "border-amber-500/20 bg-amber-500/10"
                 }`}>
                   {schaltberechtigungAktiv ? (
-                    <ShieldCheck className="h-5 w-5 text-green-400 shrink-0" />
+                    <ShieldCheck className="h-5 w-5 text-green-600 shrink-0" />
                   ) : (
-                    <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0" />
+                    <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
                   )}
                   <div>
-                    <p className={`text-sm font-semibold ${schaltberechtigungAktiv ? "text-green-400" : "text-amber-400"}`}>
+                    <p className={`text-sm font-semibold ${schaltberechtigungAktiv ? "text-green-600" : "text-amber-600"}`}>
                       {schaltberechtigungAktiv ? "Schaltberechtigung aktiv" : "Schaltberechtigung ausstehend"}
                     </p>
                     {!schaltberechtigungAktiv && (
@@ -1010,7 +1010,7 @@ const FahrschuelerDetail = () => {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {exam.bestanden ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-400">
+                          <span className="inline-flex items-center gap-1 rounded-md border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-700">
                             <CheckCircle2 className="h-3 w-3" /> Bestanden
                           </span>
                         ) : (
