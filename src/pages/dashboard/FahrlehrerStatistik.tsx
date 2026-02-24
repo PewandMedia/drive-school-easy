@@ -1,14 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import PageHeader from "@/components/PageHeader";
-import { UserCheck, ClipboardCheck, TrendingDown, Trophy, AlertTriangle } from "lucide-react";
+import { UserCheck, ClipboardCheck, TrendingDown, Trophy, AlertTriangle, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableHeader, TableHead, TableBody, TableRow, TableCell,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import InstructorManageDialog from "@/components/InstructorManageDialog";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, ResponsiveContainer, Tooltip,
 } from "recharts";
@@ -20,6 +22,7 @@ const barColorClass = (q: number) =>
   q <= 20 ? "bg-green-500" : q <= 40 ? "bg-yellow-500" : "bg-destructive";
 
 const FahrlehrerStatistik = () => {
+  const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
   const { data: instructors, isLoading: loadingInstructors } = useQuery({
     queryKey: ["instructors-all"],
     queryFn: async () => {
@@ -87,7 +90,16 @@ const FahrlehrerStatistik = () => {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Fahrlehrer-Statistik" icon={UserCheck} description="Durchfallquote pro Fahrlehrer (nur Fahrprüfungen)" />
+      <PageHeader
+        title="Fahrlehrer-Statistik"
+        icon={UserCheck}
+        description="Durchfallquote pro Fahrlehrer (nur Fahrprüfungen)"
+        action={
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setInstructorDialogOpen(true)}>
+            <Settings className="h-4 w-4" /> Fahrlehrer verwalten
+          </Button>
+        }
+      />
 
       {/* KPI Cards */}
       {isLoading ? (
@@ -234,6 +246,7 @@ const FahrlehrerStatistik = () => {
           </CardContent>
         </Card>
       </div>
+      <InstructorManageDialog open={instructorDialogOpen} onOpenChange={setInstructorDialogOpen} />
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { formatStudentName } from "@/lib/formatStudentName";
-import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter } from "lucide-react";
+import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil } from "lucide-react";
+import InstructorManageDialog from "@/components/InstructorManageDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,6 +59,7 @@ const statusBadge = (bestanden: boolean) =>
 const Pruefungen = () => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ExamForm>(defaultForm());
+  const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -356,21 +358,26 @@ const Pruefungen = () => {
             {form.typ === "praxis" && (
               <div className="space-y-1.5">
                 <Label>Fahrlehrer *</Label>
-                <Select
-                  value={form.instructor_id}
-                  onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Fahrlehrer wählen…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {instructors.map((i) => (
-                      <SelectItem key={i.id} value={i.id}>
-                        {i.nachname}, {i.vorname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={form.instructor_id}
+                    onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Fahrlehrer wählen…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {instructors.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.nachname}, {i.vorname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" onClick={() => setInstructorDialogOpen(true)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -484,6 +491,8 @@ const Pruefungen = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <InstructorManageDialog open={instructorDialogOpen} onOpenChange={setInstructorDialogOpen} />
     </div>
   );
 };
