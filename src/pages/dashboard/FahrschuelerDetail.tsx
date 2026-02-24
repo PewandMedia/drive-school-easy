@@ -647,6 +647,50 @@ const FahrschuelerDetail = () => {
               </span>
             </div>
           </div>
+
+          {/* Offene Posten Liste */}
+          {(() => {
+            const offene = openItems.filter((oi: any) => oi.status !== "bezahlt");
+            if (offene.length === 0) return null;
+            const sorted = [...offene].sort((a: any, b: any) => new Date(b.datum).getTime() - new Date(a.datum).getTime());
+            return (
+              <div className="space-y-2 mt-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Offene Posten ({offene.length})
+                </p>
+                <div className="space-y-1.5">
+                  {sorted.map((oi: any) => {
+                    const offen = Number(oi.betrag_gesamt) - Number(oi.betrag_bezahlt);
+                    const istTeilbezahlt = oi.status === "teilbezahlt";
+                    return (
+                      <div key={oi.id} className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-muted-foreground shrink-0">
+                            {format(new Date(oi.datum), "dd.MM.yy")}
+                          </span>
+                          <span className="text-foreground truncate">{oi.beschreibung}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-medium text-foreground">
+                            {offen.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            istTeilbezahlt
+                              ? "bg-orange-500/15 text-orange-400 border border-orange-500/30"
+                              : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                          }`}>
+                            {istTeilbezahlt
+                              ? `${Number(oi.betrag_bezahlt).toLocaleString("de-DE", { minimumFractionDigits: 0 })}€ bez.`
+                              : "offen"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Right Column ── */}
