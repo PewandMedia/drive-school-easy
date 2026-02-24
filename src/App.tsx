@@ -22,7 +22,7 @@ import Schaltstunden from "./pages/dashboard/Schaltstunden";
 import Pruefungen from "./pages/dashboard/Pruefungen";
 import Zahlungen from "./pages/dashboard/Zahlungen";
 import Abrechnung from "./pages/dashboard/Abrechnung";
-import Auswertung from "./pages/dashboard/Auswertung";
+
 import FahrlehrerStatistik from "./pages/dashboard/FahrlehrerStatistik";
 import Tagesabrechnung from "./pages/dashboard/Tagesabrechnung";
 
@@ -58,7 +58,7 @@ const App = () => (
               <Route path="pruefungen" element={<Pruefungen />} />
               <Route path="zahlungen" element={<Zahlungen />} />
               <Route path="abrechnung" element={<Abrechnung />} />
-              <Route path="auswertung" element={<Auswertung />} />
+              
               <Route path="fahrlehrer-statistik" element={<FahrlehrerStatistik />} />
               <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
             </Route>
