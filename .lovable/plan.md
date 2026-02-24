@@ -1,57 +1,44 @@
 
 
-## Auswertung-Dashboard visuell verbessern
+## "Sonstiges" Option in der Preisliste mit Notizfeld
 
-### Probleme im aktuellen Zustand (siehe Screenshot)
+### Was wird geaendert
 
-1. **KPI-Karten zu klein und unleserlich** - Icons und Trend-Pfeile sind winzig, Werte schwer zu lesen
-2. **Umsatzentwicklung nimmt volle Breite ein** fuer nur 1-2 Balken - sieht leer aus
-3. **Alle Balkendiagramme identisch orange** - keine visuelle Unterscheidung
-4. **Donut-Chart zu klein** ohne Zahlen im Zentrum
-5. **Kein visueller Kontrast** zwischen den Sektionen
+In der "Leistung zuordnen"-Dialog wird eine neue Option **"Sonstiges"** in der Preisliste-Auswahl ergaenzt. Wenn "Sonstiges" gewaehlt wird, erscheint ein Notizfeld (Textarea) fuer eine Beschreibung (z.B. "Strassenverkehrsamt Gebuehren") und das Preisfeld bleibt leer zum manuellen Eintragen.
 
-### Aenderungen an `src/pages/dashboard/Auswertung.tsx`
+### Aenderungen in `src/pages/dashboard/Leistungen.tsx`
 
-**1. KPI-Karten aufwerten**
+**1. Formular-State erweitern**
 
-- Layout von 6 Spalten auf 3x2 Grid (groessere Karten)
-- Icon in farbigem Kreis-Hintergrund (wie PageHeader)
-- Wert groesser und prominenter
-- Label ueber dem Wert statt darunter
-- Trend-Icon mit Farbe und Prozent-Aenderung neben dem Wert
-- Subtile Border-Akzente fuer gute/schlechte Werte (gruen/rot links-Border)
+- Neues Feld `notiz` im `defaultForm` hinzufuegen (leerer String)
 
-**2. Umsatzentwicklung kompakter**
+**2. "Sonstiges" in der Preisliste-Auswahl**
 
-- Chart-Hoehe von 260px auf 200px reduzieren
-- Umsatz-Gesamtwert als grosse Zahl im CardHeader neben dem Titel anzeigen
-- Abrundung der Balken beibehalten
+- Nach den bestehenden Preisen aus der Datenbank wird ein zusaetzlicher Eintrag **"Sonstiges"** mit dem Wert `"sonstiges"` angezeigt (Kategorie: `[Sonstiges]`)
+- Wenn "Sonstiges" gewaehlt wird:
+  - `bezeichnung` wird auf "Sonstiges" gesetzt
+  - `preis` bleibt leer (manuell eintragbar)
+  - `preis_id` wird auf leer gesetzt (kein Preis-Datensatz)
 
-**3. Visuelle Unterscheidung der Charts**
+**3. Notizfeld anzeigen**
 
-- Schueler pro Monat: Blau-Ton statt Orange (`hsl(210 80% 55%)`)
-- Fahrstunden-Auslastung: Cyan/Tuerkis (`hsl(180 70% 45%)`)
-- Pruefungsergebnisse: Gruen/Rot beibehalten (semantisch korrekt)
-- Donut: Gruen/Grau beibehalten
+- Ein Textarea-Feld erscheint **nur wenn "Sonstiges" gewaehlt** ist (oder generell nuetzlich: immer sichtbar als optionales Feld)
+- Label: "Notiz / Beschreibung"
+- Placeholder: "z.B. Strassenverkehrsamt Gebuehren..."
+- Der Notiz-Text wird an die Bezeichnung angehaengt beim Speichern: `"Sonstiges - Strassenverkehrsamt Gebuehren"`
 
-**4. Donut-Chart mit Zentral-Label**
+**4. Submit-Logik anpassen**
 
-- Gesamtbetrag und Prozent im Zentrum des Donuts als Text anzeigen
-- Bezahlt/Offen mit Euro-Betraegen in der Legende
+- Wenn "Sonstiges" gewaehlt und eine Notiz vorhanden: `bezeichnung` = `"Sonstiges – " + notiz`
+- Preis muss manuell eingetragen werden (Validierung: Preis > 0 bei Sonstiges)
 
-**5. Bessere Card-Styling**
+### Technische Details
 
-- CardHeader mit leichtem Bottom-Border zur Trennung
-- Konsistente Innenabstaende
-- Subtile Hover-Effekte auf KPI-Karten
-
-### Zusammenfassung
-
-| Bereich | Aenderung |
-|---------|-----------|
-| KPI-Karten | 3x2 Grid, groessere Icons, farbige Akzente, Label oben |
-| Umsatz-Chart | Kompakter, Gesamtwert im Header |
-| Chart-Farben | Unterschiedliche Farben pro Diagramm statt alles Orange |
-| Donut | Zentrales Label mit Gesamtbetrag und Prozent |
-| Cards | Bessere Abstaeende und visuelle Trennung |
+| Bereich | Detail |
+|---------|--------|
+| Datei | `src/pages/dashboard/Leistungen.tsx` |
+| Neue Komponente | Textarea aus `@/components/ui/textarea` (bereits vorhanden) |
+| Neuer State | `notiz: string` im Formular |
+| Sonstiges-Erkennung | `form.preis_id === "sonstiges"` |
+| Bezeichnung-Logik | Bei Sonstiges: Notiz wird Teil der Bezeichnung |
 
