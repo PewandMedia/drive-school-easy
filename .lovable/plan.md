@@ -1,66 +1,73 @@
 
 
-## Fixes: Supabase 1000-Limit, Schaltstunden Tages-Logik, Abrechnung Pagination
+## Fix: Supabase 1000-Zeilen-Limit richtig umgehen
 
-### Uebersicht
+### Problem
 
-Drei Hauptprobleme werden behoben:
-1. Supabase-Queries ohne `.limit(10000)` geben maximal 1000 Zeilen zurueck, was falsche Zahlen in Statistik-Cards und "Weitere X von 1000" verursacht
-2. Schaltstunden zeigt bereits Tages-Logik korrekt an (besteht schon), aber es fehlt die Trennung "heute keine" + trotzdem aeltere anzeigen
-3. Abrechnung hat keine Pagination ("Mehr anzeigen")
+Das Supabase PostgREST-Backend hat serverseitig ein `max_rows`-Limit von 1000. Der Client-Parameter `.limit(10000)` wird vom Server ignoriert -- es kommen maximal 1000 Zeilen zurueck. Das betrifft:
 
----
+- **Statistik-Cards**: Zeigen falsche Zahlen (z.B. "1000" statt 1208 Fahrstunden)
+- **"Mehr anzeigen"-Buttons**: Zeigen "von 1000" statt der echten Gesamtzahl
+- **Saldo-Berechnungen**: Unvollstaendig weil nicht alle Daten geladen werden
 
-### 1. Fehlende `.limit(10000)` ergaenzen
+### Loesung: Paginated Fetching
 
-Alle Queries die grosse Datenmengen laden koennen, aber noch kein `.limit(10000)` haben, werden ergaenzt. Das behebt sowohl die falschen Statistik-Zahlen (z.B. "1000" statt der echten Zahl) als auch die falsche Anzeige "Weitere 10 von 1000".
+Eine Hilfsfunktion `fetchAll()` wird erstellt, die automatisch in 1000er-Batches alle Daten aus einer Tabelle laedt. Die Funktion ruft `.range(0, 999)`, `.range(1000, 1999)` usw. auf, bis keine weiteren Daten mehr kommen.
 
-| Datei | Query/Tabelle | Problem |
-|-------|--------------|---------|
-| `Abrechnung.tsx` | `students.select("*")` | Kein Limit |
-| `Abrechnung.tsx` | `open_items.select(...)` | Kein Limit |
-| `Fahrstunden.tsx` | `students.select(...)` | Kein Limit |
-| `Theorie.tsx` | `students.select(...)` | Kein Limit |
-| `Pruefungen.tsx` | `students.select(...)` | Kein Limit |
-| `Zahlungen.tsx` | `students.select(...)` | Kein Limit |
-| `Zahlungen.tsx` | `payment_allocations.select(...)` | Kein Limit |
-| `Leistungen.tsx` | `students.select(...)` | Kein Limit |
+```text
+async function fetchAll(query):
+  allData = []
+  page = 0
+  while true:
+    data = query.range(page * 1000, (page + 1) * 1000 - 1)
+    allData.push(...data)
+    if data.length < 1000: break
+    page++
+  return allData
+```
 
-Alle diese Queries bekommen `.limit(10000)` angehaengt.
+### Betroffene Dateien und Aenderungen
 
----
+**Neue Datei: `src/lib/fetchAllRows.ts`**
+- Exportiert eine generische `fetchAllRows()` Funktion
+- Nimmt einen Supabase-Query-Builder entgegen
+- Gibt alle Zeilen zurueck, egal wie viele es sind
+- Entfernt das bisherige `.limit(10000)` Problem komplett
 
-### 2. Abrechnung: Pagination mit "Mehr anzeigen"
+**Alle 9 Dashboard-Dateien werden angepasst:**
 
-**Datei**: `src/pages/dashboard/Abrechnung.tsx`
+| Datei | Queries die umgestellt werden |
+|-------|------------------------------|
+| `Dashboard.tsx` | students, driving_lessons, exams, theory_sessions, services, payments (6 Queries) |
+| `Fahrstunden.tsx` | students, driving_lessons (2 Queries) |
+| `Schaltstunden.tsx` | driving_lessons (1 Query, students bleibt da B197-Filter < 1000) |
+| `Theorie.tsx` | students, theory_sessions (2 Queries) |
+| `Pruefungen.tsx` | exams, students (2 Queries) |
+| `Leistungen.tsx` | services, students (2 Queries) |
+| `Zahlungen.tsx` | payments, payment_allocations, students (3 Queries) |
+| `Fahrschueler.tsx` | students, driving_lessons, exams, services, payments (5 Queries) |
+| `Abrechnung.tsx` | students, open_items (2 Queries) |
 
-- Neuer State: `const [visibleCount, setVisibleCount] = useState(10)`
-- Die gefilterte Schueler-Liste wird auf `visibleCount` begrenzt: `filtered.slice(0, visibleCount)`
-- Ein "Mehr anzeigen"-Button wird unter der Tabelle angezeigt, wenn es weitere Eintraege gibt
-- Der Button zeigt "Weitere X von Y anzeigen" an
-- Bei Suchfilter-Aenderung wird `visibleCount` auf 10 zurueckgesetzt
+Bei jeder Query wird `.limit(10000)` entfernt und stattdessen `fetchAllRows()` verwendet.
 
----
+### Technisches Detail
 
-### 3. Schaltstunden: Korrekte Tages-Logik
+Die `fetchAllRows` Funktion nutzt die Supabase `.range()` Methode:
 
-**Datei**: `src/pages/dashboard/Schaltstunden.tsx`
+```text
+Aufruf: fetchAllRows(supabase.from("driving_lessons").select("*").order("datum", { ascending: false }))
 
-Die bestehende Tages-Logik ist korrekt implementiert. Es wird nur sichergestellt, dass wenn heute keine Schaltstunden vorhanden sind ABER aeltere existieren, die Meldung "Heute noch keine Schaltstunden eingetragen" angezeigt wird und die aelteren trotzdem sichtbar sind (mit "Mehr anzeigen"). Aktuell zeigt es nur die leere Meldung wenn BEIDES leer ist.
+Intern:
+  Batch 1: .range(0, 999)    -> 1000 Zeilen
+  Batch 2: .range(1000, 1999) -> 208 Zeilen
+  Fertig: 1208 Zeilen total
+```
 
-**Aenderung**: Die leere-Meldung wird nur gezeigt wenn `todayLessons.length === 0`. Falls `olderLessons.length > 0` werden diese trotzdem darunter angezeigt.
+### Zusammenfassung
 
----
-
-### Zusammenfassung der Aenderungen
-
-| Datei | Aenderung |
-|-------|-----------|
-| `Abrechnung.tsx` | `.limit(10000)` fuer beide Queries + `visibleCount` State + "Mehr anzeigen" Button + Search-Reset |
-| `Schaltstunden.tsx` | Tages-Logik Fix: leere-Meldung nur fuer heute, aeltere trotzdem anzeigen |
-| `Fahrstunden.tsx` | `.limit(10000)` fuer students-Query |
-| `Theorie.tsx` | `.limit(10000)` fuer students-Query |
-| `Pruefungen.tsx` | `.limit(10000)` fuer students-Query |
-| `Zahlungen.tsx` | `.limit(10000)` fuer students- und payment_allocations-Queries |
-| `Leistungen.tsx` | `.limit(10000)` fuer students-Query |
+| Aenderung | Details |
+|-----------|---------|
+| Neue Datei `src/lib/fetchAllRows.ts` | Generische Paginated-Fetch-Funktion |
+| 9 Dashboard-Dateien | Alle `.limit(10000)` Queries durch `fetchAllRows()` ersetzen |
+| Ergebnis | Korrekte Statistik-Zahlen, korrekte "von X" Anzeigen, korrekte Saldo-Berechnungen |
 
