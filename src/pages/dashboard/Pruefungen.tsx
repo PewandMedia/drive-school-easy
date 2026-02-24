@@ -84,7 +84,8 @@ const Pruefungen = () => {
       const { data, error } = await supabase
         .from("students")
         .select("id, vorname, nachname, fuehrerscheinklasse, geburtsdatum")
-        .order("nachname");
+        .order("nachname")
+        .limit(10000);
       if (error) throw error;
       return data;
     },
