@@ -1,57 +1,45 @@
 
 
-## Betrag automatisch aus ausgewaehlten offenen Posten berechnen
+## Offene Posten im Saldo-Bereich anzeigen
 
 ### Problem
-Wenn man im "Zahlung erfassen"-Dialog einen offenen Posten per Checkbox auswaehlt, bleibt das Betrag-Feld leer. Der Benutzer muss den Betrag manuell eintippen.
+Der Bereich "Uebersicht / Saldo" im Schuelerprofil zeigt nur drei Zeilen: Forderungen gesamt, Davon bezahlt, Offener Saldo. Man sieht nicht, welche konkreten Posten noch offen sind.
 
 ### Loesung
-Beim An-/Abwaehlen einer Checkbox wird der Betrag automatisch als Summe aller offenen Betraege der ausgewaehlten Posten berechnet und ins Betrag-Feld eingetragen.
+Unter der Saldo-Zusammenfassung eine aufklappbare oder direkt sichtbare Liste aller offenen/teilbezahlten Posten anzeigen.
 
 ### Aenderung: `src/pages/dashboard/FahrschuelerDetail.tsx`
 
-In der `onCheckedChange`-Funktion der Checkbox (ca. Zeile 1386-1393):
+Im Bereich "Uebersicht / Saldo" (ca. Zeilen 627-649) wird nach dem Saldo-Block eine Liste der offenen Posten eingefuegt:
 
-- Nach dem Aktualisieren von `selectedOpenItems` auch `betrag` neu berechnen
-- Summe aller offenen Betraege (`betrag_gesamt - betrag_bezahlt`) der ausgewaehlten Posten
-- Wert als String ins `betrag`-Feld schreiben (z.B. "240" oder "305")
+**Neue Anzeige unter dem Saldo:**
 
-**Vorher:**
-```typescript
-onCheckedChange={(c) => {
-  setFsZahlung((f) => ({
-    ...f,
-    selectedOpenItems: c
-      ? [...f.selectedOpenItems, oi.id]
-      : f.selectedOpenItems.filter((x) => x !== oi.id),
-  }));
-}}
+- Ueberschrift: "Offene Posten" (nur wenn welche vorhanden)
+- Liste aller `openItems` mit `status !== "bezahlt"`, sortiert nach Datum
+- Pro Eintrag:
+  - Datum (formatiert)
+  - Beschreibung (z.B. "Fahrstunde 90min (2E)")
+  - Offener Betrag (betrag_gesamt - betrag_bezahlt)
+  - Bei Teilzahlung: kleiner Hinweis z.B. "von 130,00 EUR"
+- Farbcodierung: Status-Badge (offen = amber, teilbezahlt = orange)
+
+**Aufbau:**
+```text
+UEBERSICHT / SALDO
+Forderungen gesamt              792,00 EUR
+Davon bezahlt                  -352,00 EUR
+─────────────────────────────────────────
+Offener Saldo                   440,00 EUR
+
+OFFENE POSTEN (3)
+24.02.2026  Fahrstunde 90min     130,00 EUR  [offen]
+24.02.2026  Theoriepruefung       85,00 EUR  [offen]
+22.02.2026  Grundbetrag          225,00 EUR  [teilbezahlt: 74€ bezahlt]
 ```
-
-**Nachher:**
-```typescript
-onCheckedChange={(c) => {
-  setFsZahlung((f) => {
-    const newSelected = c
-      ? [...f.selectedOpenItems, oi.id]
-      : f.selectedOpenItems.filter((x) => x !== oi.id);
-    const summe = offenePosten
-      .filter((item: any) => newSelected.includes(item.id))
-      .reduce((sum: number, item: any) => sum + (Number(item.betrag_gesamt) - Number(item.betrag_bezahlt)), 0);
-    return {
-      ...f,
-      selectedOpenItems: newSelected,
-      betrag: summe > 0 ? summe.toFixed(2) : "",
-    };
-  });
-}}
-```
-
-Der Betrag bleibt weiterhin manuell ueberschreibbar -- er wird nur beim Klicken auf eine Checkbox automatisch aktualisiert.
 
 ### Zusammenfassung
 
 | Datei | Aenderung |
 |-------|-----------|
-| FahrschuelerDetail.tsx | Betrag automatisch aus Checkbox-Auswahl berechnen (ca. 5 Zeilen geaendert) |
+| FahrschuelerDetail.tsx | Liste offener Posten mit Datum, Beschreibung, Betrag und Status unter dem Saldo anzeigen |
 
