@@ -3,10 +3,12 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell } from "lucide-react";
+import { LogOut, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 const DashboardLayout = () => {
   const { user, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -17,8 +19,8 @@ const DashboardLayout = () => {
           <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 shrink-0">
             <SidebarTrigger />
             <div className="flex items-center gap-3 ml-auto">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Bell className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">
