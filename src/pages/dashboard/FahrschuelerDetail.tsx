@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check } from "lucide-react";
+import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -107,7 +108,7 @@ const FahrschuelerDetail = () => {
   });
   // fsSchaltstunde removed – Fahrstunden-Dialog handles schaltwagen
   const [fsTheorie, setFsTheorie] = useState({
-    typ: "grundstoff" as "grundstoff" | "klassenspezifisch",
+    lektion: 1,
     datum: new Date().toISOString().slice(0, 16),
   });
   const [fsPruefung, setFsPruefung] = useState({
@@ -251,18 +252,20 @@ const FahrschuelerDetail = () => {
 
   const mutTheorie = useMutation({
     mutationFn: async () => {
+      const typ = lektionToTyp(fsTheorie.lektion);
       const { error } = await supabase.from("theory_sessions").insert({
         student_id: id!,
         datum: new Date(fsTheorie.datum).toISOString(),
-        typ: fsTheorie.typ,
-      });
+        typ,
+        lektion: fsTheorie.lektion,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
       setDlgTheorie(false);
-      setFsTheorie({ typ: "grundstoff", datum: new Date().toISOString().slice(0, 16) });
+      setFsTheorie({ lektion: 1, datum: new Date().toISOString().slice(0, 16) });
       toast({ title: "Theoriestunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -351,9 +354,21 @@ const FahrschuelerDetail = () => {
 
   const gesamtEinheiten = lessons.filter((l) => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten || 1), 0);
 
+  // Unique lesson-based counting
+  const completedLektionen = new Set(
+    theorySessions
+      .filter((s: any) => s.lektion != null)
+      .map((s: any) => s.lektion as number)
+  );
+  const uniqueGrundstoff = Array.from(completedLektionen).filter((n) => n >= 1 && n <= 12);
+  const uniqueKlassen = Array.from(completedLektionen).filter((n) => n >= 13 && n <= 14);
+  // Legacy data without lektion
+  const altGrundstoff = theorySessions.filter((s: any) => s.lektion == null && s.typ === "grundstoff").length;
+  const altKlassen = theorySessions.filter((s: any) => s.lektion == null && s.typ === "klassenspezifisch").length;
+
   const theoryCounts = {
-    grundstoff: theorySessions.filter((s) => s.typ === "grundstoff").length,
-    klassenspezifisch: theorySessions.filter((s) => s.typ === "klassenspezifisch").length,
+    grundstoff: uniqueGrundstoff.length + altGrundstoff,
+    klassenspezifisch: uniqueKlassen.length + altKlassen,
   };
 
   const allTheorieComplete =
@@ -744,6 +759,52 @@ const FahrschuelerDetail = () => {
                   </div>
                 );
               })}
+
+              {/* Lektionen-Checkliste */}
+              <div className="border-t border-border pt-3 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Grundstoff (Lektion 1–12)</p>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                    {THEORIE_LEKTIONEN.filter((l) => l.nr <= 12).map((l) => {
+                      const done = completedLektionen.has(l.nr);
+                      return (
+                        <div
+                          key={l.nr}
+                          className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                            done
+                              ? "border-green-500/30 bg-green-500/10 text-green-400"
+                              : "border-border bg-muted/30 text-muted-foreground"
+                          }`}
+                        >
+                          {done ? <Check className="h-3 w-3" /> : <span className="h-3 w-3" />}
+                          L{l.nr}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Klassenspezifisch (Lektion 13–14)</p>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                    {THEORIE_LEKTIONEN.filter((l) => l.nr >= 13).map((l) => {
+                      const done = completedLektionen.has(l.nr);
+                      return (
+                        <div
+                          key={l.nr}
+                          className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                            done
+                              ? "border-green-500/30 bg-green-500/10 text-green-400"
+                              : "border-border bg-muted/30 text-muted-foreground"
+                          }`}
+                        >
+                          {done ? <Check className="h-3 w-3" /> : <span className="h-3 w-3" />}
+                          L{l.nr}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1059,14 +1120,26 @@ const FahrschuelerDetail = () => {
           </DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); mutTheorie.mutate(); }} className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>Typ</Label>
-              <Select value={fsTheorie.typ} onValueChange={(v) => setFsTheorie((f) => ({ ...f, typ: v as "grundstoff" | "klassenspezifisch" }))}>
+              <Label>Theorielektion</Label>
+              <Select value={String(fsTheorie.lektion)} onValueChange={(v) => setFsTheorie((f) => ({ ...f, lektion: parseInt(v) }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="grundstoff">Grundstoff</SelectItem>
-                  <SelectItem value="klassenspezifisch">Klassenspezifisch</SelectItem>
+                  {THEORIE_LEKTIONEN.map((l) => (
+                    <SelectItem key={l.nr} value={String(l.nr)}>{l.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {/* Duplikat-Warnung */}
+              {(() => {
+                const existing = theorySessions.find((s: any) => s.lektion === fsTheorie.lektion);
+                if (!existing) return null;
+                return (
+                  <p className="text-xs text-amber-400 flex items-center gap-1.5 mt-1">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    Lektion {fsTheorie.lektion} wurde bereits am {format(new Date(existing.datum), "dd.MM.yyyy", { locale: de })} besucht. Sie wird nicht doppelt für die Pflicht gezählt.
+                  </p>
+                );
+              })()}
             </div>
             <div className="space-y-1.5">
               <Label>Datum & Uhrzeit</Label>

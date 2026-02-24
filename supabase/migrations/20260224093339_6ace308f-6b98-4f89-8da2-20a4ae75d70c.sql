@@ -1,0 +1,1 @@
+ALTER TABLE public.theory_sessions ADD COLUMN lektion integer;

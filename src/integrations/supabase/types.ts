@@ -341,6 +341,7 @@ export type Database = {
           created_at: string
           datum: string
           id: string
+          lektion: number | null
           student_id: string
           typ: Database["public"]["Enums"]["theory_session_typ"]
         }
@@ -348,6 +349,7 @@ export type Database = {
           created_at?: string
           datum?: string
           id?: string
+          lektion?: number | null
           student_id: string
           typ: Database["public"]["Enums"]["theory_session_typ"]
         }
@@ -355,6 +357,7 @@ export type Database = {
           created_at?: string
           datum?: string
           id?: string
+          lektion?: number | null
           student_id?: string
           typ?: Database["public"]["Enums"]["theory_session_typ"]
         }

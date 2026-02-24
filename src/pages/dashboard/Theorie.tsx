@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BookOpen, Plus, Trash2, Users, GraduationCap, BookMarked } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
+import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -41,11 +42,12 @@ type TheorySession = {
   student_id: string;
   datum: string;
   typ: "grundstoff" | "klassenspezifisch";
+  lektion: number | null;
 };
 
 const defaultForm = {
   student_id: "",
-  typ: "grundstoff" as "grundstoff" | "klassenspezifisch",
+  lektion: 1,
   datum: new Date().toISOString().slice(0, 16),
 };
 
@@ -73,7 +75,7 @@ const Theorie = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("theory_sessions")
-        .select("id, student_id, datum, typ")
+        .select("id, student_id, datum, typ, lektion")
         .order("datum", { ascending: false });
       if (error) throw error;
       return (data ?? []) as TheorySession[];
@@ -82,11 +84,13 @@ const Theorie = () => {
 
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
+      const typ = lektionToTyp(values.lektion);
       const { error } = await supabase.from("theory_sessions").insert({
         student_id: values.student_id,
         datum: new Date(values.datum).toISOString(),
-        typ: values.typ,
-      });
+        typ,
+        lektion: values.lektion,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -188,19 +192,20 @@ const Theorie = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Typ</Label>
+                  <Label>Theorielektion</Label>
                   <Select
-                    value={form.typ}
-                    onValueChange={(v) =>
-                      setForm((f) => ({ ...f, typ: v as "grundstoff" | "klassenspezifisch" }))
-                    }
+                    value={String(form.lektion)}
+                    onValueChange={(v) => setForm((f) => ({ ...f, lektion: parseInt(v) }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="grundstoff">Grundstoff</SelectItem>
-                      <SelectItem value="klassenspezifisch">Klassenspezifisch</SelectItem>
+                      {THEORIE_LEKTIONEN.map((l) => (
+                        <SelectItem key={l.nr} value={String(l.nr)}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -279,7 +284,7 @@ const Theorie = () => {
             <TableRow>
               <TableHead>Schüler</TableHead>
               <TableHead>Datum</TableHead>
-              <TableHead>Typ</TableHead>
+              <TableHead>Lektion</TableHead>
               <TableHead>Einheit</TableHead>
               <TableHead className="w-12" />
             </TableRow>
@@ -293,35 +298,43 @@ const Theorie = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((session) => (
-                <TableRow key={session.id}>
-                  <TableCell className="font-medium">
-                    {studentMap[session.student_id] ?? "–"}
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(session.datum), "dd.MM.yyyy HH:mm", { locale: de })}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={session.typ === "grundstoff" ? "default" : "secondary"}>
-                      {session.typ === "grundstoff" ? "Grundstoff" : "Klassenspezifisch"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {sessionNumberMap[session.id]}. Stunde
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(session.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              filtered.map((session) => {
+                const typ = session.lektion ? lektionToTyp(session.lektion) : session.typ;
+                const lektionLabel = session.lektion
+                  ? `Lektion ${session.lektion}`
+                  : (session.typ === "grundstoff" ? "Grundstoff" : "Klassenspezifisch");
+                const typLabel = typ === "grundstoff" ? "Grundstoff" : "Klassenspezifisch";
+
+                return (
+                  <TableRow key={session.id}>
+                    <TableCell className="font-medium">
+                      {studentMap[session.student_id] ?? "–"}
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(session.datum), "dd.MM.yyyy HH:mm", { locale: de })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={typ === "grundstoff" ? "default" : "secondary"}>
+                        {session.lektion ? `${lektionLabel} (${typLabel})` : lektionLabel}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {sessionNumberMap[session.id]}. Stunde
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => deleteMutation.mutate(session.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
