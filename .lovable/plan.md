@@ -1,55 +1,67 @@
 
 
-## Fahrlehrer-Verwaltung: Hinzufuegen, Bearbeiten, Loeschen
+## Datenbank mit 400 Demo-Fahrschuelern fuellen
 
 ### Uebersicht
 
-Es wird eine wiederverwendbare Fahrlehrer-Verwaltungs-Komponente erstellt, die als Dialog (Popup) geoeffnet werden kann. Diese wird an zwei Stellen eingebunden:
+Es wird eine Supabase Edge Function erstellt, die einmalig aufgerufen wird und 400 realistische Fahrschueler mit allen zugehoerigen Daten generiert. Die Daten decken die letzten 3 Monate ab (Dezember 2025 bis Februar 2026).
 
-1. **Pruefungen-Seite** (`Pruefungen.tsx`): Ein Edit-Icon neben dem Fahrlehrer-Dropdown (nur sichtbar bei Fahrpruefung)
-2. **Fahrlehrer-Statistik** (`FahrlehrerStatistik.tsx`): Ein Button im PageHeader
+### Was wird generiert
 
-### Neue Datei: `src/components/InstructorManageDialog.tsx`
+| Daten | Details |
+|-------|---------|
+| **400 Fahrschueler** | Realistische deutsche Vor-/Nachnamen, Geburtsdaten (17-35 Jahre), zufaellige Adressen, Telefonnummern, E-Mails |
+| **Fuehrerscheinklassen** | Zufaellig verteilt: ca. 60% B, 25% B197, 15% B78 |
+| **Fahrschule** | Zufaellig "riemke" oder "rathaus" |
+| **Anmeldedatum** | Verteilt ueber die letzten 3 Monate |
+| **Fahrstunden** | 0-25 pro Schueler je nach "Fortschritt", unterschiedliche Typen (Uebungsstunde, Ueberland, Autobahn, Nacht, Testfahrt B197) |
+| **Theoriestunden** | 0-14 Grundstoff + 0-2 klassenspezifisch pro Schueler |
+| **Schaltstunden** | Fuer B197-Schueler: 0-10 Schaltstunden |
+| **Pruefungen** | Theorie- und Fahrpruefungen mit bestanden/nicht bestanden, Fahrpruefungen mit zufaelligem Fahrlehrer |
+| **Leistungen (Services)** | Grundbetrag, Lernmaterial etc. aus bestehender Preisliste |
+| **Zahlungen** | Realistische Zahlungen (bar, EC, Ueberweisung) die offenen Posten zugeordnet werden |
 
-Eine eigenstaendige Dialog-Komponente mit folgender Funktionalitaet:
+### Wichtige Regeln
 
-**Ansicht: Liste**
-- Tabelle aller Fahrlehrer (Vorname, Nachname, aktiv/inaktiv)
-- Button "Neuen Fahrlehrer hinzufuegen"
-- Pro Zeile: Bearbeiten-Icon und Loeschen-Icon
+- **Bestehende Fahrlehrer** werden verwendet (7 aktive Fahrlehrer)
+- **Bestehende Preise** werden verwendet (5 aktive Preise)
+- **Trigger** arbeiten automatisch: Fahrstunden-Preise werden berechnet, offene Posten werden erstellt
+- **Zahlungen** werden ueber `payment_allocations` den offenen Posten zugeordnet, sodass der Trigger den Status aktualisiert
+- Unterschiedliche Fortschrittsstufen: Anfaenger (nur Anmeldung), Fortgeschrittene (viele Fahrstunden), Pruefungsreife (Pruefungen abgelegt)
 
-**Ansicht: Formular (Hinzufuegen/Bearbeiten)**
-- Zwei Eingabefelder: Vorname und Nachname
-- Speichern- und Abbrechen-Button
-- Beim Bearbeiten werden die bestehenden Werte vorausgefuellt
+### Technischer Ablauf
 
-**Loeschen**
-- Bestaetigung via AlertDialog bevor ein Fahrlehrer geloescht wird
-- Setzt `aktiv = false` (Soft-Delete), damit bestehende Pruefungsdaten nicht kaputt gehen
+**Neue Datei: `supabase/functions/seed-demo-data/index.ts`**
 
-### Aenderungen in `src/pages/dashboard/Pruefungen.tsx`
+1. Edge Function mit Service Role Key (umgeht RLS)
+2. Generiert 400 Schueler in Batches (50er Batches fuer Performance)
+3. Pro Schueler wird ein zufaelliger "Fortschrittsgrad" (0-100%) bestimmt
+4. Basierend auf dem Fortschritt werden Fahrstunden, Theorie, Pruefungen etc. erstellt
+5. Wartet nach jedem Insert auf die Trigger (open_items werden automatisch erstellt)
+6. Erstellt Zahlungen und ordnet sie den entstandenen offenen Posten zu
 
-- Import der neuen `InstructorManageDialog`-Komponente
-- Neuer State: `instructorDialogOpen`
-- Neben dem Fahrlehrer-Select (Zeile 358-374) wird ein kleines Edit-Icon (Pencil) als Button hinzugefuegt
-- Klick darauf oeffnet den Fahrlehrer-Verwaltungs-Dialog
-- Nach dem Schliessen werden die Fahrlehrer-Daten neu geladen (queryKey `instructors_active`)
+**Fortschrittsstufen:**
 
-### Aenderungen in `src/pages/dashboard/FahrlehrerStatistik.tsx`
+```text
+0-20%  : Nur Anmeldung + Grundbetrag/Lernmaterial
+20-50% : + einige Theoriestunden + erste Fahrstunden
+50-75% : + viele Fahrstunden + Sonderfahrten + Theoriepruefung
+75-100%: + Fahrpruefung, teilweise bestanden
+```
 
-- Import der neuen `InstructorManageDialog`-Komponente
-- Neuer State: `instructorDialogOpen`
-- Im PageHeader wird ein Button "Fahrlehrer verwalten" als `action`-Prop hinzugefuegt
-- Nach dem Schliessen werden auch hier die Daten invalidiert (queryKey `instructors-all`)
+**Zahlungslogik:**
+- Jeder Schueler hat zwischen 30-90% seiner offenen Posten bezahlt
+- Zahlungen werden chronologisch den aeltesten offenen Posten zugeordnet
+- Zahlungsarten zufaellig verteilt (bar, EC, Ueberweisung)
 
-### Technische Details
+### Aufruf
 
-| Bereich | Detail |
-|---------|--------|
-| Neue Datei | `src/components/InstructorManageDialog.tsx` |
-| Geaenderte Dateien | `Pruefungen.tsx`, `FahrlehrerStatistik.tsx` |
-| DB-Operationen | `INSERT`, `UPDATE` (aktiv-Flag), kein echtes DELETE |
-| Eingabefelder | Vorname (Pflicht), Nachname (Pflicht) |
-| Query-Invalidierung | `instructors_active`, `instructors-all` |
-| Validierung | Vorname und Nachname duerfen nicht leer sein |
+Nach dem Deployment wird die Funktion einmalig per curl aufgerufen. Danach kann sie wieder geloescht werden.
+
+### Dateien
+
+| Datei | Aktion |
+|-------|--------|
+| `supabase/functions/seed-demo-data/index.ts` | Neu erstellen |
+| `supabase/config.toml` | `verify_jwt = false` fuer die Funktion |
 
