@@ -58,6 +58,8 @@ function filterByDate<T extends { datum?: string; created_at?: string }>(
 const CHART_GREEN = "hsl(142 71% 45%)";
 const CHART_RED = "hsl(0 84% 60%)";
 const CHART_PRIMARY = "hsl(38 95% 52%)";
+const CHART_BLUE = "hsl(210 80% 55%)";
+const CHART_CYAN = "hsl(180 70% 45%)";
 const CHART_MUTED = "hsl(220 18% 25%)";
 
 const euroFormatter = (v: number) =>
@@ -139,7 +141,6 @@ const Auswertung = () => {
 
   const gesamtumsatz = fp.reduce((s, p) => s + Number(p.betrag), 0);
 
-  // Avg driving lessons until passed practical exam
   const avgFahrstunden = useMemo(() => {
     if (!exams || !drivingLessons) return null;
     const passedStudents = exams
@@ -204,12 +205,12 @@ const Auswertung = () => {
   }, [totalGesamt, totalBezahlt]);
 
   const kpis = [
-    { label: "Bestandsquote Theorie", value: theorieQuote !== null ? `${theorieQuote}%` : "–", icon: GraduationCap, good: theorieQuote !== null && theorieQuote >= 70 },
-    { label: "Bestandsquote Praxis", value: praxisQuote !== null ? `${praxisQuote}%` : "–", icon: Car, good: praxisQuote !== null && praxisQuote >= 60 },
-    { label: "Ø Fahrstunden bis Prüfung", value: avgFahrstunden !== null ? `${avgFahrstunden}` : "–", icon: Car, good: null },
-    { label: "Neue Schüler", value: `${fs.length}`, icon: Users, good: null },
-    { label: "Gesamtumsatz", value: euroFormatter(gesamtumsatz), icon: Euro, good: null },
-    { label: "Bezahlquote", value: bezahlQuote !== null ? `${bezahlQuote}%` : "–", icon: PiggyBank, good: bezahlQuote !== null && bezahlQuote >= 70 },
+    { label: "Bestandsquote Theorie", value: theorieQuote !== null ? `${theorieQuote}%` : "–", icon: GraduationCap, good: theorieQuote !== null && theorieQuote >= 70, bad: theorieQuote !== null && theorieQuote < 70 },
+    { label: "Bestandsquote Praxis", value: praxisQuote !== null ? `${praxisQuote}%` : "–", icon: Car, good: praxisQuote !== null && praxisQuote >= 60, bad: praxisQuote !== null && praxisQuote < 60 },
+    { label: "Ø Fahrstunden bis Prüfung", value: avgFahrstunden !== null ? `${avgFahrstunden}` : "–", icon: Car, good: false, bad: false },
+    { label: "Neue Schüler", value: `${fs.length}`, icon: Users, good: false, bad: false },
+    { label: "Gesamtumsatz", value: euroFormatter(gesamtumsatz), icon: Euro, good: false, bad: false },
+    { label: "Bezahlquote", value: bezahlQuote !== null ? `${bezahlQuote}%` : "–", icon: PiggyBank, good: bezahlQuote !== null && bezahlQuote >= 70, bad: bezahlQuote !== null && bezahlQuote < 70 },
   ];
 
   return (
@@ -232,31 +233,48 @@ const Auswertung = () => {
         }
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* KPI Cards – 3x2 Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {kpis.map((kpi) => (
-          <Card key={kpi.label}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <kpi.icon className="h-4 w-4 text-primary" />
-                {kpi.good === true && <TrendingUp className="h-3 w-3 text-green-500" />}
-                {kpi.good === false && <TrendingDown className="h-3 w-3 text-destructive" />}
+          <Card
+            key={kpi.label}
+            className={`transition-all hover:shadow-md ${
+              kpi.good ? "border-l-4 border-l-green-500" :
+              kpi.bad ? "border-l-4 border-l-destructive" : ""
+            }`}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                    {kpi.label}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-3xl font-bold text-foreground">{kpi.value}</p>
+                    {kpi.good && <TrendingUp className="h-5 w-5 text-green-500 shrink-0" />}
+                    {kpi.bad && <TrendingDown className="h-5 w-5 text-destructive shrink-0" />}
+                  </div>
+                </div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                  <kpi.icon className="h-5 w-5 text-primary" />
+                </div>
               </div>
-              <p className="text-2xl font-bold text-primary">{kpi.value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Umsatzentwicklung full width */}
+      {/* Umsatzentwicklung – kompakter mit Gesamtwert im Header */}
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Umsatzentwicklung</CardTitle>
+        <CardHeader className="pb-2 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">Umsatzentwicklung</CardTitle>
+            <span className="text-xl font-bold text-primary">{euroFormatter(gesamtumsatz)}</span>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {umsatzMonatlich.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={umsatzMonatlich}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 18% 16%)" />
                 <XAxis dataKey="name" tick={{ fill: "hsl(215 15% 55%)", fontSize: 12 }} />
@@ -271,14 +289,14 @@ const Auswertung = () => {
         </CardContent>
       </Card>
 
-      {/* 2x2 Charts */}
+      {/* 2x2 Charts mit unterschiedlichen Farben */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Schüler pro Monat */}
+        {/* Schüler pro Monat – Blau */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 border-b border-border/50">
             <CardTitle className="text-base font-semibold">Schüler pro Monat</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {schuelerMonatlich.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={schuelerMonatlich}>
@@ -286,7 +304,7 @@ const Auswertung = () => {
                   <XAxis dataKey="name" tick={{ fill: "hsl(215 15% 55%)", fontSize: 12 }} />
                   <YAxis allowDecimals={false} tick={{ fill: "hsl(215 15% 55%)", fontSize: 12 }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="Schüler" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="Schüler" fill={CHART_BLUE} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -295,12 +313,12 @@ const Auswertung = () => {
           </CardContent>
         </Card>
 
-        {/* Fahrstunden-Auslastung */}
+        {/* Fahrstunden-Auslastung – Cyan */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 border-b border-border/50">
             <CardTitle className="text-base font-semibold">Fahrstunden-Auslastung</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {fahrstundenMonatlich.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={fahrstundenMonatlich}>
@@ -308,7 +326,7 @@ const Auswertung = () => {
                   <XAxis dataKey="name" tick={{ fill: "hsl(215 15% 55%)", fontSize: 12 }} />
                   <YAxis allowDecimals={false} tick={{ fill: "hsl(215 15% 55%)", fontSize: 12 }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="Fahrstunden" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="Fahrstunden" fill={CHART_CYAN} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -317,12 +335,12 @@ const Auswertung = () => {
           </CardContent>
         </Card>
 
-        {/* Prüfungsergebnisse */}
+        {/* Prüfungsergebnisse – Grün/Rot */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 border-b border-border/50">
             <CardTitle className="text-base font-semibold">Prüfungsergebnisse</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {pruefungenMonatlich.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={pruefungenMonatlich}>
@@ -340,12 +358,12 @@ const Auswertung = () => {
           </CardContent>
         </Card>
 
-        {/* Offene vs. Bezahlte Beträge */}
+        {/* Offene vs. Bezahlte Beträge – Donut mit Zentral-Label */}
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-2 border-b border-border/50">
             <CardTitle className="text-base font-semibold">Offene vs. Bezahlte Beträge</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {totalGesamt > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
@@ -353,8 +371,8 @@ const Auswertung = () => {
                     data={donutData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
+                    innerRadius={60}
+                    outerRadius={90}
                     paddingAngle={3}
                     dataKey="value"
                     nameKey="name"
@@ -362,6 +380,13 @@ const Auswertung = () => {
                     <Cell fill={CHART_GREEN} />
                     <Cell fill={CHART_MUTED} />
                   </Pie>
+                  {/* Central label */}
+                  <text x="50%" y="46%" textAnchor="middle" fill="hsl(210 20% 94%)" fontSize={20} fontWeight="bold">
+                    {bezahlQuote ?? 0}%
+                  </text>
+                  <text x="50%" y="58%" textAnchor="middle" fill="hsl(215 15% 55%)" fontSize={11}>
+                    {euroFormatter(totalBezahlt)} bezahlt
+                  </text>
                   <Tooltip
                     formatter={(value: number) => euroFormatter(value)}
                     contentStyle={{ backgroundColor: "hsl(220 22% 10%)", border: "1px solid hsl(220 18% 16%)", borderRadius: 8, fontSize: 12 }}
