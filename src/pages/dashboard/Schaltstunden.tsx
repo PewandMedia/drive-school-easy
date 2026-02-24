@@ -404,8 +404,16 @@ const Schaltstunden = () => {
               </TableRow>
             ) : (
               <>
-                {todayLessons.map(renderRow)}
-                {todayLessons.length > 0 && visibleOlder.length > 0 && (
+                {todayLessons.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
+                      Heute noch keine Schaltstunden eingetragen
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  todayLessons.map(renderRow)
+                )}
+                {visibleOlder.length > 0 && (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
                       Ältere Einträge

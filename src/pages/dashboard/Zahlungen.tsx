@@ -94,7 +94,8 @@ const Zahlungen = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payment_allocations")
-        .select("*, open_items(beschreibung, typ, datum)") as any;
+        .select("*, open_items(beschreibung, typ, datum)")
+        .limit(10000) as any;
       if (error) throw error;
       return data ?? [];
     },
@@ -106,7 +107,8 @@ const Zahlungen = () => {
       const { data, error } = await supabase
         .from("students")
         .select("id, vorname, nachname, geburtsdatum")
-        .order("nachname");
+        .order("nachname")
+        .limit(10000);
       if (error) throw error;
       return data ?? [];
     },

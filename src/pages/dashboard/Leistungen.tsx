@@ -100,7 +100,8 @@ const Leistungen = () => {
       const { data, error } = await supabase
         .from("students")
         .select("id, vorname, nachname, geburtsdatum")
-        .order("nachname");
+        .order("nachname")
+        .limit(10000);
       if (error) throw error;
       return data as Student[];
     },

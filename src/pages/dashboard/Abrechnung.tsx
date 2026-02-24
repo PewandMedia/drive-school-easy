@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Receipt, TrendingUp, Wallet, AlertCircle, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatStudentName } from "@/lib/formatStudentName";
 import PageHeader from "@/components/PageHeader";
@@ -17,11 +18,15 @@ const fmt = (v: number) =>
 const Abrechnung = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  // Reset visible count on search change
+  useEffect(() => { setVisibleCount(10); }, [searchTerm]);
 
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("students").select("*").order("nachname");
+      const { data, error } = await supabase.from("students").select("*").order("nachname").limit(10000);
       if (error) throw error;
       return data;
     },
@@ -30,7 +35,7 @@ const Abrechnung = () => {
   const { data: openItems = [] } = useQuery({
     queryKey: ["open_items_all"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("open_items").select("student_id, betrag_gesamt, betrag_bezahlt") as any;
+      const { data, error } = await supabase.from("open_items").select("student_id, betrag_gesamt, betrag_bezahlt").limit(10000) as any;
       if (error) throw error;
       return data ?? [];
     },
@@ -123,12 +128,15 @@ const Abrechnung = () => {
             const name = `${s.nachname} ${s.vorname}`.toLowerCase();
             return name.includes(searchTerm.toLowerCase());
           });
+          const visible = filtered.slice(0, visibleCount);
+          const remaining = filtered.length - visibleCount;
           return filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Receipt className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">Noch keine Schüler vorhanden.</p>
           </div>
         ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -140,7 +148,7 @@ const Abrechnung = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((s) => {
+              {visible.map((s) => {
                 const ausgeglichen = s.saldo <= 0;
                 return (
                   <TableRow
@@ -178,6 +186,18 @@ const Abrechnung = () => {
               })}
             </TableBody>
           </Table>
+          {remaining > 0 && (
+            <div className="p-3 border-t border-border text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((c) => c + 10)}
+              >
+                Weitere {Math.min(10, remaining)} von {filtered.length} anzeigen
+              </Button>
+            </div>
+          )}
+          </>
         );
         })()}
       </div>
