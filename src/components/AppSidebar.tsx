@@ -151,7 +151,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-2">
-        <p className="px-2 text-[10px] text-muted-foreground truncate">© 2025 Fahrschulverwaltung</p>
+        <p className="px-2 text-[10px] text-muted-foreground truncate">© 2026 Fahrschulverwaltung</p>
       </SidebarFooter>
     </Sidebar>
   );

@@ -34,9 +34,9 @@ type Student = {
 };
 
 const klasseColors: Record<string, string> = {
-  B: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  B78: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  B197: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+  B: "bg-blue-500/10 text-blue-700 border-blue-500/20",
+  B78: "bg-purple-500/10 text-purple-700 border-purple-500/20",
+  B197: "bg-cyan-500/10 text-cyan-700 border-cyan-500/20",
 };
 
 const FAHRSCHULE_LABELS: Record<string, string> = {
@@ -288,7 +288,7 @@ const Fahrschueler = () => {
 
                 <div>
                   {student.ist_umschreiber ? (
-                    <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 font-semibold text-xs">
+                    <Badge className="bg-amber-500/10 text-amber-700 border border-amber-500/20 hover:bg-amber-500/15 font-semibold text-xs">
                       Umschreiber
                     </Badge>
                   ) : (
@@ -299,7 +299,7 @@ const Fahrschueler = () => {
                 <div>
                   {(() => {
                     const saldo = saldoMap[student.id] || 0;
-                    const color = saldo > 0 ? "text-amber-400" : saldo < 0 ? "text-emerald-400" : "text-foreground";
+                    const color = saldo > 0 ? "text-red-600" : saldo < 0 ? "text-emerald-600" : "text-foreground";
                     return (
                       <span className={`text-sm font-medium ${color}`}>
                         {saldo.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}

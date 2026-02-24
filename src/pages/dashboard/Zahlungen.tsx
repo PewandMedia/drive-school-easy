@@ -240,7 +240,7 @@ const Zahlungen = () => {
             <span className="text-xs text-muted-foreground italic">Freie Zahlung</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-semibold text-green-400">
+        <TableCell className="text-right font-semibold text-green-600">
           +{eur(Number(p.betrag))}
         </TableCell>
         <TableCell>
@@ -274,7 +274,7 @@ const Zahlungen = () => {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="rounded-xl border border-border bg-card p-5">
-          <p className="text-2xl font-bold text-green-400">{eur(eingegangeneMonat)}</p>
+          <p className="text-2xl font-bold text-green-600">{eur(eingegangeneMonat)}</p>
           <p className="text-sm text-muted-foreground mt-1">Eingegangen (dieser Monat)</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">

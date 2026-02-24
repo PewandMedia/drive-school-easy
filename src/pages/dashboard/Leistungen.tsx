@@ -44,8 +44,8 @@ type Student = {
 };
 
 const statusConfig: Record<ServiceStatus, { label: string; className: string }> = {
-  offen: { label: "Offen", className: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  bezahlt: { label: "Bezahlt", className: "bg-green-500/15 text-green-400 border-green-500/30" },
+  offen: { label: "Offen", className: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+  bezahlt: { label: "Bezahlt", className: "bg-green-500/10 text-green-700 border-green-500/20" },
   erledigt: { label: "Erledigt", className: "bg-secondary text-muted-foreground border-border" },
 };
 
@@ -191,13 +191,13 @@ const Leistungen = () => {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xl font-bold text-amber-400">
+          <p className="text-xl font-bold text-amber-600">
             {totalOffen.toFixed(2).replace(".", ",")} €
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Offene Posten</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xl font-bold text-green-400">
+          <p className="text-xl font-bold text-green-600">
             {totalBezahlt.toFixed(2).replace(".", ",")} €
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Bezahlt</p>
@@ -272,7 +272,7 @@ const Leistungen = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     {saldo > 0 && (
-                      <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-0.5">
+                      <span className="text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/15 rounded-md px-2 py-0.5">
                         Offen: {saldo.toFixed(2).replace(".", ",")} €
                       </span>
                     )}
