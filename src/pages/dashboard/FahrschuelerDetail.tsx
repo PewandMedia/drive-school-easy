@@ -1384,12 +1384,19 @@ const FahrschuelerDetail = () => {
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(c) => {
-                              setFsZahlung((f) => ({
-                                ...f,
-                                selectedOpenItems: c
+                              setFsZahlung((f) => {
+                                const newSelected = c
                                   ? [...f.selectedOpenItems, oi.id]
-                                  : f.selectedOpenItems.filter((x) => x !== oi.id),
-                              }));
+                                  : f.selectedOpenItems.filter((x) => x !== oi.id);
+                                const summe = offenePosten
+                                  .filter((item: any) => newSelected.includes(item.id))
+                                  .reduce((sum: number, item: any) => sum + (Number(item.betrag_gesamt) - Number(item.betrag_bezahlt)), 0);
+                                return {
+                                  ...f,
+                                  selectedOpenItems: newSelected,
+                                  betrag: summe > 0 ? summe.toFixed(2) : "",
+                                };
+                              });
                             }}
                             className="mt-0.5"
                           />
