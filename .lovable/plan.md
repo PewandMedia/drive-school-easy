@@ -1,86 +1,105 @@
 
 
-## Tagesabrechnung verbessern und strukturieren
+## Auswertung zum echten Statistik-Dashboard ausbauen
 
-### Probleme im aktuellen Zustand
+### Ueberblick
 
-1. **Uhrzeit falsch (01:00 bei allen)**: Die Zahlungen werden mit `new Date(selectedDate)` abgefragt, was je nach Zeitzone Mitternacht UTC ergibt. Die gespeicherten Zeitstempel zeigen dann alle "01:00" (UTC+1). Das Datum wird beim Erfassen oft nur als Tageswert gespeichert.
-2. **Keine Zuordnung sichtbar**: Man sieht nicht, wofuer bezahlt wurde (Fahrstunde, Pruefung, Grundbetrag etc.)
-3. **Emojis statt Icons**: Die Zusammenfassungskarten nutzen Emojis statt der vorhandenen Lucide-Icons
-4. **Fehlende Struktur**: Keine visuelle Gruppierung oder Zwischensummen
+Die Platzhalter-Seite wird zu einem vollstaendigen, datengetriebenen Dashboard mit 6 Sektionen, Zeitraum-Filter und Recharts-Diagrammen umgebaut. Alle Daten kommen live aus Supabase.
 
-### Aenderungen an `src/pages/dashboard/Tagesabrechnung.tsx`
-
-**1. Zuordnungs-Spalte hinzufuegen**
-
-Query erweitern: Payments zusaetzlich mit `payment_allocations` und `open_items` joinen, um zu zeigen wofuer bezahlt wurde.
+### Aufbau der neuen Seite
 
 ```text
-supabase.from("payments")
-  .select("id, betrag, zahlungsart, datum, 
-    students(vorname, nachname, geburtsdatum),
-    payment_allocations(betrag, open_items(beschreibung))")
++------------------------------------------------------------------+
+| [Zeitraum-Filter: Monat / Quartal / Jahr]   [Jahr-Auswahl]       |
++------------------------------------------------------------------+
+| KPI 1              | KPI 2              | KPI 3        | KPI 4   |
+| Bestandsquote      | Bestandsquote      | Oe Fahrst.   | Neue    |
+| Theorie  82%       | Praxis  71%        | bis Pruef 28 | Schueler|
++------------------------------------------------------------------+
+| KPI 5                          | KPI 6                           |
+| Gesamtumsatz (Zeitraum)        | Offene vs. Bezahlte Betraege    |
+| 12.450 EUR                     | 78% bezahlt / 22% offen         |
++------------------------------------------------------------------+
+| Umsatzentwicklung (Balkendiagramm)                                |
+| Monatsweise Zahlungseingaenge mit Vormonatsvergleich              |
++------------------------------------------------------------------+
+| Schueler pro Monat            | Fahrstunden-Auslastung           |
+| (Balkendiagramm)              | (Balkendiagramm)                 |
++------------------------------------------------------------------+
+| Pruefungsergebnisse           | Offene vs. Bezahlte Betraege     |
+| (Gestapeltes Balkendiagramm)  | (Donut/Pie Chart)                |
++------------------------------------------------------------------+
 ```
 
-Neue Spalte "Verwendungszweck" in der Tabelle:
-- Zeigt z.B. "Fahrstunde 90min (2E), Grundbetrag"
-- Wenn keine Zuordnung: "Freie Zahlung"
+### Datenquellen und Berechnungen
 
-**2. Uhrzeit-Anzeige korrigieren**
+**1. Umsatzentwicklung**
+- Quelle: `payments` Tabelle, gruppiert nach Monat des `datum` Feldes
+- Balkendiagramm mit monatlichen Summen
+- Gesamtumsatz als KPI-Karte oben
 
-Statt der Uhrzeit (die bei Tagesdatum-Erfassung immer gleich ist) das Zahlungsdatum als "dd.MM.yyyy" anzeigen. Die Spalte wird von "Uhrzeit" zu "Datum" umbenannt -- da es ein Tagesbericht ist, ist die Uhrzeit ohnehin nicht relevant.
+**2. Pruefungsstatistik**
+- Quelle: `exams` Tabelle
+- Bestandsquote Theorie: `COUNT(bestanden=true WHERE typ='theorie') / COUNT(typ='theorie') * 100`
+- Bestandsquote Praxis: `COUNT(bestanden=true WHERE typ='praxis') / COUNT(typ='praxis') * 100`
+- Gestapeltes Balkendiagramm: Bestanden vs. Nicht bestanden pro Monat
 
-**3. Emojis durch Icons ersetzen**
+**3. Durchschnittliche Fahrstunden bis Pruefung**
+- Quelle: `driving_lessons` + `exams` (typ='praxis', bestanden=true)
+- Fuer jeden Schueler mit bestandener Praxis: Anzahl Fahrstunden zaehlen
+- Durchschnitt bilden
 
-Die vier Zusammenfassungskarten bekommen die bereits importierten Lucide-Icons (Banknote, CreditCard, Building2) statt der Emojis. Zusaetzlich die Anzahl pro Zahlungsart anzeigen.
+**4. Neue Schueler pro Monat**
+- Quelle: `students.created_at`, gruppiert nach Monat
+- Balkendiagramm
 
-```text
-Vorher: "💵 Bar gesamt"     -> Nachher: [Banknote-Icon] Bar gesamt (3 Zahlungen)
-Vorher: "💳 EC gesamt"      -> Nachher: [CreditCard-Icon] EC gesamt (2 Zahlungen)
-Vorher: "🏦 Ueberweisung"   -> Nachher: [Building2-Icon] Ueberweisung gesamt (0)
-Vorher: "📊 Gesamtbetrag"   -> Nachher: [FileText-Icon] Gesamtbetrag (5 Zahlungen)
-```
+**5. Fahrstunden-Auslastung**
+- Quelle: `driving_lessons.datum`, gruppiert nach Monat
+- Anzahl Fahrstunden pro Monat als Balkendiagramm
 
-**4. Tabelle nach Zahlungsart gruppieren (optional Zwischensummen)**
+**6. Offene vs. Bezahlte Betraege**
+- Quelle: `open_items`
+- Gesamtsumme `betrag_gesamt` vs. Gesamtsumme `betrag_bezahlt`
+- Prozentuale Quote und Donut-Diagramm
 
-Wenn der Filter auf "Alle Zahlungsarten" steht, werden am Ende der Tabelle Zwischensummen pro Zahlungsart als farbige Zeilen angezeigt.
+### Zeitraum-Filter
 
-**5. Geburtsdatum-Spalte entfernen**
+- Oben auf der Seite: Select mit Optionen "Diesen Monat", "Dieses Quartal", "Dieses Jahr", "Letztes Jahr", "Gesamt"
+- Alle Queries filtern nach dem gewaehlten Zeitraum
+- Diagramme und KPIs aktualisieren sich live
 
-Diese Spalte ist fuer einen Kassenbericht nicht relevant und nimmt Platz weg. Stattdessen kommt die neue Zuordnungs-Spalte.
+### Technische Umsetzung
 
-**6. Druckbereich ebenfalls aktualisieren**
+| Bereich | Details |
+|---------|---------|
+| Datei | `src/pages/dashboard/Auswertung.tsx` (kompletter Neubau) |
+| Queries | 5 separate `useQuery` Hooks fuer payments, exams, driving_lessons, students, open_items |
+| Diagramme | Recharts (bereits installiert): BarChart, PieChart, ResponsiveContainer, Tooltip |
+| Filter | `useState` fuer Zeitraum, `useMemo` fuer gefilterte Daten |
+| UI-Komponenten | Card, Select aus bestehenden shadcn-Komponenten |
+| Stil | Dunkles Design beibehalten, gleicher Stil wie FahrlehrerStatistik |
 
-Der Print-Bereich bekommt die gleichen Aenderungen: Zuordnungs-Spalte, kein Geburtsdatum, korrekte Struktur.
+### KPI-Karten (oberer Bereich)
 
-### Neue Tabellenstruktur
+6 Karten in 2 Reihen:
+1. **Bestandsquote Theorie** - Prozent mit Trend-Icon
+2. **Bestandsquote Praxis** - Prozent mit Trend-Icon
+3. **Oe Fahrstunden bis Pruefung** - Durchschnittswert
+4. **Neue Schueler** - Anzahl im Zeitraum
+5. **Gesamtumsatz** - Summe Zahlungseingaenge im Zeitraum
+6. **Bezahlquote** - Prozent bezahlt von Forderungen
 
-```text
-| Datum      | Schueler          | Verwendungszweck                    | Zahlungsart    | Betrag     |
-|------------|-------------------|-------------------------------------|----------------|------------|
-| 24.02.2026 | Ilkay Mustermann  | Fahrstunde 90min (2E)               | [Icon] Bar     | 440,00 EUR |
-| 24.02.2026 | Ilkay Mustermann  | Grundbetrag                         | [Icon] Bar     |  20,00 EUR |
-| 24.02.2026 | Simon Senf        | Theoriepruefung                     | [Icon] EC      |  65,00 EUR |
-| 24.02.2026 | Max Mustermann    | Fahrstunde 90min (2E), Grundbetrag  | [Icon] Bar     | 130,00 EUR |
-```
+### Diagramme (unterer Bereich)
 
-### Zusammenfassungskarten (neu)
-
-```text
-+--------------------+--------------------+--------------------+--------------------+
-| [Banknote]         | [CreditCard]       | [Building2]        | [FileText]         |
-| Bar gesamt         | EC gesamt          | Ueberweisung       | Gesamtbetrag       |
-| 3 Zahlungen        | 2 Zahlungen        | 0 Zahlungen        | 5 Zahlungen        |
-| 720,00 EUR         | 115,00 EUR         | 0,00 EUR           | 835,00 EUR         |
-+--------------------+--------------------+--------------------+--------------------+
-```
+4 Diagramme in 2x2 Grid:
+1. **Umsatzentwicklung** - Vertikales Balkendiagramm, monatlich, Euros auf Y-Achse
+2. **Schueler pro Monat** - Vertikales Balkendiagramm
+3. **Pruefungsergebnisse** - Gestapeltes Balkendiagramm (bestanden gruen / nicht bestanden rot)
+4. **Offene vs. Bezahlte Betraege** - Donut-Chart mit Legende
 
 ### Zusammenfassung
 
-| Bereich | Aenderung |
-|---------|-----------|
-| Query | Payment_allocations + open_items joinen fuer Verwendungszweck |
-| Tabelle | Spalte "Uhrzeit" -> "Datum", "Geburtsdatum" -> "Verwendungszweck" |
-| Karten | Emojis durch Lucide-Icons ersetzen, Anzahl pro Zahlungsart |
-| Druckbereich | Gleiche Struktur wie Bildschirmansicht |
+| Datei | Aenderung |
+|-------|-----------|
+| `src/pages/dashboard/Auswertung.tsx` | Kompletter Neubau mit 5 Supabase-Queries, 6 KPI-Karten, 4 Recharts-Diagrammen und Zeitraum-Filter |
 
