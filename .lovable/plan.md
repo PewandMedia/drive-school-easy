@@ -1,67 +1,133 @@
 
 
-## Datenbank mit 400 Demo-Fahrschuelern fuellen
+## Performance-Optimierung: Limits, "Mehr anzeigen" und Tabellenumstellung
 
 ### Uebersicht
 
-Es wird eine Supabase Edge Function erstellt, die einmalig aufgerufen wird und 400 realistische Fahrschueler mit allen zugehoerigen Daten generiert. Die Daten decken die letzten 3 Monate ab (Dezember 2025 bis Februar 2026).
+Alle Reiter werden auf ein "Mehr anzeigen"-System umgestellt, um die Performance mit 400+ Schuelern zu gewaehrleisten. Statistik-Cards zaehlen weiterhin ueber 1000 hinaus. Fahrstunden werden von Cards auf eine Tabelle umgestellt.
 
-### Was wird generiert
+---
 
-| Daten | Details |
-|-------|---------|
-| **400 Fahrschueler** | Realistische deutsche Vor-/Nachnamen, Geburtsdaten (17-35 Jahre), zufaellige Adressen, Telefonnummern, E-Mails |
-| **Fuehrerscheinklassen** | Zufaellig verteilt: ca. 60% B, 25% B197, 15% B78 |
-| **Fahrschule** | Zufaellig "riemke" oder "rathaus" |
-| **Anmeldedatum** | Verteilt ueber die letzten 3 Monate |
-| **Fahrstunden** | 0-25 pro Schueler je nach "Fortschritt", unterschiedliche Typen (Uebungsstunde, Ueberland, Autobahn, Nacht, Testfahrt B197) |
-| **Theoriestunden** | 0-14 Grundstoff + 0-2 klassenspezifisch pro Schueler |
-| **Schaltstunden** | Fuer B197-Schueler: 0-10 Schaltstunden |
-| **Pruefungen** | Theorie- und Fahrpruefungen mit bestanden/nicht bestanden, Fahrpruefungen mit zufaelligem Fahrlehrer |
-| **Leistungen (Services)** | Grundbetrag, Lernmaterial etc. aus bestehender Preisliste |
-| **Zahlungen** | Realistische Zahlungen (bar, EC, Ueberweisung) die offenen Posten zugeordnet werden |
+### 1. Statistik-Cards: Zaehlung ueber 1000 hinaus
 
-### Wichtige Regeln
+**Betrifft**: Dashboard, Fahrstunden, Theorie, Schaltstunden, Pruefungen, Leistungen, Zahlungen
 
-- **Bestehende Fahrlehrer** werden verwendet (7 aktive Fahrlehrer)
-- **Bestehende Preise** werden verwendet (5 aktive Preise)
-- **Trigger** arbeiten automatisch: Fahrstunden-Preise werden berechnet, offene Posten werden erstellt
-- **Zahlungen** werden ueber `payment_allocations` den offenen Posten zugeordnet, sodass der Trigger den Status aktualisiert
-- Unterschiedliche Fortschrittsstufen: Anfaenger (nur Anmeldung), Fortgeschrittene (viele Fahrstunden), Pruefungsreife (Pruefungen abgelegt)
+Aktuell werden alle Daten korrekt gezaehlt – das Problem liegt vermutlich am Supabase-Default-Limit von 1000 Zeilen pro Query. Alle Queries die fuer Statistiken verwendet werden, bekommen ein explizites `.limit()` entfernt bzw. es wird sichergestellt, dass die Daten vollstaendig geladen werden, indem Supabase-Queries mit Paginierung oder Count-Abfragen ergaenzt werden.
 
-### Technischer Ablauf
+**Loesung**: Fuer Statistik-Werte werden separate Count/Sum-Queries verwendet (z.B. `supabase.from("driving_lessons").select("*", { count: "exact", head: true })`) oder die Queries bekommen ein hohes Limit (z.B. 10000), damit alle Eintraege gezaehlt werden.
 
-**Neue Datei: `supabase/functions/seed-demo-data/index.ts`**
+---
 
-1. Edge Function mit Service Role Key (umgeht RLS)
-2. Generiert 400 Schueler in Batches (50er Batches fuer Performance)
-3. Pro Schueler wird ein zufaelliger "Fortschrittsgrad" (0-100%) bestimmt
-4. Basierend auf dem Fortschritt werden Fahrstunden, Theorie, Pruefungen etc. erstellt
-5. Wartet nach jedem Insert auf die Trigger (open_items werden automatisch erstellt)
-6. Erstellt Zahlungen und ordnet sie den entstandenen offenen Posten zu
+### 2. Fahrstunden-Reiter: Cards durch Tabelle ersetzen + Tages-Logik
 
-**Fortschrittsstufen:**
+**Datei**: `src/pages/dashboard/Fahrstunden.tsx`
+
+- Die gruppierte Card-Ansicht (groupedByStudent) wird entfernt
+- Stattdessen eine einzelne Tabelle wie bei Schaltstunden mit Spalten: Schueler, Datum, Typ, Fahrzeug, Dauer, **Preis**, Loeschen
+- **Tages-Logik**: Zuerst werden alle Fahrstunden von heute angezeigt (kein Limit). Falls keine vorhanden: "Heute noch keine Fahrstunden eingetragen"
+- Darunter ein "Mehr anzeigen"-Button, der jeweils 10 aeltere Eintraege nachlaedt
+
+---
+
+### 3. Schaltstunden-Reiter: Preis-Spalte + Limit
+
+**Datei**: `src/pages/dashboard/Schaltstunden.tsx`
+
+- Neue Spalte **Preis** in der Tabelle (Daten sind bereits in `driving_lessons.preis` vorhanden, muessen nur im Query mit selektiert werden)
+- Tages-Logik: Alle von heute anzeigen, dann "Mehr anzeigen" fuer aeltere (10er-Limit)
+
+---
+
+### 4. Theorie-Reiter: Tages-Logik
+
+**Datei**: `src/pages/dashboard/Theorie.tsx`
+
+- Alle Theoriestunden von **heute** komplett anzeigen (kein Limit)
+- Falls keine vorhanden: "Heute noch keine Theoriestunden hinzugefuegt"
+- Button "Aeltere Eintraege anzeigen" laedt jeweils 10 weitere aus vergangenen Tagen
+
+---
+
+### 5. Pruefungen-Reiter: 10er-Limit
+
+**Datei**: `src/pages/dashboard/Pruefungen.tsx`
+
+- Standardmaessig nur die neusten 10 Pruefungen anzeigen
+- "Mehr anzeigen"-Button laedt jeweils 10 weitere nach
+
+---
+
+### 6. Leistungen-Reiter: 10er-Limit
+
+**Datei**: `src/pages/dashboard/Leistungen.tsx`
+
+- Standardmaessig nur die neusten 10 Leistungen anzeigen (gruppiert nach Schueler bleibt, aber mit Limit auf die Gesamtanzahl)
+- "Mehr anzeigen"-Button laedt jeweils 10 weitere nach
+
+---
+
+### 7. Zahlungen-Reiter: Tages-Logik + Limit
+
+**Datei**: `src/pages/dashboard/Zahlungen.tsx`
+
+- Zuerst alle Zahlungen von **heute** anzeigen (kein Limit)
+- Falls keine vorhanden: "Heute noch keine Zahlungen erfasst"
+- "Mehr anzeigen"-Button laedt jeweils 10 aeltere Zahlungen nach
+
+---
+
+### 8. Fahrschueler-Reiter: 10er-Limit
+
+**Datei**: `src/pages/dashboard/Fahrschueler.tsx`
+
+- Standardmaessig nur 10 Schueler anzeigen
+- "Mehr anzeigen"-Button laedt jeweils 10 weitere nach
+- Suchfunktion filtert weiterhin ueber alle Schueler
+
+---
+
+### Technische Umsetzung
+
+Jede betroffene Seite bekommt einen `visibleCount`-State:
 
 ```text
-0-20%  : Nur Anmeldung + Grundbetrag/Lernmaterial
-20-50% : + einige Theoriestunden + erste Fahrstunden
-50-75% : + viele Fahrstunden + Sonderfahrten + Theoriepruefung
-75-100%: + Fahrpruefung, teilweise bestanden
+const [visibleCount, setVisibleCount] = useState(10);
 ```
 
-**Zahlungslogik:**
-- Jeder Schueler hat zwischen 30-90% seiner offenen Posten bezahlt
-- Zahlungen werden chronologisch den aeltesten offenen Posten zugeordnet
-- Zahlungsarten zufaellig verteilt (bar, EC, Ueberweisung)
+Fuer Seiten mit Tages-Logik (Fahrstunden, Theorie, Zahlungen, Schaltstunden):
 
-### Aufruf
+```text
+- todayItems = alle Eintraege von heute (immer komplett angezeigt)
+- olderItems = alle aelteren Eintraege (sortiert nach Datum absteigend)
+- visibleOlder = olderItems.slice(0, visibleCount)
+- "Mehr anzeigen" erhoeht visibleCount um 10
+```
 
-Nach dem Deployment wird die Funktion einmalig per curl aufgerufen. Danach kann sie wieder geloescht werden.
+Fuer Seiten ohne Tages-Logik (Pruefungen, Leistungen, Fahrschueler):
 
-### Dateien
+```text
+- visibleItems = filtered.slice(0, visibleCount)
+- "Mehr anzeigen" erhoeht visibleCount um 10
+```
 
-| Datei | Aktion |
-|-------|--------|
-| `supabase/functions/seed-demo-data/index.ts` | Neu erstellen |
-| `supabase/config.toml` | `verify_jwt = false` fuer die Funktion |
+Der "Mehr anzeigen"-Button wird nur angezeigt, wenn es noch weitere Eintraege gibt. Er zeigt auch an, wie viele noch uebrig sind (z.B. "Weitere 10 von 85 anzeigen").
+
+### Supabase Query-Limit Fix
+
+Um das 1000-Zeilen-Default-Limit zu umgehen, werden die Haupt-Queries angepasst:
+- Statistik-relevante Queries bekommen `.limit(10000)` oder nutzen `{ count: "exact", head: true }` fuer reine Zaehlung
+- Listen-Queries koennen weiterhin alle Daten laden, da das Frontend das Limit uebernimmt
+
+### Zusammenfassung der Aenderungen
+
+| Datei | Aenderungen |
+|-------|------------|
+| `Fahrstunden.tsx` | Cards durch Tabelle ersetzen, Tages-Logik + Mehr anzeigen, Preis-Spalte bleibt |
+| `Schaltstunden.tsx` | Preis-Spalte hinzufuegen, Tages-Logik + Mehr anzeigen |
+| `Theorie.tsx` | Tages-Logik + Mehr anzeigen |
+| `Pruefungen.tsx` | 10er-Limit + Mehr anzeigen |
+| `Leistungen.tsx` | 10er-Limit + Mehr anzeigen |
+| `Zahlungen.tsx` | Tages-Logik + Mehr anzeigen |
+| `Fahrschueler.tsx` | 10er-Limit + Mehr anzeigen |
+| `Dashboard.tsx` | Query-Limits erhoehen fuer korrekte Statistiken |
 
