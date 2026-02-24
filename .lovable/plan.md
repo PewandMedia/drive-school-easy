@@ -1,117 +1,232 @@
 
 
-## Theoriestunden auf Lektionen 1-14 umstellen
+## Zahlungen an offene Posten koppeln
 
 ### Uebersicht
-Das bisherige System mit nur "Grundstoff" / "Klassenspezifisch" wird auf konkrete Lektionsnummern (1-14) umgestellt. Lektion 1-12 = Grundstoff, Lektion 13-14 = Klassenspezifisch. Die Fortschrittsanzeige zeigt dann an, welche konkreten Lektionen absolviert sind und welche fehlen.
+Aktuell werden Zahlungen "frei" erfasst und der Saldo rein rechnerisch ermittelt (Summe Fahrstunden + Pruefungen + Leistungen - Zahlungen). Das neue System fuehrt eine zentrale `open_items`-Tabelle ein, die alle kostenpflichtigen Buchungen als offene Posten erfasst, sowie eine `payment_allocations`-Tabelle, die Zahlungen konkret einzelnen Posten zuordnet.
 
 ### Aenderung 1: Datenbank-Migration
 
-- Neue Spalte `lektion` (integer, nullable) zur Tabelle `theory_sessions` hinzufuegen
-- Bestehende Eintraege migrieren: `grundstoff` -> lektion NULL (bleiben als Altdaten bestehen), `klassenspezifisch` -> lektion NULL
-- Die `typ`-Spalte bleibt bestehen (wird automatisch aus der Lektion abgeleitet), damit bestehende Abfragen nicht sofort brechen
-- Alternativ: Die `typ`-Spalte behalten und automatisch aus `lektion` ableiten
+**Neue Tabelle `open_items`:**
 
-```sql
-ALTER TABLE public.theory_sessions 
-ADD COLUMN lektion integer;
+| Spalte | Typ | Default |
+|--------|-----|---------|
+| id | uuid | gen_random_uuid() |
+| student_id | uuid | NOT NULL |
+| typ | text | NOT NULL (fahrstunde / pruefung / leistung) |
+| referenz_id | uuid | NOT NULL (ID aus driving_lessons / exams / services) |
+| datum | timestamptz | now() |
+| beschreibung | text | NOT NULL |
+| betrag_gesamt | numeric | NOT NULL |
+| betrag_bezahlt | numeric | 0 |
+| status | text | 'offen' (offen / teilbezahlt / bezahlt) |
+| created_at | timestamptz | now() |
 
--- Bestehende Eintraege behalten ihren typ, lektion bleibt NULL fuer Altdaten
-```
+**Neue Tabelle `payment_allocations`:**
 
-### Aenderung 2: `src/pages/dashboard/Theorie.tsx` (Theorie-Uebersichtsseite)
+| Spalte | Typ | Default |
+|--------|-----|---------|
+| id | uuid | gen_random_uuid() |
+| payment_id | uuid | NOT NULL |
+| open_item_id | uuid | NOT NULL |
+| betrag | numeric | NOT NULL |
+| created_at | timestamptz | now() |
 
-**Popup "Neue Theoriestunde":**
-- Das bisherige Typ-Dropdown (Grundstoff/Klassenspezifisch) ersetzen durch ein Lektions-Dropdown:
-  - "Lektion 1 -- Grundstoff"
-  - "Lektion 2 -- Grundstoff"
-  - ...
-  - "Lektion 12 -- Grundstoff"
-  - "Lektion 13 -- Klassenspezifisch"
-  - "Lektion 14 -- Klassenspezifisch"
-- Der `typ` wird automatisch aus der Lektion abgeleitet (1-12 = grundstoff, 13-14 = klassenspezifisch)
-- Form-State: `lektion: number` statt `typ: string`
+**DB-Trigger: Automatisch offene Posten erstellen**
 
-**Tabelle:**
-- Spalte "Typ" ersetzen durch "Lektion" mit Anzeige z.B. "Lektion 3 (Grundstoff)"
-- Badge-Farbe bleibt: Grundstoff = default, Klassenspezifisch = secondary
+Drei Trigger-Funktionen die nach INSERT auf `driving_lessons`, `exams` und `services` automatisch einen Eintrag in `open_items` erzeugen:
 
-**Statistiken:**
-- "Theoriestunden gesamt" bleibt
-- "Schueler mit Grundstoff" -> "Unterschiedliche Lektionen" oder beibehalten
-- "Klassenspezifisch" bleibt
+- `driving_lessons` INSERT -> open_item mit typ='fahrstunde', beschreibung z.B. "Fahrstunde 90min (2E)", betrag_gesamt = preis
+- `exams` INSERT -> open_item mit typ='pruefung', beschreibung z.B. "Theoriepruefung" oder "Fahrpruefung", betrag_gesamt = preis
+- `services` INSERT -> open_item mit typ='leistung', beschreibung = bezeichnung, betrag_gesamt = preis
 
-### Aenderung 3: `src/pages/dashboard/FahrschuelerDetail.tsx` (Schuelerprofil)
+**DB-Trigger: Offene Posten nach Zahlung aktualisieren**
 
-**Theorie-Dialog (Modal):**
-- Gleiches Lektions-Dropdown wie auf der Theorie-Seite
-- Warnung anzeigen wenn die gewaehlte Lektion fuer diesen Schueler bereits absolviert wurde:
-  "Lektion X wurde bereits am TT.MM.JJJJ besucht. Sie wird nicht doppelt fuer die Pflicht gezaehlt."
+Nach INSERT auf `payment_allocations`:
+- Berechne SUM(betrag) aller Zuordnungen fuer den open_item
+- Setze `betrag_bezahlt` = diese Summe
+- Setze `status` = 'bezahlt' wenn betrag_bezahlt >= betrag_gesamt, 'teilbezahlt' wenn betrag_bezahlt > 0, sonst 'offen'
 
-**Fortschrittsanzeige im Bereich "Theorieunterricht":**
-- Weiterhin Fortschrittsbalken: "Grundstoff X/12" und "Klassenspezifisch X/2"
-- Neu: Darunter eine Checkliste der einzelnen Lektionen:
+**Bestehende Daten migrieren:**
 
+SQL-Script das fuer alle existierenden `driving_lessons`, `exams` und `services` nachtraeglich open_items erzeugt. Bestehende Zahlungen bleiben als "freie Zahlungen" bestehen (ohne Zuordnung).
+
+**RLS-Policies:**
+
+Gleiche Struktur wie bestehende Tabellen (authentifizierte Benutzer koennen alles).
+
+### Aenderung 2: `src/pages/dashboard/FahrschuelerDetail.tsx`
+
+**Zahlung-Dialog komplett ueberarbeiten:**
+
+Statt nur Betrag/Zahlungsart/Datum neu:
+
+1. Zahlungsdatum (Default: heute)
+2. Zahlungsart (Bar / EC / Ueberweisung)
+3. Betrag (eingehender Gesamtbetrag)
+4. "Offene Posten zuordnen" -- Liste mit Checkboxen:
+   - Jeder offene Posten des Schuelers wird angezeigt mit:
+     - Datum
+     - Typ-Icon + Beschreibung
+     - Betrag offen (betrag_gesamt - betrag_bezahlt)
+   - Sortiert nach Datum (aelteste zuerst)
+   - Nur Posten mit status != 'bezahlt' werden angezeigt
+
+5. Verteilungslogik (Option B -- automatisch):
+   - Ausgewaehlte Posten werden nach Datum sortiert (aelteste zuerst)
+   - Der eingegebene Betrag wird automatisch verteilt
+   - Anzeige wie viel auf jeden Posten entfaellt
+   - Wenn Betrag kleiner als Summe der Posten -> Teilzahlung auf aeltesten Posten
+
+6. Speichern:
+   - Payment in `payments` einfuegen
+   - Fuer jeden zugeordneten Posten einen Eintrag in `payment_allocations`
+   - Trigger aktualisiert automatisch `open_items.betrag_bezahlt` und `status`
+
+**Neue Query: Offene Posten laden**
 ```text
-Grundstoff:
-[x] Lektion 1   [x] Lektion 2   [ ] Lektion 3   [x] Lektion 4
-[ ] Lektion 5   [ ] Lektion 6   [x] Lektion 7   [ ] Lektion 8
-[ ] Lektion 9   [ ] Lektion 10  [ ] Lektion 11  [ ] Lektion 12
-
-Klassenspezifisch:
-[x] Lektion 13  [ ] Lektion 14
+supabase.from("open_items")
+  .select("*")
+  .eq("student_id", id)
+  .neq("status", "bezahlt")
+  .order("datum", { ascending: true })
 ```
 
-**Fortschrittslogik:**
-- Zaehlung fuer die Pflicht: Nur *unterschiedliche* Lektionen zaehlen (keine Doppelzaehlung)
-- `grundstoff`: Anzahl einzigartiger Lektionen 1-12
-- `klassenspezifisch`: Anzahl einzigartiger Lektionen 13-14
-- Altdaten (lektion = NULL): Zaehlen weiterhin nach ihrem `typ`-Feld, jeweils als 1 Einheit
+**Saldo-Berechnung anpassen:**
 
-### Aenderung 4: Insert-Logik anpassen
+Der Saldo wird nun aus `open_items` berechnet:
+```text
+saldo = SUM(open_items.betrag_gesamt) - SUM(open_items.betrag_bezahlt)
+```
+Das ersetzt die bisherige Berechnung aus 4 separaten Tabellen.
 
-Beim Einfuegen einer neuen Theoriestunde:
-- `lektion` wird gespeichert
-- `typ` wird automatisch abgeleitet: lektion <= 12 -> "grundstoff", lektion >= 13 -> "klassenspezifisch"
-- Beides wird in die DB geschrieben fuer Abwaertskompatibilitaet
+**Fahrstunden / Pruefungen / Leistungen Anzeige erweitern:**
+
+Bei jedem Eintrag zusaetzlich anzeigen:
+- Status-Badge: offen / teilbezahlt / bezahlt (aus zugehoerigem open_item)
+- Bei teilbezahlt: "65€ bezahlt / 65€ offen"
+
+### Aenderung 3: `src/pages/dashboard/Zahlungen.tsx`
+
+**Zahlungsliste erweitern:**
+
+Neue Spalte "Zuordnung" in der Tabelle die zeigt, wofuer bezahlt wurde:
+- Query erweitern: Payments mit payment_allocations und open_items joinen
+- Anzeige: z.B. "Fahrstunde 90min (24.02.2026)" oder "Grundbetrag"
+- Wenn keine Zuordnung: "Freie Zahlung"
+
+**Zahlung-Dialog ueberarbeiten:**
+
+Gleiche Logik wie im Schuelerprofil:
+- Nach Schueler-Auswahl: offene Posten laden
+- Checkbox-Liste der offenen Posten
+- Automatische Verteilung des Betrags
+
+### Aenderung 4: `src/pages/dashboard/Abrechnung.tsx`
+
+**Saldo-Berechnung umstellen:**
+
+Statt 4 separate Queries (driving_lessons, exams, services, payments) nur noch:
+- `open_items` mit SUM(betrag_gesamt) und SUM(betrag_bezahlt) pro Student
+- Saldo = betrag_gesamt - betrag_bezahlt
+
+### Aenderung 5: `src/integrations/supabase/types.ts`
+
+Wird automatisch aktualisiert nach der Migration (neue Tabellen open_items und payment_allocations).
 
 ### Technische Details
 
-**Lektions-Konstante (wiederverwendbar):**
+**Trigger-Funktion fuer driving_lessons:**
 ```text
-const THEORIE_LEKTIONEN = Array.from({ length: 14 }, (_, i) => ({
-  nr: i + 1,
-  typ: i < 12 ? "grundstoff" : "klassenspezifisch",
-  label: `Lektion ${i + 1} – ${i < 12 ? "Grundstoff" : "Klassenspezifisch"}`,
-}));
+CREATE FUNCTION create_open_item_for_driving_lesson()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO open_items (student_id, typ, referenz_id, datum, beschreibung, betrag_gesamt)
+  VALUES (
+    NEW.student_id,
+    'fahrstunde',
+    NEW.id,
+    NEW.datum,
+    'Fahrstunde ' || NEW.dauer_minuten || 'min (' || NEW.einheiten || 'E)',
+    NEW.preis
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 ```
 
-**Fortschrittsberechnung (Schuelerprofil):**
+**Trigger-Funktion fuer payment_allocations:**
 ```text
-const uniqueGrundstoff = new Set(
-  theorySessions
-    .filter(s => s.lektion && s.lektion >= 1 && s.lektion <= 12)
-    .map(s => s.lektion)
-);
-// Plus Altdaten ohne lektion
-const altGrundstoff = theorySessions.filter(s => !s.lektion && s.typ === "grundstoff").length;
-const grundstoffDone = uniqueGrundstoff.size + altGrundstoff;
+CREATE FUNCTION update_open_item_after_allocation()
+RETURNS trigger AS $$
+DECLARE
+  total_paid numeric;
+  item_total numeric;
+BEGIN
+  SELECT COALESCE(SUM(betrag), 0) INTO total_paid
+  FROM payment_allocations WHERE open_item_id = NEW.open_item_id;
+
+  SELECT betrag_gesamt INTO item_total
+  FROM open_items WHERE id = NEW.open_item_id;
+
+  UPDATE open_items SET
+    betrag_bezahlt = total_paid,
+    status = CASE
+      WHEN total_paid >= item_total THEN 'bezahlt'
+      WHEN total_paid > 0 THEN 'teilbezahlt'
+      ELSE 'offen'
+    END
+  WHERE id = NEW.open_item_id;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 ```
 
-**Duplikat-Warnung:**
+**Bestehende Daten migrieren:**
 ```text
-const alreadyDone = theorySessions.find(s => s.lektion === selectedLektion);
-if (alreadyDone) {
-  // Warnung anzeigen, Speichern trotzdem erlauben
+-- Fahrstunden -> open_items
+INSERT INTO open_items (student_id, typ, referenz_id, datum, beschreibung, betrag_gesamt)
+SELECT student_id, 'fahrstunde', id, datum,
+  'Fahrstunde ' || dauer_minuten || 'min (' || einheiten || 'E)',
+  preis
+FROM driving_lessons;
+
+-- Pruefungen -> open_items
+INSERT INTO open_items (...)
+SELECT student_id, 'pruefung', id, datum,
+  CASE WHEN typ='theorie' THEN 'Theoriepruefung' ELSE 'Fahrpruefung' END,
+  preis
+FROM exams;
+
+-- Leistungen -> open_items
+INSERT INTO open_items (...)
+SELECT student_id, 'leistung', id, created_at, bezeichnung, preis
+FROM services;
+```
+
+**Frontend Zahlungs-Verteilungslogik:**
+```text
+// Ausgewaehlte Posten nach Datum sortieren
+const sorted = selectedItems.sort((a, b) => new Date(a.datum) - new Date(b.datum));
+let remaining = parseFloat(betrag);
+const allocations = [];
+
+for (const item of sorted) {
+  if (remaining <= 0) break;
+  const offen = item.betrag_gesamt - item.betrag_bezahlt;
+  const zuordnung = Math.min(remaining, offen);
+  allocations.push({ open_item_id: item.id, betrag: zuordnung });
+  remaining -= zuordnung;
 }
 ```
 
 ### Zusammenfassung
 
-| Datei / Bereich | Aenderung |
-|-----------------|-----------|
-| DB-Migration | Spalte `lektion` (integer, nullable) hinzufuegen |
-| `Theorie.tsx` | Lektions-Dropdown statt Typ-Dropdown, Tabelle zeigt Lektion, Typ wird abgeleitet |
-| `FahrschuelerDetail.tsx` | Lektions-Dropdown im Dialog, Duplikat-Warnung, Checkliste der Lektionen in Fortschrittsanzeige |
-| Fortschrittslogik | Zaehlung basiert auf einzigartigen Lektionen (keine Doppelzaehlung) |
+| Bereich | Aenderung |
+|---------|-----------|
+| DB-Migration | Tabellen `open_items` + `payment_allocations`, 4 Trigger, Datenmigration, RLS |
+| FahrschuelerDetail.tsx | Zahlung-Dialog mit offenen Posten Checkboxen, Status bei Eintraegen, neuer Saldo |
+| Zahlungen.tsx | Zuordnungs-Spalte, offene Posten im Dialog |
+| Abrechnung.tsx | Saldo aus open_items statt 4 Tabellen |
 
