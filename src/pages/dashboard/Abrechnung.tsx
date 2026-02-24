@@ -6,6 +6,7 @@ import { formatStudentName } from "@/lib/formatStudentName";
 import PageHeader from "@/components/PageHeader";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useNavigate } from "react-router-dom";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -25,20 +26,12 @@ const Abrechnung = () => {
 
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("students").select("*").order("nachname").limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("*").order("nachname")),
   });
 
   const { data: openItems = [] } = useQuery({
     queryKey: ["open_items_all"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("open_items").select("student_id, betrag_gesamt, betrag_bezahlt").limit(10000) as any;
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("open_items").select("student_id, betrag_gesamt, betrag_bezahlt") as any) as Promise<any[]>,
   });
 
   // ── Saldo pro Schüler berechnen (aus open_items) ─────────────────────────────

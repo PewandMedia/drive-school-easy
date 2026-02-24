@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useToast } from "@/hooks/use-toast";
 
 const DAUER_OPTIONS = [45, 90, 135];
@@ -92,15 +93,13 @@ const Schaltstunden = () => {
     queryKey: ["driving_lessons", "schaltwagen", "b197", b197StudentIds],
     queryFn: async () => {
       if (b197StudentIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("driving_lessons")
-        .select("id, student_id, datum, dauer_minuten, einheiten, typ, preis")
-        .eq("fahrzeug_typ", "schaltwagen")
-        .in("student_id", b197StudentIds)
-        .order("datum", { ascending: false })
-        .limit(10000);
-      if (error) throw error;
-      return (data ?? []) as SchaltstundeRow[];
+      return fetchAllRows(
+        supabase.from("driving_lessons")
+          .select("id, student_id, datum, dauer_minuten, einheiten, typ, preis")
+          .eq("fahrzeug_typ", "schaltwagen")
+          .in("student_id", b197StudentIds)
+          .order("datum", { ascending: false })
+      ) as Promise<SchaltstundeRow[]>;
     },
     enabled: b197StudentIds.length > 0,
   });

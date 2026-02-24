@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useToast } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -104,15 +105,7 @@ const Fahrstunden = () => {
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, vorname, nachname, geburtsdatum")
-        .order("nachname")
-        .limit(10000);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
   });
 
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
@@ -130,15 +123,7 @@ const Fahrstunden = () => {
 
   const { data: lessons = [] } = useQuery<DrivingLesson[]>({
     queryKey: ["driving_lessons"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("driving_lessons")
-        .select("*")
-        .order("datum", { ascending: false })
-        .limit(10000);
-      if (error) throw error;
-      return (data ?? []) as DrivingLesson[];
-    },
+    queryFn: () => fetchAllRows(supabase.from("driving_lessons").select("*").order("datum", { ascending: false })) as Promise<DrivingLesson[]>,
   });
 
   const insertMutation = useMutation({

@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import PageHeader from "@/components/PageHeader";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { format, startOfMonth, endOfMonth, isToday } from "date-fns";
 import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -78,40 +79,17 @@ const Zahlungen = () => {
 
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["payments"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payments")
-        .select("*, students(vorname, nachname, geburtsdatum)")
-        .order("datum", { ascending: false })
-        .limit(10000);
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () => fetchAllRows(supabase.from("payments").select("*, students(vorname, nachname, geburtsdatum)").order("datum", { ascending: false })) as Promise<any[]>,
   });
 
   const { data: allAllocations = [] } = useQuery({
     queryKey: ["payment_allocations_all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payment_allocations")
-        .select("*, open_items(beschreibung, typ, datum)")
-        .limit(10000) as any;
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("payment_allocations").select("*, open_items(beschreibung, typ, datum)") as any) as Promise<any[]>,
   });
 
   const { data: students = [] } = useQuery({
     queryKey: ["students_list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, vorname, nachname, geburtsdatum")
-        .order("nachname")
-        .limit(10000);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
   });
 
   const { data: openItemsForStudent = [] } = useQuery({

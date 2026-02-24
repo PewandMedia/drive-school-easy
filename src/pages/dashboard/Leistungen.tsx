@@ -11,6 +11,7 @@ import StudentCombobox from "@/components/StudentCombobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 
 type ServiceStatus = "offen" | "bezahlt" | "erledigt";
@@ -69,15 +70,7 @@ const Leistungen = () => {
 
   const { data: services = [], isLoading } = useQuery({
     queryKey: ["services"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*, students(vorname, nachname, geburtsdatum)")
-        .order("created_at", { ascending: false })
-        .limit(10000);
-      if (error) throw error;
-      return data as Service[];
-    },
+    queryFn: () => fetchAllRows(supabase.from("services").select("*, students(vorname, nachname, geburtsdatum)").order("created_at", { ascending: false })) as Promise<Service[]>,
   });
 
   const { data: prices = [] } = useQuery({
@@ -96,15 +89,7 @@ const Leistungen = () => {
 
   const { data: students = [] } = useQuery({
     queryKey: ["students", "list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, vorname, nachname, geburtsdatum")
-        .order("nachname")
-        .limit(10000);
-      if (error) throw error;
-      return data as Student[];
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")) as Promise<Student[]>,
   });
 
   const createMutation = useMutation({
