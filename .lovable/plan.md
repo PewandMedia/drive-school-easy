@@ -1,133 +1,66 @@
 
 
-## Performance-Optimierung: Limits, "Mehr anzeigen" und Tabellenumstellung
+## Fixes: Supabase 1000-Limit, Schaltstunden Tages-Logik, Abrechnung Pagination
 
 ### Uebersicht
 
-Alle Reiter werden auf ein "Mehr anzeigen"-System umgestellt, um die Performance mit 400+ Schuelern zu gewaehrleisten. Statistik-Cards zaehlen weiterhin ueber 1000 hinaus. Fahrstunden werden von Cards auf eine Tabelle umgestellt.
+Drei Hauptprobleme werden behoben:
+1. Supabase-Queries ohne `.limit(10000)` geben maximal 1000 Zeilen zurueck, was falsche Zahlen in Statistik-Cards und "Weitere X von 1000" verursacht
+2. Schaltstunden zeigt bereits Tages-Logik korrekt an (besteht schon), aber es fehlt die Trennung "heute keine" + trotzdem aeltere anzeigen
+3. Abrechnung hat keine Pagination ("Mehr anzeigen")
 
 ---
 
-### 1. Statistik-Cards: Zaehlung ueber 1000 hinaus
+### 1. Fehlende `.limit(10000)` ergaenzen
 
-**Betrifft**: Dashboard, Fahrstunden, Theorie, Schaltstunden, Pruefungen, Leistungen, Zahlungen
+Alle Queries die grosse Datenmengen laden koennen, aber noch kein `.limit(10000)` haben, werden ergaenzt. Das behebt sowohl die falschen Statistik-Zahlen (z.B. "1000" statt der echten Zahl) als auch die falsche Anzeige "Weitere 10 von 1000".
 
-Aktuell werden alle Daten korrekt gezaehlt – das Problem liegt vermutlich am Supabase-Default-Limit von 1000 Zeilen pro Query. Alle Queries die fuer Statistiken verwendet werden, bekommen ein explizites `.limit()` entfernt bzw. es wird sichergestellt, dass die Daten vollstaendig geladen werden, indem Supabase-Queries mit Paginierung oder Count-Abfragen ergaenzt werden.
+| Datei | Query/Tabelle | Problem |
+|-------|--------------|---------|
+| `Abrechnung.tsx` | `students.select("*")` | Kein Limit |
+| `Abrechnung.tsx` | `open_items.select(...)` | Kein Limit |
+| `Fahrstunden.tsx` | `students.select(...)` | Kein Limit |
+| `Theorie.tsx` | `students.select(...)` | Kein Limit |
+| `Pruefungen.tsx` | `students.select(...)` | Kein Limit |
+| `Zahlungen.tsx` | `students.select(...)` | Kein Limit |
+| `Zahlungen.tsx` | `payment_allocations.select(...)` | Kein Limit |
+| `Leistungen.tsx` | `students.select(...)` | Kein Limit |
 
-**Loesung**: Fuer Statistik-Werte werden separate Count/Sum-Queries verwendet (z.B. `supabase.from("driving_lessons").select("*", { count: "exact", head: true })`) oder die Queries bekommen ein hohes Limit (z.B. 10000), damit alle Eintraege gezaehlt werden.
-
----
-
-### 2. Fahrstunden-Reiter: Cards durch Tabelle ersetzen + Tages-Logik
-
-**Datei**: `src/pages/dashboard/Fahrstunden.tsx`
-
-- Die gruppierte Card-Ansicht (groupedByStudent) wird entfernt
-- Stattdessen eine einzelne Tabelle wie bei Schaltstunden mit Spalten: Schueler, Datum, Typ, Fahrzeug, Dauer, **Preis**, Loeschen
-- **Tages-Logik**: Zuerst werden alle Fahrstunden von heute angezeigt (kein Limit). Falls keine vorhanden: "Heute noch keine Fahrstunden eingetragen"
-- Darunter ein "Mehr anzeigen"-Button, der jeweils 10 aeltere Eintraege nachlaedt
+Alle diese Queries bekommen `.limit(10000)` angehaengt.
 
 ---
 
-### 3. Schaltstunden-Reiter: Preis-Spalte + Limit
+### 2. Abrechnung: Pagination mit "Mehr anzeigen"
+
+**Datei**: `src/pages/dashboard/Abrechnung.tsx`
+
+- Neuer State: `const [visibleCount, setVisibleCount] = useState(10)`
+- Die gefilterte Schueler-Liste wird auf `visibleCount` begrenzt: `filtered.slice(0, visibleCount)`
+- Ein "Mehr anzeigen"-Button wird unter der Tabelle angezeigt, wenn es weitere Eintraege gibt
+- Der Button zeigt "Weitere X von Y anzeigen" an
+- Bei Suchfilter-Aenderung wird `visibleCount` auf 10 zurueckgesetzt
+
+---
+
+### 3. Schaltstunden: Korrekte Tages-Logik
 
 **Datei**: `src/pages/dashboard/Schaltstunden.tsx`
 
-- Neue Spalte **Preis** in der Tabelle (Daten sind bereits in `driving_lessons.preis` vorhanden, muessen nur im Query mit selektiert werden)
-- Tages-Logik: Alle von heute anzeigen, dann "Mehr anzeigen" fuer aeltere (10er-Limit)
+Die bestehende Tages-Logik ist korrekt implementiert. Es wird nur sichergestellt, dass wenn heute keine Schaltstunden vorhanden sind ABER aeltere existieren, die Meldung "Heute noch keine Schaltstunden eingetragen" angezeigt wird und die aelteren trotzdem sichtbar sind (mit "Mehr anzeigen"). Aktuell zeigt es nur die leere Meldung wenn BEIDES leer ist.
+
+**Aenderung**: Die leere-Meldung wird nur gezeigt wenn `todayLessons.length === 0`. Falls `olderLessons.length > 0` werden diese trotzdem darunter angezeigt.
 
 ---
-
-### 4. Theorie-Reiter: Tages-Logik
-
-**Datei**: `src/pages/dashboard/Theorie.tsx`
-
-- Alle Theoriestunden von **heute** komplett anzeigen (kein Limit)
-- Falls keine vorhanden: "Heute noch keine Theoriestunden hinzugefuegt"
-- Button "Aeltere Eintraege anzeigen" laedt jeweils 10 weitere aus vergangenen Tagen
-
----
-
-### 5. Pruefungen-Reiter: 10er-Limit
-
-**Datei**: `src/pages/dashboard/Pruefungen.tsx`
-
-- Standardmaessig nur die neusten 10 Pruefungen anzeigen
-- "Mehr anzeigen"-Button laedt jeweils 10 weitere nach
-
----
-
-### 6. Leistungen-Reiter: 10er-Limit
-
-**Datei**: `src/pages/dashboard/Leistungen.tsx`
-
-- Standardmaessig nur die neusten 10 Leistungen anzeigen (gruppiert nach Schueler bleibt, aber mit Limit auf die Gesamtanzahl)
-- "Mehr anzeigen"-Button laedt jeweils 10 weitere nach
-
----
-
-### 7. Zahlungen-Reiter: Tages-Logik + Limit
-
-**Datei**: `src/pages/dashboard/Zahlungen.tsx`
-
-- Zuerst alle Zahlungen von **heute** anzeigen (kein Limit)
-- Falls keine vorhanden: "Heute noch keine Zahlungen erfasst"
-- "Mehr anzeigen"-Button laedt jeweils 10 aeltere Zahlungen nach
-
----
-
-### 8. Fahrschueler-Reiter: 10er-Limit
-
-**Datei**: `src/pages/dashboard/Fahrschueler.tsx`
-
-- Standardmaessig nur 10 Schueler anzeigen
-- "Mehr anzeigen"-Button laedt jeweils 10 weitere nach
-- Suchfunktion filtert weiterhin ueber alle Schueler
-
----
-
-### Technische Umsetzung
-
-Jede betroffene Seite bekommt einen `visibleCount`-State:
-
-```text
-const [visibleCount, setVisibleCount] = useState(10);
-```
-
-Fuer Seiten mit Tages-Logik (Fahrstunden, Theorie, Zahlungen, Schaltstunden):
-
-```text
-- todayItems = alle Eintraege von heute (immer komplett angezeigt)
-- olderItems = alle aelteren Eintraege (sortiert nach Datum absteigend)
-- visibleOlder = olderItems.slice(0, visibleCount)
-- "Mehr anzeigen" erhoeht visibleCount um 10
-```
-
-Fuer Seiten ohne Tages-Logik (Pruefungen, Leistungen, Fahrschueler):
-
-```text
-- visibleItems = filtered.slice(0, visibleCount)
-- "Mehr anzeigen" erhoeht visibleCount um 10
-```
-
-Der "Mehr anzeigen"-Button wird nur angezeigt, wenn es noch weitere Eintraege gibt. Er zeigt auch an, wie viele noch uebrig sind (z.B. "Weitere 10 von 85 anzeigen").
-
-### Supabase Query-Limit Fix
-
-Um das 1000-Zeilen-Default-Limit zu umgehen, werden die Haupt-Queries angepasst:
-- Statistik-relevante Queries bekommen `.limit(10000)` oder nutzen `{ count: "exact", head: true }` fuer reine Zaehlung
-- Listen-Queries koennen weiterhin alle Daten laden, da das Frontend das Limit uebernimmt
 
 ### Zusammenfassung der Aenderungen
 
-| Datei | Aenderungen |
-|-------|------------|
-| `Fahrstunden.tsx` | Cards durch Tabelle ersetzen, Tages-Logik + Mehr anzeigen, Preis-Spalte bleibt |
-| `Schaltstunden.tsx` | Preis-Spalte hinzufuegen, Tages-Logik + Mehr anzeigen |
-| `Theorie.tsx` | Tages-Logik + Mehr anzeigen |
-| `Pruefungen.tsx` | 10er-Limit + Mehr anzeigen |
-| `Leistungen.tsx` | 10er-Limit + Mehr anzeigen |
-| `Zahlungen.tsx` | Tages-Logik + Mehr anzeigen |
-| `Fahrschueler.tsx` | 10er-Limit + Mehr anzeigen |
-| `Dashboard.tsx` | Query-Limits erhoehen fuer korrekte Statistiken |
+| Datei | Aenderung |
+|-------|-----------|
+| `Abrechnung.tsx` | `.limit(10000)` fuer beide Queries + `visibleCount` State + "Mehr anzeigen" Button + Search-Reset |
+| `Schaltstunden.tsx` | Tages-Logik Fix: leere-Meldung nur fuer heute, aeltere trotzdem anzeigen |
+| `Fahrstunden.tsx` | `.limit(10000)` fuer students-Query |
+| `Theorie.tsx` | `.limit(10000)` fuer students-Query |
+| `Pruefungen.tsx` | `.limit(10000)` fuer students-Query |
+| `Zahlungen.tsx` | `.limit(10000)` fuer students- und payment_allocations-Queries |
+| `Leistungen.tsx` | `.limit(10000)` fuer students-Query |
 
