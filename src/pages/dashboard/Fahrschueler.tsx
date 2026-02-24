@@ -65,6 +65,7 @@ const Fahrschueler = () => {
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students"],
@@ -72,7 +73,8 @@ const Fahrschueler = () => {
       const { data, error } = await supabase
         .from("students")
         .select("*")
-        .order("nachname", { ascending: true });
+        .order("nachname", { ascending: true })
+        .limit(10000);
       if (error) throw error;
       return data as Student[];
     },
@@ -81,7 +83,7 @@ const Fahrschueler = () => {
   const { data: lessons = [], isLoading: isLoadingLessons } = useQuery({
     queryKey: ["driving_lessons_saldo"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("driving_lessons").select("student_id, preis");
+      const { data, error } = await supabase.from("driving_lessons").select("student_id, preis").limit(10000);
       if (error) throw error;
       return data;
     },
@@ -90,7 +92,7 @@ const Fahrschueler = () => {
   const { data: exams = [], isLoading: isLoadingExams } = useQuery({
     queryKey: ["exams_saldo"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("exams").select("student_id, preis");
+      const { data, error } = await supabase.from("exams").select("student_id, preis").limit(10000);
       if (error) throw error;
       return data;
     },
@@ -99,7 +101,7 @@ const Fahrschueler = () => {
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
     queryKey: ["services_saldo"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("services").select("student_id, preis");
+      const { data, error } = await supabase.from("services").select("student_id, preis").limit(10000);
       if (error) throw error;
       return data;
     },
@@ -108,7 +110,7 @@ const Fahrschueler = () => {
   const { data: payments = [], isLoading: isLoadingPayments } = useQuery({
     queryKey: ["payments_saldo"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payments").select("student_id, betrag");
+      const { data, error } = await supabase.from("payments").select("student_id, betrag").limit(10000);
       if (error) throw error;
       return data;
     },
@@ -173,6 +175,10 @@ const Fahrschueler = () => {
     );
   });
 
+  // Apply limit
+  const visibleStudents = filtered.slice(0, visibleCount);
+  const remaining = filtered.length - visibleCount;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.vorname || !form.nachname) {
@@ -209,7 +215,7 @@ const Fahrschueler = () => {
             className="pl-9"
             placeholder="Schüler suchen..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setVisibleCount(10); }}
           />
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
@@ -230,7 +236,6 @@ const Fahrschueler = () => {
 
       {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
-        {/* Header */}
         <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <button className="flex items-center gap-1 text-left hover:text-foreground transition-colors">
             Name <ArrowUpDown className="h-3 w-3" />
@@ -243,14 +248,13 @@ const Fahrschueler = () => {
           <span />
         </div>
 
-        {/* Rows */}
         {allLoading ? (
           <div className="flex flex-col gap-2 p-4">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="h-12 rounded-lg bg-secondary/40 animate-pulse" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : visibleStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Users className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-muted-foreground">
@@ -270,13 +274,12 @@ const Fahrschueler = () => {
           </div>
         ) : (
           <div>
-            {filtered.map((student) => (
+            {visibleStudents.map((student) => (
               <button
                 key={student.id}
                 onClick={() => navigate(`/dashboard/fahrschueler/${student.id}`)}
                 className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
               >
-                {/* Name */}
                 <div className="min-w-0">
                   <p className="font-medium text-foreground truncate">
                     {formatStudentName(student.nachname, student.vorname, student.geburtsdatum)}
@@ -286,14 +289,12 @@ const Fahrschueler = () => {
                   )}
                 </div>
 
-                {/* Geburtsdatum */}
                 <div>
                   <span className="text-sm text-muted-foreground">
                     {student.geburtsdatum ? format(new Date(student.geburtsdatum), "dd.MM.yyyy") : "–"}
                   </span>
                 </div>
 
-                {/* Klasse */}
                 <div>
                   <span
                     className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${klasseColors[student.fuehrerscheinklasse]}`}
@@ -302,14 +303,12 @@ const Fahrschueler = () => {
                   </span>
                 </div>
 
-                {/* Fahrschule */}
                 <div>
                   <Badge variant="outline" className="text-xs font-medium">
                     {FAHRSCHULE_LABELS[student.fahrschule] || student.fahrschule}
                   </Badge>
                 </div>
 
-                {/* Umschreiber */}
                 <div>
                   {student.ist_umschreiber ? (
                     <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 font-semibold text-xs">
@@ -320,7 +319,6 @@ const Fahrschueler = () => {
                   )}
                 </div>
 
-                {/* Saldo */}
                 <div>
                   {(() => {
                     const saldo = saldoMap[student.id] || 0;
@@ -333,10 +331,21 @@ const Fahrschueler = () => {
                   })()}
                 </div>
 
-                {/* Arrow */}
                 <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </button>
             ))}
+          </div>
+        )}
+
+        {remaining > 0 && (
+          <div className="p-3 border-t border-border text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleCount((c) => c + 10)}
+            >
+              Weitere {Math.min(10, remaining)} von {filtered.length} anzeigen
+            </Button>
           </div>
         )}
       </div>
@@ -369,7 +378,6 @@ const Fahrschueler = () => {
               </div>
             </div>
 
-            {/* Geburtsdatum */}
             <div className="space-y-2">
               <Label>Geburtsdatum *</Label>
               <div className="relative">
@@ -465,50 +473,40 @@ const Fahrschueler = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="riemke">Miro-Drive (Riemke Markt)</SelectItem>
-                  <SelectItem value="rathaus">Miro-Drive (Rathaus)</SelectItem>
+                  <SelectItem value="riemke">Riemke Markt</SelectItem>
+                  <SelectItem value="rathaus">Rathaus</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="adresse">Adresse</Label>
               <Input
                 id="adresse"
-                placeholder="Musterstraße 1, 12345 Musterstadt"
+                placeholder="Musterstraße 1, 44791 Bochum"
                 value={form.adresse}
                 onChange={(e) => setForm({ ...form, adresse: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Input
-                id="status"
-                placeholder="z. B. Aktiv, Pausiert..."
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-foreground">Umschreiber</p>
-                <p className="text-xs text-muted-foreground">Hat bereits einen ausländischen Führerschein</p>
-              </div>
+
+            <div className="flex items-center gap-3">
               <Switch
                 checked={form.ist_umschreiber}
                 onCheckedChange={(v) => setForm({ ...form, ist_umschreiber: v })}
               />
+              <Label>Umschreiber</Label>
             </div>
 
             {formError && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{formError}</p>
+              <p className="text-sm text-destructive">{formError}</p>
             )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setOpen(false); setForm(defaultForm); setGeburtsdatumText(""); setFormError(""); }}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Abbrechen
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Speichern..." : "Schüler anlegen"}
+                {createMutation.isPending ? "Speichern…" : "Speichern"}
               </Button>
             </DialogFooter>
           </form>

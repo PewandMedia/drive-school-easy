@@ -65,21 +65,21 @@ const Leistungen = () => {
   const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<ServiceStatus | "alle">("alle");
+  const [visibleCount, setVisibleCount] = useState(10);
 
-  // Fetch services joined with student names
   const { data: services = [], isLoading } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("services")
         .select("*, students(vorname, nachname, geburtsdatum)")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10000);
       if (error) throw error;
       return data as Service[];
     },
   });
 
-  // Fetch active prices for dropdown
   const { data: prices = [] } = useQuery({
     queryKey: ["prices", "active"],
     queryFn: async () => {
@@ -94,7 +94,6 @@ const Leistungen = () => {
     },
   });
 
-  // Fetch students for dropdown
   const { data: students = [] } = useQuery({
     queryKey: ["students", "list"],
     queryFn: async () => {
@@ -135,28 +134,15 @@ const Leistungen = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["services"] }),
   });
 
-  // When a price is selected, auto-fill bezeichnung and preis
   const isSonstiges = form.preis_id === "sonstiges";
 
   const handlePreisSelect = (preisId: string) => {
     if (preisId === "sonstiges") {
-      setForm((f) => ({
-        ...f,
-        preis_id: "sonstiges",
-        bezeichnung: "Sonstiges",
-        preis: "",
-        notiz: "",
-      }));
+      setForm((f) => ({ ...f, preis_id: "sonstiges", bezeichnung: "Sonstiges", preis: "", notiz: "" }));
     } else {
       const found = prices.find((p) => p.id === preisId);
       if (found) {
-        setForm((f) => ({
-          ...f,
-          preis_id: preisId,
-          bezeichnung: found.bezeichnung,
-          preis: found.preis.toString(),
-          notiz: "",
-        }));
+        setForm((f) => ({ ...f, preis_id: preisId, bezeichnung: found.bezeichnung, preis: found.preis.toString(), notiz: "" }));
       } else {
         setForm((f) => ({ ...f, preis_id: preisId, notiz: "" }));
       }
@@ -190,8 +176,12 @@ const Leistungen = () => {
     return matchSearch && matchStatus;
   });
 
-  // Group by student
-  const grouped = filtered.reduce<Record<string, Service[]>>((acc, s) => {
+  // Apply limit to filtered
+  const visibleFiltered = filtered.slice(0, visibleCount);
+  const remaining = filtered.length - visibleCount;
+
+  // Group visible by student
+  const grouped = visibleFiltered.reduce<Record<string, Service[]>>((acc, s) => {
     const key = s.student_id;
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
@@ -275,85 +265,94 @@ const Leistungen = () => {
           )}
         </div>
       ) : (
-        Object.entries(grouped).map(([studentId, items]) => {
-          const student = items[0].students;
-          const studentName = student ? formatStudentName(student.nachname, student.vorname, student.geburtsdatum) : "Unbekannt";
-          const saldo = items.filter((s) => s.status === "offen").reduce((sum, s) => sum + Number(s.preis), 0);
+        <>
+          {Object.entries(grouped).map(([studentId, items]) => {
+            const student = items[0].students;
+            const studentName = student ? formatStudentName(student.nachname, student.vorname, student.geburtsdatum) : "Unbekannt";
+            const saldo = items.filter((s) => s.status === "offen").reduce((sum, s) => sum + Number(s.preis), 0);
 
-          return (
-            <div key={studentId} className="rounded-xl border border-border bg-card overflow-hidden">
-              {/* Student header */}
-              <button
-                onClick={() => navigate(`/dashboard/fahrschueler/${studentId}`)}
-                className="w-full flex items-center justify-between px-5 py-3 border-b border-border bg-secondary/30 hover:bg-secondary/50 transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                    {student?.nachname?.[0] ?? "?"}
-                  </div>
-                  <span className="font-medium text-foreground text-sm">{studentName}</span>
-                  <span className="text-xs text-muted-foreground">{items.length} Leistung{items.length !== 1 ? "en" : ""}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {saldo > 0 && (
-                    <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-0.5">
-                      Offen: {saldo.toFixed(2).replace(".", ",")} €
-                    </span>
-                  )}
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </div>
-              </button>
-
-              {/* Column header */}
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 px-5 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/40">
-                <span>Bezeichnung</span>
-                <span>Datum</span>
-                <span>Preis</span>
-                <span>Status</span>
-              </div>
-
-              {/* Service rows */}
-              {items.map((service) => (
-                <div
-                  key={service.id}
-                  className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 items-center px-5 py-3 border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
+            return (
+              <div key={studentId} className="rounded-xl border border-border bg-card overflow-hidden">
+                <button
+                  onClick={() => navigate(`/dashboard/fahrschueler/${studentId}`)}
+                  className="w-full flex items-center justify-between px-5 py-3 border-b border-border bg-secondary/30 hover:bg-secondary/50 transition-colors group"
                 >
-                  <span className="text-sm text-foreground truncate">{service.bezeichnung}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(service.created_at).toLocaleDateString("de-DE")}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {Number(service.preis).toFixed(2).replace(".", ",")} €
-                  </span>
-                  {/* Status Select */}
-                  <Select
-                    value={service.status}
-                    onValueChange={(v) => updateStatusMutation.mutate({ id: service.id, status: v as ServiceStatus })}
-                  >
-                    <SelectTrigger className={`h-7 text-xs border rounded-md px-2 w-28 ${statusConfig[service.status].className}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(statusConfig).map(([val, cfg]) => (
-                        <SelectItem key={val} value={val} className="text-xs">{cfg.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-3">
+                    <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                      {student?.nachname?.[0] ?? "?"}
+                    </div>
+                    <span className="font-medium text-foreground text-sm">{studentName}</span>
+                    <span className="text-xs text-muted-foreground">{items.length} Leistung{items.length !== 1 ? "en" : ""}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {saldo > 0 && (
+                      <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-0.5">
+                        Offen: {saldo.toFixed(2).replace(".", ",")} €
+                      </span>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </div>
+                </button>
+
+                <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 px-5 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider border-b border-border/40">
+                  <span>Bezeichnung</span>
+                  <span>Datum</span>
+                  <span>Preis</span>
+                  <span>Status</span>
                 </div>
-              ))}
+
+                {items.map((service) => (
+                  <div
+                    key={service.id}
+                    className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 items-center px-5 py-3 border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
+                  >
+                    <span className="text-sm text-foreground truncate">{service.bezeichnung}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(service.created_at).toLocaleDateString("de-DE")}
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {Number(service.preis).toFixed(2).replace(".", ",")} €
+                    </span>
+                    <Select
+                      value={service.status}
+                      onValueChange={(v) => updateStatusMutation.mutate({ id: service.id, status: v as ServiceStatus })}
+                    >
+                      <SelectTrigger className={`h-7 text-xs border rounded-md px-2 w-28 ${statusConfig[service.status].className}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(statusConfig).map(([val, cfg]) => (
+                          <SelectItem key={val} value={val} className="text-xs">{cfg.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
+          {remaining > 0 && (
+            <div className="text-center py-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((c) => c + 10)}
+              >
+                Weitere {Math.min(10, remaining)} von {filtered.length} anzeigen
+              </Button>
             </div>
-          );
-        })
+          )}
+        </>
       )}
 
-      {/* Dialog: Leistung zuordnen */}
+      {/* Dialog */}
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setForm(defaultForm); setFormError(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Leistung zuordnen</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-            {/* Student select */}
             <div className="space-y-2">
               <Label>Fahrschüler *</Label>
               <StudentCombobox
@@ -363,7 +362,6 @@ const Leistungen = () => {
               />
             </div>
 
-            {/* Price select – auto-fills bezeichnung + preis */}
             <div className="space-y-2">
               <Label>Aus Preisliste wählen</Label>
               <Select value={form.preis_id} onValueChange={handlePreisSelect}>
@@ -388,7 +386,6 @@ const Leistungen = () => {
               </Select>
             </div>
 
-            {/* Notizfeld bei Sonstiges */}
             {isSonstiges && (
               <div className="space-y-2">
                 <Label htmlFor="notiz">Notiz / Beschreibung *</Label>
@@ -402,7 +399,6 @@ const Leistungen = () => {
               </div>
             )}
 
-            {/* Bezeichnung (editable, pre-filled) – hidden when Sonstiges */}
             {!isSonstiges && (
               <div className="space-y-2">
                 <Label htmlFor="bezeichnung">Bezeichnung *</Label>
@@ -415,7 +411,6 @@ const Leistungen = () => {
               </div>
             )}
 
-            {/* Preis (editable, pre-filled) */}
             <div className="space-y-2">
               <Label htmlFor="preis">Preis (€)</Label>
               <div className="relative">
@@ -433,7 +428,6 @@ const Leistungen = () => {
               </div>
             </div>
 
-            {/* Status */}
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as ServiceStatus })}>
@@ -449,7 +443,7 @@ const Leistungen = () => {
             </div>
 
             {formError && (
-              <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{formError}</p>
+              <p className="text-sm text-destructive">{formError}</p>
             )}
 
             <DialogFooter>
@@ -457,7 +451,7 @@ const Leistungen = () => {
                 Abbrechen
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Speichern..." : "Zuordnen"}
+                {createMutation.isPending ? "Speichern…" : "Speichern"}
               </Button>
             </DialogFooter>
           </form>

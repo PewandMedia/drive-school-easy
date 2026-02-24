@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import PageHeader from "@/components/PageHeader";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, isToday } from "date-fns";
 import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,7 +35,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
 type Zahlungsart = "bar" | "ec" | "ueberweisung";
 
 type PaymentForm = {
@@ -54,7 +53,6 @@ const defaultForm = (): PaymentForm => ({
   selectedOpenItems: [],
 });
 
-// ── Labels ────────────────────────────────────────────────────────────────────
 const ZAHLUNGSART_LABELS: Record<Zahlungsart, string> = {
   bar: "Bar",
   ec: "EC-Karte",
@@ -70,28 +68,27 @@ const ZAHLUNGSART_ICONS: Record<Zahlungsart, React.ReactNode> = {
 const eur = (v: number) =>
   v.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
-// ── Component ─────────────────────────────────────────────────────────────────
 const Zahlungen = () => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PaymentForm>(defaultForm());
   const [searchTerm, setSearchTerm] = useState("");
+  const [visibleOlderCount, setVisibleOlderCount] = useState(10);
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // ── Queries ──────────────────────────────────────────────────────────────────
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["payments"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
         .select("*, students(vorname, nachname, geburtsdatum)")
-        .order("datum", { ascending: false });
+        .order("datum", { ascending: false })
+        .limit(10000);
       if (error) throw error;
       return data as any[];
     },
   });
 
-  // Payment allocations for display
   const { data: allAllocations = [] } = useQuery({
     queryKey: ["payment_allocations_all"],
     queryFn: async () => {
@@ -115,7 +112,6 @@ const Zahlungen = () => {
     },
   });
 
-  // Open items for selected student in dialog
   const { data: openItemsForStudent = [] } = useQuery({
     queryKey: ["open_items_student", form.student_id],
     queryFn: async () => {
@@ -132,7 +128,6 @@ const Zahlungen = () => {
     enabled: !!form.student_id,
   });
 
-  // ── Mutation ─────────────────────────────────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
       const betrag = parseFloat(form.betrag) || 0;
@@ -148,7 +143,6 @@ const Zahlungen = () => {
         .single();
       if (paymentError) throw paymentError;
 
-      // Allocate to selected open items
       if (form.selectedOpenItems.length > 0) {
         const selectedItems = openItemsForStudent
           .filter((oi: any) => form.selectedOpenItems.includes(oi.id))
@@ -197,7 +191,7 @@ const Zahlungen = () => {
     },
   });
 
-  // ── Stats ────────────────────────────────────────────────────────────────────
+  // Stats
   const now = new Date();
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
@@ -213,13 +207,76 @@ const Zahlungen = () => {
 
   const canSave = form.student_id && form.betrag && parseFloat(form.betrag) > 0;
 
-  // Build allocation map for display
   const allocationsByPayment = new Map<string, any[]>();
   for (const alloc of allAllocations) {
     const list = allocationsByPayment.get(alloc.payment_id) || [];
     list.push(alloc);
     allocationsByPayment.set(alloc.payment_id, list);
   }
+
+  // Search filter
+  const searchFiltered = payments.filter((p: any) => {
+    if (!searchTerm) return true;
+    const st = p.students;
+    if (!st) return false;
+    const name = `${st.nachname} ${st.vorname}`.toLowerCase();
+    return name.includes(searchTerm.toLowerCase());
+  });
+
+  // Today / older split
+  const todayPayments = searchFiltered.filter((p: any) => isToday(new Date(p.datum)));
+  const olderPayments = searchFiltered.filter((p: any) => !isToday(new Date(p.datum)));
+  const visibleOlder = olderPayments.slice(0, visibleOlderCount);
+  const remainingOlder = olderPayments.length - visibleOlderCount;
+
+  const renderRow = (p: any) => {
+    const st = p.students;
+    const allocations = allocationsByPayment.get(p.id) || [];
+    return (
+      <TableRow key={p.id}>
+        <TableCell className="font-medium">
+          {st ? formatStudentName(st.nachname, st.vorname, st.geburtsdatum) : "–"}
+        </TableCell>
+        <TableCell className="text-muted-foreground">
+          {format(new Date(p.datum), "dd.MM.yyyy", { locale: de })}
+        </TableCell>
+        <TableCell>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground">
+            {ZAHLUNGSART_ICONS[p.zahlungsart as Zahlungsart]}
+            {ZAHLUNGSART_LABELS[p.zahlungsart as Zahlungsart]}
+          </span>
+        </TableCell>
+        <TableCell>
+          {allocations.length > 0 ? (
+            <div className="space-y-0.5">
+              {allocations.map((a: any) => (
+                <p key={a.id} className="text-xs text-muted-foreground">
+                  {a.open_items?.beschreibung ?? "–"}{" "}
+                  <span className="text-foreground font-medium">{eur(Number(a.betrag))}</span>
+                </p>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground italic">Freie Zahlung</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right font-semibold text-green-400">
+          +{eur(Number(p.betrag))}
+        </TableCell>
+        <TableCell>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => deleteMutation.mutate(p.id)}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -277,77 +334,48 @@ const Zahlungen = () => {
                   <div className="h-4 w-48 bg-secondary/60 rounded animate-pulse mx-auto" />
                 </TableCell>
               </TableRow>
-            ) : payments.filter((p: any) => {
-                if (!searchTerm) return true;
-                const st = p.students;
-                if (!st) return false;
-                const name = `${st.nachname} ${st.vorname}`.toLowerCase();
-                return name.includes(searchTerm.toLowerCase());
-              }).length === 0 ? (
+            ) : todayPayments.length === 0 && olderPayments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                   <TrendingDown className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  Noch keine Zahlungen erfasst
+                  Heute noch keine Zahlungen erfasst
                 </TableCell>
               </TableRow>
             ) : (
-              payments.filter((p: any) => {
-                if (!searchTerm) return true;
-                const st = p.students;
-                if (!st) return false;
-                const name = `${st.nachname} ${st.vorname}`.toLowerCase();
-                return name.includes(searchTerm.toLowerCase());
-              }).map((p: any) => {
-                const st = p.students;
-                const allocations = allocationsByPayment.get(p.id) || [];
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {st ? formatStudentName(st.nachname, st.vorname, st.geburtsdatum) : "–"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(p.datum), "dd.MM.yyyy", { locale: de })}
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2 py-0.5 text-xs font-medium text-foreground">
-                        {ZAHLUNGSART_ICONS[p.zahlungsart as Zahlungsart]}
-                        {ZAHLUNGSART_LABELS[p.zahlungsart as Zahlungsart]}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {allocations.length > 0 ? (
-                        <div className="space-y-0.5">
-                          {allocations.map((a: any) => (
-                            <p key={a.id} className="text-xs text-muted-foreground">
-                              {a.open_items?.beschreibung ?? "–"}{" "}
-                              <span className="text-foreground font-medium">{eur(Number(a.betrag))}</span>
-                            </p>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Freie Zahlung</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-green-400">
-                      +{eur(Number(p.betrag))}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteMutation.mutate(p.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+              <>
+                {todayPayments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-4 text-sm text-muted-foreground">
+                      Heute noch keine Zahlungen erfasst
                     </TableCell>
                   </TableRow>
-                );
-              })
+                ) : (
+                  todayPayments.map(renderRow)
+                )}
+                {visibleOlder.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
+                      Ältere Einträge
+                    </TableCell>
+                  </TableRow>
+                )}
+                {visibleOlder.map(renderRow)}
+              </>
             )}
           </TableBody>
         </Table>
+
+        {remainingOlder > 0 && (
+          <div className="p-3 border-t border-border text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleOlderCount((c) => c + 10)}
+            >
+              Weitere {Math.min(10, remainingOlder)} von {olderPayments.length} anzeigen
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Dialog */}
@@ -358,7 +386,6 @@ const Zahlungen = () => {
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
-            {/* Schüler */}
             <div className="space-y-1.5">
               <Label>Schüler</Label>
               <StudentCombobox
@@ -369,7 +396,6 @@ const Zahlungen = () => {
               />
             </div>
 
-            {/* Datum */}
             <div className="space-y-1.5">
               <Label>Datum</Label>
               <Input
@@ -379,7 +405,6 @@ const Zahlungen = () => {
               />
             </div>
 
-            {/* Zahlungsart */}
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
               <Select
@@ -397,7 +422,6 @@ const Zahlungen = () => {
               </Select>
             </div>
 
-            {/* Betrag */}
             <div className="space-y-1.5">
               <Label>Betrag (€)</Label>
               <Input
@@ -410,7 +434,6 @@ const Zahlungen = () => {
               />
             </div>
 
-            {/* Offene Posten */}
             {form.student_id && openItemsForStudent.length > 0 && (() => {
               const betragNum = parseFloat(form.betrag) || 0;
               const selectedItems = openItemsForStudent
@@ -436,58 +459,37 @@ const Zahlungen = () => {
                       const checked = form.selectedOpenItems.includes(oi.id);
                       const alloc = allocMap.get(oi.id);
                       return (
-                        <label key={oi.id} className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40">
+                        <label key={oi.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-secondary/30 cursor-pointer transition-colors">
                           <Checkbox
                             checked={checked}
                             onCheckedChange={(c) => {
-                              setForm((f) => {
-                                const newSelected = c
+                              setForm((f) => ({
+                                ...f,
+                                selectedOpenItems: c
                                   ? [...f.selectedOpenItems, oi.id]
-                                  : f.selectedOpenItems.filter((x) => x !== oi.id);
-                                const summe = openItemsForStudent
-                                  .filter((item: any) => newSelected.includes(item.id))
-                                  .reduce((sum: number, item: any) => sum + (Number(item.betrag_gesamt) - Number(item.betrag_bezahlt)), 0);
-                                return {
-                                  ...f,
-                                  selectedOpenItems: newSelected,
-                                  betrag: summe > 0 ? summe.toFixed(2) : "",
-                                };
-                              });
+                                  : f.selectedOpenItems.filter((x) => x !== oi.id),
+                              }));
                             }}
-                            className="mt-0.5"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(oi.datum), "dd.MM.yyyy", { locale: de })}
-                              </span>
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                {oi.typ === "fahrstunde" ? "Fahrstunde" : oi.typ === "pruefung" ? "Prüfung" : "Leistung"}
-                              </Badge>
-                            </div>
                             <p className="text-sm text-foreground truncate">{oi.beschreibung}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(oi.datum), "dd.MM.yyyy", { locale: de })} · Offen: {eur(offen)}
+                            </p>
                           </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-semibold text-foreground">{eur(offen)}</p>
-                            {checked && alloc != null && alloc > 0 && (
-                              <p className="text-xs text-green-400">→ {eur(alloc)}</p>
-                            )}
-                          </div>
+                          {checked && alloc !== undefined && (
+                            <Badge variant="secondary" className="text-xs shrink-0">
+                              {eur(alloc)}
+                            </Badge>
+                          )}
                         </label>
                       );
                     })}
                   </div>
-                  {form.selectedOpenItems.length > 0 && betragNum > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Verteilung: {eur(Array.from(allocMap.values()).reduce((s, v) => s + v, 0))} zugeordnet
-                      {remaining > 0 && ` · ${eur(remaining)} Restbetrag`}
-                    </p>
-                  )}
                 </div>
               );
             })()}
 
-            {/* Actions */}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setOpen(false); setForm(defaultForm()); }}>
                 Abbrechen
