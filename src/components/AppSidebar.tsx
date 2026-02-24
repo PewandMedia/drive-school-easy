@@ -24,6 +24,7 @@ import {
   CreditCard,
   BarChart3,
   Receipt,
+  FileText,
 } from "lucide-react";
 
 const navItems = [
@@ -47,6 +48,7 @@ const finanzItems = [
   { title: "Zahlungen", url: "/dashboard/zahlungen", icon: CreditCard },
   { title: "Abrechnung", url: "/dashboard/abrechnung", icon: Receipt },
   { title: "Auswertung", url: "/dashboard/auswertung", icon: BarChart3 },
+  { title: "Tagesabrechnung", url: "/dashboard/tagesabrechnung", icon: FileText },
 ];
 
 export function AppSidebar() {
