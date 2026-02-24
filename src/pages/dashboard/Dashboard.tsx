@@ -3,7 +3,7 @@ import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { format, isToday, startOfMonth, isAfter, isSameMonth } from "date-fns";
+import { format, isToday, isAfter, isSameMonth } from "date-fns";
 import { de } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 
@@ -16,7 +16,7 @@ const Dashboard = () => {
   const { data: students = [] } = useQuery({
     queryKey: ["dashboard-students"],
     queryFn: async () => {
-      const { data } = await supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname");
+      const { data } = await supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname").limit(10000);
       return data ?? [];
     },
   });
@@ -24,7 +24,7 @@ const Dashboard = () => {
   const { data: drivingLessons = [] } = useQuery({
     queryKey: ["dashboard-driving-lessons"],
     queryFn: async () => {
-      const { data } = await supabase.from("driving_lessons").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase.from("driving_lessons").select("*").order("created_at", { ascending: false }).limit(10000);
       return data ?? [];
     },
   });
@@ -32,7 +32,7 @@ const Dashboard = () => {
   const { data: exams = [] } = useQuery({
     queryKey: ["dashboard-exams"],
     queryFn: async () => {
-      const { data } = await supabase.from("exams").select("*").order("datum", { ascending: false });
+      const { data } = await supabase.from("exams").select("*").order("datum", { ascending: false }).limit(10000);
       return data ?? [];
     },
   });
@@ -40,7 +40,7 @@ const Dashboard = () => {
   const { data: theorySessions = [] } = useQuery({
     queryKey: ["dashboard-theory"],
     queryFn: async () => {
-      const { data } = await supabase.from("theory_sessions").select("*");
+      const { data } = await supabase.from("theory_sessions").select("*").limit(10000);
       return data ?? [];
     },
   });
@@ -48,7 +48,7 @@ const Dashboard = () => {
   const { data: services = [] } = useQuery({
     queryKey: ["dashboard-services"],
     queryFn: async () => {
-      const { data } = await supabase.from("services").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase.from("services").select("*").order("created_at", { ascending: false }).limit(10000);
       return data ?? [];
     },
   });
@@ -56,7 +56,7 @@ const Dashboard = () => {
   const { data: payments = [] } = useQuery({
     queryKey: ["dashboard-payments"],
     queryFn: async () => {
-      const { data } = await supabase.from("payments").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase.from("payments").select("*").order("created_at", { ascending: false }).limit(10000);
       return data ?? [];
     },
   });

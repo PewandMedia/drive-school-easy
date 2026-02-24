@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ToggleLeft, Plus, Trash2, Clock, Users, TrendingUp } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,7 @@ type SchaltstundeRow = {
   dauer_minuten: number;
   einheiten: number;
   typ: string;
+  preis: number;
 };
 
 const defaultForm = {
@@ -70,8 +71,8 @@ const Schaltstunden = () => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [filterStudentId, setFilterStudentId] = useState<string>("all");
+  const [visibleOlderCount, setVisibleOlderCount] = useState(10);
 
-  // Nur B197-Schüler laden (datenbankseitig gefiltert)
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students", "b197"],
     queryFn: async () => {
@@ -87,24 +88,23 @@ const Schaltstunden = () => {
 
   const b197StudentIds = students.map((s) => s.id);
 
-  // Schaltwagen-Fahrstunden nur für B197-Schüler
   const { data: lessons = [] } = useQuery<SchaltstundeRow[]>({
     queryKey: ["driving_lessons", "schaltwagen", "b197", b197StudentIds],
     queryFn: async () => {
       if (b197StudentIds.length === 0) return [];
       const { data, error } = await supabase
         .from("driving_lessons")
-        .select("id, student_id, datum, dauer_minuten, einheiten, typ")
+        .select("id, student_id, datum, dauer_minuten, einheiten, typ, preis")
         .eq("fahrzeug_typ", "schaltwagen")
         .in("student_id", b197StudentIds)
-        .order("datum", { ascending: false });
+        .order("datum", { ascending: false })
+        .limit(10000);
       if (error) throw error;
       return (data ?? []) as SchaltstundeRow[];
     },
     enabled: b197StudentIds.length > 0,
   });
 
-  // Insert mutation – legt driving_lesson mit fahrzeug_typ=schaltwagen an
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
       const { error } = await supabase.from("driving_lessons").insert({
@@ -127,7 +127,6 @@ const Schaltstunden = () => {
     },
   });
 
-  // Delete mutation – löscht aus driving_lessons
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("driving_lessons").delete().eq("id", id);
@@ -155,34 +154,63 @@ const Schaltstunden = () => {
     students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])
   );
 
-  // Nur Nicht-Fehlstunden für Statistiken
   const statsLessons = lessons.filter((l) => l.typ !== "fehlstunde");
-
-  // Einheiten gesamt (aus einheiten-Feld)
   const totalEinheiten = statsLessons.reduce(
     (sum, l) => sum + (l.einheiten || Math.floor(l.dauer_minuten / 45)), 0
   );
 
-  // Filter
   const filtered =
     filterStudentId === "all"
       ? lessons
       : lessons.filter((l) => l.student_id === filterStudentId);
 
-  // Ø Dauer (alle Schaltwagen-Fahrstunden)
   const avgDauer =
     lessons.length > 0
       ? Math.round(lessons.reduce((s, l) => s + l.dauer_minuten, 0) / lessons.length)
       : 0;
 
-  // Einheiten pro Schüler (ohne Fehlstunden)
   const einheitenPerStudent: Record<string, number> = {};
   for (const l of statsLessons) {
     einheitenPerStudent[l.student_id] = (einheitenPerStudent[l.student_id] ?? 0) + (l.einheiten || Math.floor(l.dauer_minuten / 45));
   }
-
   const studentsCompleted = Object.values(einheitenPerStudent)
     .filter((count) => count >= SCHALTSTUNDEN_PFLICHT).length;
+
+  // Today / older split
+  const todayLessons = filtered.filter((l) => isToday(new Date(l.datum)));
+  const olderLessons = filtered.filter((l) => !isToday(new Date(l.datum)));
+  const visibleOlder = olderLessons.slice(0, visibleOlderCount);
+  const remainingOlder = olderLessons.length - visibleOlderCount;
+
+  const renderRow = (lesson: SchaltstundeRow) => (
+    <TableRow key={lesson.id}>
+      <TableCell className="font-medium">
+        {studentMap[lesson.student_id] ?? "–"}
+      </TableCell>
+      <TableCell>{TYP_LABELS[lesson.typ] ?? lesson.typ}</TableCell>
+      <TableCell>
+        {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })}
+      </TableCell>
+      <TableCell>{lesson.dauer_minuten} min</TableCell>
+      <TableCell className="text-muted-foreground">
+        {lesson.einheiten || Math.floor(lesson.dauer_minuten / 45)}E
+      </TableCell>
+      <TableCell className="text-right font-semibold">
+        {Number(lesson.preis).toFixed(2)} €
+      </TableCell>
+      <TableCell>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-destructive"
+          onClick={() => deleteMutation.mutate(lesson.id)}
+          disabled={deleteMutation.isPending}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-6">
@@ -203,7 +231,6 @@ const Schaltstunden = () => {
                 <DialogTitle>Neue Schaltstunde</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                {/* Schüler */}
                 <div className="space-y-1.5">
                   <Label>Schüler</Label>
                   <Select
@@ -223,7 +250,6 @@ const Schaltstunden = () => {
                   </Select>
                 </div>
 
-                {/* Typ */}
                 <div className="space-y-1.5">
                   <Label>Typ</Label>
                   <Select
@@ -243,7 +269,6 @@ const Schaltstunden = () => {
                   </Select>
                 </div>
 
-                {/* Datum & Uhrzeit */}
                 <div className="space-y-1.5">
                   <Label>Datum & Uhrzeit</Label>
                   <Input
@@ -255,7 +280,6 @@ const Schaltstunden = () => {
                   />
                 </div>
 
-                {/* Dauer */}
                 <div className="space-y-1.5">
                   <Label>Dauer (Minuten)</Label>
                   <div className="flex gap-2 flex-wrap">
@@ -366,47 +390,45 @@ const Schaltstunden = () => {
               <TableHead>Datum</TableHead>
               <TableHead>Dauer</TableHead>
               <TableHead>Einheit</TableHead>
+              <TableHead className="text-right">Preis</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {todayLessons.length === 0 && olderLessons.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  Noch keine Schaltstunden eingetragen
+                  Heute noch keine Schaltstunden eingetragen
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((lesson) => (
-                <TableRow key={lesson.id}>
-                  <TableCell className="font-medium">
-                    {studentMap[lesson.student_id] ?? "–"}
-                  </TableCell>
-                  <TableCell>{TYP_LABELS[lesson.typ] ?? lesson.typ}</TableCell>
-                  <TableCell>
-                    {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })}
-                  </TableCell>
-                  <TableCell>{lesson.dauer_minuten} min</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {lesson.einheiten || Math.floor(lesson.dauer_minuten / 45)}E
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(lesson.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              <>
+                {todayLessons.map(renderRow)}
+                {todayLessons.length > 0 && visibleOlder.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
+                      Ältere Einträge
+                    </TableCell>
+                  </TableRow>
+                )}
+                {visibleOlder.map(renderRow)}
+              </>
             )}
           </TableBody>
         </Table>
+
+        {remainingOlder > 0 && (
+          <div className="p-3 border-t border-border text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleOlderCount((c) => c + 10)}
+            >
+              Weitere {Math.min(10, remainingOlder)} von {olderLessons.length} anzeigen
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

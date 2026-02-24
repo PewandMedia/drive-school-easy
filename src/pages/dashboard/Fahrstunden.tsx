@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { Car, Plus, Trash2, Euro, Clock, TrendingUp, Users } from "lucide-react";
+import { Car, Plus, Trash2, Euro, Clock, TrendingUp } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -93,77 +92,6 @@ const defaultForm = {
   datum: new Date().toISOString().slice(0, 16),
 };
 
-// --- Sub-components ---
-
-type LessonTableProps = {
-  lessons: DrivingLesson[];
-  studentMap: Record<string, string>;
-  showStudent?: boolean;
-  onDelete: (id: string) => void;
-  deleting: boolean;
-};
-
-const LessonTable = ({ lessons, studentMap, showStudent = true, onDelete, deleting }: LessonTableProps) => (
-  <Table>
-    <TableHeader>
-      <TableRow>
-        {showStudent && <TableHead>Schüler</TableHead>}
-        <TableHead>Datum</TableHead>
-        <TableHead>Typ</TableHead>
-        <TableHead>Fahrzeug</TableHead>
-        <TableHead>Dauer</TableHead>
-        <TableHead className="text-right">Preis</TableHead>
-        <TableHead className="w-12" />
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {lessons.length === 0 ? (
-        <TableRow>
-          <TableCell
-            colSpan={showStudent ? 7 : 6}
-            className="text-center py-12 text-muted-foreground"
-          >
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            Keine Fahrstunden vorhanden
-          </TableCell>
-        </TableRow>
-      ) : (
-        lessons.map((lesson) => (
-          <TableRow key={lesson.id}>
-            {showStudent && (
-              <TableCell className="font-medium">
-                {studentMap[lesson.student_id] ?? "–"}
-              </TableCell>
-            )}
-            <TableCell className="text-muted-foreground">
-              {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })}
-            </TableCell>
-            <TableCell>{TYP_LABELS[lesson.typ]}</TableCell>
-            <TableCell>{FAHRZEUG_LABELS[lesson.fahrzeug_typ]}</TableCell>
-            <TableCell>{lesson.dauer_minuten} min ({lesson.einheiten ?? Math.floor(lesson.dauer_minuten / 45)} E)</TableCell>
-            <TableCell className="text-right font-semibold">
-              {Number(lesson.preis).toFixed(2)} €
-            </TableCell>
-            <TableCell>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => onDelete(lesson.id)}
-                disabled={deleting}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))
-      )}
-    </TableBody>
-  </Table>
-);
-
-// --- Main component ---
-
 const Fahrstunden = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -172,8 +100,8 @@ const Fahrstunden = () => {
   const [filterTyp, setFilterTyp] = useState<string>("all");
   const [filterFahrzeug, setFilterFahrzeug] = useState<string>("all");
   const [filterStudent, setFilterStudent] = useState<string>("all");
+  const [visibleOlderCount, setVisibleOlderCount] = useState(10);
 
-  // Students
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students"],
     queryFn: async () => {
@@ -186,7 +114,6 @@ const Fahrstunden = () => {
     },
   });
 
-  // Vehicles
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["vehicles"],
     queryFn: async () => {
@@ -200,20 +127,19 @@ const Fahrstunden = () => {
     },
   });
 
-  // Driving lessons
   const { data: lessons = [] } = useQuery<DrivingLesson[]>({
     queryKey: ["driving_lessons"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("driving_lessons")
         .select("*")
-        .order("datum", { ascending: false });
+        .order("datum", { ascending: false })
+        .limit(10000);
       if (error) throw error;
       return (data ?? []) as DrivingLesson[];
     },
   });
 
-  // Insert mutation
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
       const { error } = await supabase.from("driving_lessons").insert({
@@ -236,7 +162,6 @@ const Fahrstunden = () => {
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -272,7 +197,6 @@ const Fahrstunden = () => {
     [students]
   );
 
-  // Filtered lessons (typ + fahrzeug + student)
   const filtered = useMemo(() => {
     return lessons.filter((l) => {
       if (filterTyp !== "all" && l.typ !== filterTyp) return false;
@@ -282,31 +206,49 @@ const Fahrstunden = () => {
     });
   }, [lessons, filterTyp, filterFahrzeug, filterStudent]);
 
-  // Stats based on filtered data
-  const gesamtumsatz = filtered.reduce((s, l) => s + Number(l.preis), 0);
-  const avgDauer =
-    filtered.length > 0
-      ? Math.round(filtered.reduce((s, l) => s + l.dauer_minuten, 0) / filtered.length)
-      : 0;
+  // Today / older split
+  const todayLessons = useMemo(() => filtered.filter((l) => isToday(new Date(l.datum))), [filtered]);
+  const olderLessons = useMemo(() => filtered.filter((l) => !isToday(new Date(l.datum))), [filtered]);
+  const visibleOlder = olderLessons.slice(0, visibleOlderCount);
+  const remainingOlder = olderLessons.length - visibleOlderCount;
 
-  // Grouped by student (for "all" view)
-  const groupedByStudent = useMemo(() => {
-    const groups: Record<string, DrivingLesson[]> = {};
-    for (const l of filtered) {
-      if (!groups[l.student_id]) groups[l.student_id] = [];
-      groups[l.student_id].push(l);
-    }
-    // Sort groups alphabetically by student name
-    const sorted = Object.entries(groups).sort(([a], [b]) => {
-      const nameA = studentMap[a] ?? "";
-      const nameB = studentMap[b] ?? "";
-      return nameA.localeCompare(nameB, "de");
-    });
-    return sorted;
-  }, [filtered, studentMap]);
+  // Stats
+  const gesamtumsatz = lessons.reduce((s, l) => s + Number(l.preis), 0);
+  const avgDauer =
+    lessons.length > 0
+      ? Math.round(lessons.reduce((s, l) => s + l.dauer_minuten, 0) / lessons.length)
+      : 0;
 
   const previewPrice = calculatePrice(form.dauer_minuten);
   const hasActiveFilters = filterTyp !== "all" || filterFahrzeug !== "all" || filterStudent !== "all";
+
+  const renderRow = (lesson: DrivingLesson) => (
+    <TableRow key={lesson.id}>
+      <TableCell className="font-medium">
+        {studentMap[lesson.student_id] ?? "–"}
+      </TableCell>
+      <TableCell className="text-muted-foreground">
+        {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })}
+      </TableCell>
+      <TableCell>{TYP_LABELS[lesson.typ]}</TableCell>
+      <TableCell>{FAHRZEUG_LABELS[lesson.fahrzeug_typ]}</TableCell>
+      <TableCell>{lesson.dauer_minuten} min ({lesson.einheiten ?? Math.floor(lesson.dauer_minuten / 45)} E)</TableCell>
+      <TableCell className="text-right font-semibold">
+        {Number(lesson.preis).toFixed(2)} €
+      </TableCell>
+      <TableCell>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-destructive"
+          onClick={() => deleteMutation.mutate(lesson.id)}
+          disabled={deleteMutation.isPending}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-6">
@@ -327,7 +269,6 @@ const Fahrstunden = () => {
                 <DialogTitle>Neue Fahrstunde</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                {/* Schüler */}
                 <div className="space-y-1.5">
                   <Label>Schüler</Label>
                   <StudentCombobox
@@ -337,7 +278,6 @@ const Fahrstunden = () => {
                   />
                 </div>
 
-                {/* Typ */}
                 <div className="space-y-1.5">
                   <Label>Typ</Label>
                   <Select
@@ -361,7 +301,6 @@ const Fahrstunden = () => {
                   </Select>
                 </div>
 
-                {/* Fahrzeug auswählen */}
                 <div className="space-y-1.5">
                   <Label>Fahrzeug</Label>
                   {vehicles.length > 0 ? (
@@ -408,7 +347,6 @@ const Fahrstunden = () => {
                   )}
                 </div>
 
-                {/* Datum */}
                 <div className="space-y-1.5">
                   <Label>Datum & Uhrzeit</Label>
                   <Input
@@ -420,7 +358,6 @@ const Fahrstunden = () => {
                   />
                 </div>
 
-                {/* Dauer */}
                 <div className="space-y-1.5">
                   <Label>Dauer (Minuten)</Label>
                   <div className="flex gap-2">
@@ -453,7 +390,6 @@ const Fahrstunden = () => {
                   </div>
                 </div>
 
-                {/* Preisvorschau */}
                 <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">
                     Berechneter Preis
@@ -500,7 +436,7 @@ const Fahrstunden = () => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Einheiten gesamt</p>
-            <p className="text-xl font-bold text-foreground">{filtered.filter(l => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten ?? Math.floor(l.dauer_minuten / 45)), 0)}</p>
+            <p className="text-xl font-bold text-foreground">{lessons.filter(l => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten ?? Math.floor(l.dauer_minuten / 45)), 0)}</p>
           </div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
@@ -570,57 +506,56 @@ const Fahrstunden = () => {
         )}
       </div>
 
-      {/* Content: Grouped or flat table */}
-      {filterStudent === "all" ? (
-        // Grouped view by student
-        <div className="space-y-4">
-          {groupedByStudent.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground">
-              <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              Noch keine Fahrstunden eingetragen
-            </div>
-          ) : (
-            groupedByStudent.map(([studentId, studentLessons]) => {
-              const total = studentLessons.reduce((s, l) => s + Number(l.preis), 0);
-              return (
-                <Card key={studentId}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-semibold">
-                        {studentMap[studentId] ?? "Unbekannt"}
-                      </CardTitle>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>{studentLessons.length} Stunde{studentLessons.length !== 1 ? "n" : ""}</span>
-                        <span className="font-semibold text-foreground">{total.toFixed(2)} €</span>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <LessonTable
-                      lessons={studentLessons}
-                      studentMap={studentMap}
-                      showStudent={false}
-                      onDelete={(id) => deleteMutation.mutate(id)}
-                      deleting={deleteMutation.isPending}
-                    />
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
-      ) : (
-        // Single student flat table
-        <div className="rounded-xl border border-border bg-card">
-          <LessonTable
-            lessons={filtered}
-            studentMap={studentMap}
-            showStudent={false}
-            onDelete={(id) => deleteMutation.mutate(id)}
-            deleting={deleteMutation.isPending}
-          />
-        </div>
-      )}
+      {/* Tabelle */}
+      <div className="rounded-xl border border-border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Schüler</TableHead>
+              <TableHead>Datum</TableHead>
+              <TableHead>Typ</TableHead>
+              <TableHead>Fahrzeug</TableHead>
+              <TableHead>Dauer</TableHead>
+              <TableHead className="text-right">Preis</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {todayLessons.length === 0 && olderLessons.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  Heute noch keine Fahrstunden eingetragen
+                </TableCell>
+              </TableRow>
+            ) : (
+              <>
+                {todayLessons.map(renderRow)}
+                {todayLessons.length > 0 && visibleOlder.length > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
+                      Ältere Einträge
+                    </TableCell>
+                  </TableRow>
+                )}
+                {visibleOlder.map(renderRow)}
+              </>
+            )}
+          </TableBody>
+        </Table>
+
+        {remainingOlder > 0 && (
+          <div className="p-3 border-t border-border text-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleOlderCount((c) => c + 10)}
+            >
+              Weitere {Math.min(10, remainingOlder)} von {olderLessons.length} anzeigen
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
