@@ -75,6 +75,9 @@
 }
 
 @media print {
+  @page {
+    margin: 0;
+  }
   body * {
     visibility: hidden;
   }
@@ -87,6 +90,7 @@
     left: 0;
     top: 0;
     width: 100%;
+    padding: 20mm;
     color: black;
     background: white;
   }
