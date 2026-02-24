@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useToast } from "@/hooks/use-toast";
 
 type Student = { id: string; vorname: string; nachname: string; geburtsdatum: string | null };
@@ -61,28 +62,12 @@ const Theorie = () => {
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, vorname, nachname, geburtsdatum")
-        .order("nachname")
-        .limit(10000);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
   });
 
   const { data: sessions = [] } = useQuery<TheorySession[]>({
     queryKey: ["theory_sessions"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("theory_sessions")
-        .select("id, student_id, datum, typ, lektion")
-        .order("datum", { ascending: false })
-        .limit(10000);
-      if (error) throw error;
-      return (data ?? []) as TheorySession[];
-    },
+    queryFn: () => fetchAllRows(supabase.from("theory_sessions").select("id, student_id, datum, typ, lektion").order("datum", { ascending: false })) as Promise<TheorySession[]>,
   });
 
   const insertMutation = useMutation({

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import PageHeader from "@/components/PageHeader";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -67,28 +68,12 @@ const Pruefungen = () => {
 
   const { data: exams = [], isLoading: loadingExams } = useQuery({
     queryKey: ["exams_all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("exams")
-        .select("*, students(vorname, nachname, fuehrerscheinklasse, geburtsdatum)")
-        .order("datum", { ascending: false })
-        .limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("exams").select("*, students(vorname, nachname, fuehrerscheinklasse, geburtsdatum)").order("datum", { ascending: false })),
   });
 
   const { data: students = [] } = useQuery({
     queryKey: ["students_list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, vorname, nachname, fuehrerscheinklasse, geburtsdatum")
-        .order("nachname")
-        .limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, fuehrerscheinklasse, geburtsdatum").order("nachname")),
   });
 
   const { data: priceEntries = [] } = useQuery({

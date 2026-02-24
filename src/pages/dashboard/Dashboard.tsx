@@ -1,5 +1,6 @@
 import { Users, Car, CreditCard, ClipboardCheck, BookOpen, TrendingUp } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -15,50 +16,32 @@ const Dashboard = () => {
 
   const { data: students = [] } = useQuery({
     queryKey: ["dashboard-students"],
-    queryFn: async () => {
-      const { data } = await supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname").limit(10000);
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
   });
 
   const { data: drivingLessons = [] } = useQuery({
     queryKey: ["dashboard-driving-lessons"],
-    queryFn: async () => {
-      const { data } = await supabase.from("driving_lessons").select("*").order("created_at", { ascending: false }).limit(10000);
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("driving_lessons").select("*").order("created_at", { ascending: false })),
   });
 
   const { data: exams = [] } = useQuery({
     queryKey: ["dashboard-exams"],
-    queryFn: async () => {
-      const { data } = await supabase.from("exams").select("*").order("datum", { ascending: false }).limit(10000);
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("exams").select("*").order("datum", { ascending: false })),
   });
 
   const { data: theorySessions = [] } = useQuery({
     queryKey: ["dashboard-theory"],
-    queryFn: async () => {
-      const { data } = await supabase.from("theory_sessions").select("*").limit(10000);
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("theory_sessions").select("*")),
   });
 
   const { data: services = [] } = useQuery({
     queryKey: ["dashboard-services"],
-    queryFn: async () => {
-      const { data } = await supabase.from("services").select("*").order("created_at", { ascending: false }).limit(10000);
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("services").select("*").order("created_at", { ascending: false })),
   });
 
   const { data: payments = [] } = useQuery({
     queryKey: ["dashboard-payments"],
-    queryFn: async () => {
-      const { data } = await supabase.from("payments").select("*").order("created_at", { ascending: false }).limit(10000);
-      return data ?? [];
-    },
+    queryFn: () => fetchAllRows(supabase.from("payments").select("*").order("created_at", { ascending: false })),
   });
 
   // Student name map

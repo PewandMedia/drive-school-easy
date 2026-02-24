@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 import { formatStudentName } from "@/lib/formatStudentName";
 
@@ -69,51 +70,27 @@ const Fahrschueler = () => {
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("*")
-        .order("nachname", { ascending: true })
-        .limit(10000);
-      if (error) throw error;
-      return data as Student[];
-    },
+    queryFn: () => fetchAllRows(supabase.from("students").select("*").order("nachname", { ascending: true })) as Promise<Student[]>,
   });
 
   const { data: lessons = [], isLoading: isLoadingLessons } = useQuery({
     queryKey: ["driving_lessons_saldo"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("driving_lessons").select("student_id, preis").limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("driving_lessons").select("student_id, preis")),
   });
 
   const { data: exams = [], isLoading: isLoadingExams } = useQuery({
     queryKey: ["exams_saldo"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("exams").select("student_id, preis").limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("exams").select("student_id, preis")),
   });
 
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
     queryKey: ["services_saldo"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("services").select("student_id, preis").limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("services").select("student_id, preis")),
   });
 
   const { data: payments = [], isLoading: isLoadingPayments } = useQuery({
     queryKey: ["payments_saldo"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("payments").select("student_id, betrag").limit(10000);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("payments").select("student_id, betrag")),
   });
 
   const saldoMap = useMemo(() => {
