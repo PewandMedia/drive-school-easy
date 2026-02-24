@@ -1,105 +1,57 @@
 
 
-## Auswertung zum echten Statistik-Dashboard ausbauen
+## Auswertung-Dashboard visuell verbessern
 
-### Ueberblick
+### Probleme im aktuellen Zustand (siehe Screenshot)
 
-Die Platzhalter-Seite wird zu einem vollstaendigen, datengetriebenen Dashboard mit 6 Sektionen, Zeitraum-Filter und Recharts-Diagrammen umgebaut. Alle Daten kommen live aus Supabase.
+1. **KPI-Karten zu klein und unleserlich** - Icons und Trend-Pfeile sind winzig, Werte schwer zu lesen
+2. **Umsatzentwicklung nimmt volle Breite ein** fuer nur 1-2 Balken - sieht leer aus
+3. **Alle Balkendiagramme identisch orange** - keine visuelle Unterscheidung
+4. **Donut-Chart zu klein** ohne Zahlen im Zentrum
+5. **Kein visueller Kontrast** zwischen den Sektionen
 
-### Aufbau der neuen Seite
+### Aenderungen an `src/pages/dashboard/Auswertung.tsx`
 
-```text
-+------------------------------------------------------------------+
-| [Zeitraum-Filter: Monat / Quartal / Jahr]   [Jahr-Auswahl]       |
-+------------------------------------------------------------------+
-| KPI 1              | KPI 2              | KPI 3        | KPI 4   |
-| Bestandsquote      | Bestandsquote      | Oe Fahrst.   | Neue    |
-| Theorie  82%       | Praxis  71%        | bis Pruef 28 | Schueler|
-+------------------------------------------------------------------+
-| KPI 5                          | KPI 6                           |
-| Gesamtumsatz (Zeitraum)        | Offene vs. Bezahlte Betraege    |
-| 12.450 EUR                     | 78% bezahlt / 22% offen         |
-+------------------------------------------------------------------+
-| Umsatzentwicklung (Balkendiagramm)                                |
-| Monatsweise Zahlungseingaenge mit Vormonatsvergleich              |
-+------------------------------------------------------------------+
-| Schueler pro Monat            | Fahrstunden-Auslastung           |
-| (Balkendiagramm)              | (Balkendiagramm)                 |
-+------------------------------------------------------------------+
-| Pruefungsergebnisse           | Offene vs. Bezahlte Betraege     |
-| (Gestapeltes Balkendiagramm)  | (Donut/Pie Chart)                |
-+------------------------------------------------------------------+
-```
+**1. KPI-Karten aufwerten**
 
-### Datenquellen und Berechnungen
+- Layout von 6 Spalten auf 3x2 Grid (groessere Karten)
+- Icon in farbigem Kreis-Hintergrund (wie PageHeader)
+- Wert groesser und prominenter
+- Label ueber dem Wert statt darunter
+- Trend-Icon mit Farbe und Prozent-Aenderung neben dem Wert
+- Subtile Border-Akzente fuer gute/schlechte Werte (gruen/rot links-Border)
 
-**1. Umsatzentwicklung**
-- Quelle: `payments` Tabelle, gruppiert nach Monat des `datum` Feldes
-- Balkendiagramm mit monatlichen Summen
-- Gesamtumsatz als KPI-Karte oben
+**2. Umsatzentwicklung kompakter**
 
-**2. Pruefungsstatistik**
-- Quelle: `exams` Tabelle
-- Bestandsquote Theorie: `COUNT(bestanden=true WHERE typ='theorie') / COUNT(typ='theorie') * 100`
-- Bestandsquote Praxis: `COUNT(bestanden=true WHERE typ='praxis') / COUNT(typ='praxis') * 100`
-- Gestapeltes Balkendiagramm: Bestanden vs. Nicht bestanden pro Monat
+- Chart-Hoehe von 260px auf 200px reduzieren
+- Umsatz-Gesamtwert als grosse Zahl im CardHeader neben dem Titel anzeigen
+- Abrundung der Balken beibehalten
 
-**3. Durchschnittliche Fahrstunden bis Pruefung**
-- Quelle: `driving_lessons` + `exams` (typ='praxis', bestanden=true)
-- Fuer jeden Schueler mit bestandener Praxis: Anzahl Fahrstunden zaehlen
-- Durchschnitt bilden
+**3. Visuelle Unterscheidung der Charts**
 
-**4. Neue Schueler pro Monat**
-- Quelle: `students.created_at`, gruppiert nach Monat
-- Balkendiagramm
+- Schueler pro Monat: Blau-Ton statt Orange (`hsl(210 80% 55%)`)
+- Fahrstunden-Auslastung: Cyan/Tuerkis (`hsl(180 70% 45%)`)
+- Pruefungsergebnisse: Gruen/Rot beibehalten (semantisch korrekt)
+- Donut: Gruen/Grau beibehalten
 
-**5. Fahrstunden-Auslastung**
-- Quelle: `driving_lessons.datum`, gruppiert nach Monat
-- Anzahl Fahrstunden pro Monat als Balkendiagramm
+**4. Donut-Chart mit Zentral-Label**
 
-**6. Offene vs. Bezahlte Betraege**
-- Quelle: `open_items`
-- Gesamtsumme `betrag_gesamt` vs. Gesamtsumme `betrag_bezahlt`
-- Prozentuale Quote und Donut-Diagramm
+- Gesamtbetrag und Prozent im Zentrum des Donuts als Text anzeigen
+- Bezahlt/Offen mit Euro-Betraegen in der Legende
 
-### Zeitraum-Filter
+**5. Bessere Card-Styling**
 
-- Oben auf der Seite: Select mit Optionen "Diesen Monat", "Dieses Quartal", "Dieses Jahr", "Letztes Jahr", "Gesamt"
-- Alle Queries filtern nach dem gewaehlten Zeitraum
-- Diagramme und KPIs aktualisieren sich live
-
-### Technische Umsetzung
-
-| Bereich | Details |
-|---------|---------|
-| Datei | `src/pages/dashboard/Auswertung.tsx` (kompletter Neubau) |
-| Queries | 5 separate `useQuery` Hooks fuer payments, exams, driving_lessons, students, open_items |
-| Diagramme | Recharts (bereits installiert): BarChart, PieChart, ResponsiveContainer, Tooltip |
-| Filter | `useState` fuer Zeitraum, `useMemo` fuer gefilterte Daten |
-| UI-Komponenten | Card, Select aus bestehenden shadcn-Komponenten |
-| Stil | Dunkles Design beibehalten, gleicher Stil wie FahrlehrerStatistik |
-
-### KPI-Karten (oberer Bereich)
-
-6 Karten in 2 Reihen:
-1. **Bestandsquote Theorie** - Prozent mit Trend-Icon
-2. **Bestandsquote Praxis** - Prozent mit Trend-Icon
-3. **Oe Fahrstunden bis Pruefung** - Durchschnittswert
-4. **Neue Schueler** - Anzahl im Zeitraum
-5. **Gesamtumsatz** - Summe Zahlungseingaenge im Zeitraum
-6. **Bezahlquote** - Prozent bezahlt von Forderungen
-
-### Diagramme (unterer Bereich)
-
-4 Diagramme in 2x2 Grid:
-1. **Umsatzentwicklung** - Vertikales Balkendiagramm, monatlich, Euros auf Y-Achse
-2. **Schueler pro Monat** - Vertikales Balkendiagramm
-3. **Pruefungsergebnisse** - Gestapeltes Balkendiagramm (bestanden gruen / nicht bestanden rot)
-4. **Offene vs. Bezahlte Betraege** - Donut-Chart mit Legende
+- CardHeader mit leichtem Bottom-Border zur Trennung
+- Konsistente Innenabstaende
+- Subtile Hover-Effekte auf KPI-Karten
 
 ### Zusammenfassung
 
-| Datei | Aenderung |
-|-------|-----------|
-| `src/pages/dashboard/Auswertung.tsx` | Kompletter Neubau mit 5 Supabase-Queries, 6 KPI-Karten, 4 Recharts-Diagrammen und Zeitraum-Filter |
+| Bereich | Aenderung |
+|---------|-----------|
+| KPI-Karten | 3x2 Grid, groessere Icons, farbige Akzente, Label oben |
+| Umsatz-Chart | Kompakter, Gesamtwert im Header |
+| Chart-Farben | Unterschiedliche Farben pro Diagramm statt alles Orange |
+| Donut | Zentrales Label mit Gesamtbetrag und Prozent |
+| Cards | Bessere Abstaeende und visuelle Trennung |
 
