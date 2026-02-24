@@ -1,73 +1,90 @@
 
 
-## Fix: Supabase 1000-Zeilen-Limit richtig umgehen
+## Redesign: Helles Premium-Theme mit roter Branding-Farbe
 
-### Problem
+### Uebersicht
 
-Das Supabase PostgREST-Backend hat serverseitig ein `max_rows`-Limit von 1000. Der Client-Parameter `.limit(10000)` wird vom Server ignoriert -- es kommen maximal 1000 Zeilen zurueck. Das betrifft:
+Das gesamte Design wird von einem dunklen Navy/Amber-Theme auf ein helles, serioes-modernes Theme mit roter Branding-Akzentfarbe umgestellt. Keine Logik oder Funktionen werden veraendert -- nur CSS-Variablen, Farbklassen und das Copyright-Jahr.
 
-- **Statistik-Cards**: Zeigen falsche Zahlen (z.B. "1000" statt 1208 Fahrstunden)
-- **"Mehr anzeigen"-Buttons**: Zeigen "von 1000" statt der echten Gesamtzahl
-- **Saldo-Berechnungen**: Unvollstaendig weil nicht alle Daten geladen werden
+---
 
-### Loesung: Paginated Fetching
+### 1. CSS-Variablen komplett umstellen (src/index.css)
 
-Eine Hilfsfunktion `fetchAll()` wird erstellt, die automatisch in 1000er-Batches alle Daten aus einer Tabelle laedt. Die Funktion ruft `.range(0, 999)`, `.range(1000, 1999)` usw. auf, bis keine weiteren Daten mehr kommen.
+Die `:root`-Variablen werden von dunkel auf hell geaendert:
 
 ```text
-async function fetchAll(query):
-  allData = []
-  page = 0
-  while true:
-    data = query.range(page * 1000, (page + 1) * 1000 - 1)
-    allData.push(...data)
-    if data.length < 1000: break
-    page++
-  return allData
+Vorher (Dark):                    Nachher (Light):
+--background: 220 25% 7%         --background: 0 0% 98%
+--foreground: 210 20% 94%        --foreground: 220 20% 10%
+--card: 220 22% 10%              --card: 0 0% 100%
+--primary: 38 95% 52% (Amber)    --primary: 0 80% 50% (Rot)
+--secondary: 220 18% 14%         --secondary: 220 14% 96%
+--muted: 220 18% 14%             --muted: 220 14% 96%
+--border: 220 18% 16%            --border: 220 13% 91%
+--sidebar-background: dunkel     --sidebar-background: hell/weiss
 ```
 
-### Betroffene Dateien und Aenderungen
+Die Gradient-Variablen werden ebenfalls angepasst:
+- `--gradient-hero`: Heller Gradient (weiss zu hellgrau)
+- `--gradient-accent`: Rot-Gradient statt Amber
+- `--shadow-glow`: Roter Schimmer statt Amber
 
-**Neue Datei: `src/lib/fetchAllRows.ts`**
-- Exportiert eine generische `fetchAllRows()` Funktion
-- Nimmt einen Supabase-Query-Builder entgegen
-- Gibt alle Zeilen zurueck, egal wie viele es sind
-- Entfernt das bisherige `.limit(10000)` Problem komplett
+---
 
-**Alle 9 Dashboard-Dateien werden angepasst:**
+### 2. Hardcoded Farben in Komponenten anpassen
 
-| Datei | Queries die umgestellt werden |
-|-------|------------------------------|
-| `Dashboard.tsx` | students, driving_lessons, exams, theory_sessions, services, payments (6 Queries) |
-| `Fahrstunden.tsx` | students, driving_lessons (2 Queries) |
-| `Schaltstunden.tsx` | driving_lessons (1 Query, students bleibt da B197-Filter < 1000) |
-| `Theorie.tsx` | students, theory_sessions (2 Queries) |
-| `Pruefungen.tsx` | exams, students (2 Queries) |
-| `Leistungen.tsx` | services, students (2 Queries) |
-| `Zahlungen.tsx` | payments, payment_allocations, students (3 Queries) |
-| `Fahrschueler.tsx` | students, driving_lessons, exams, services, payments (5 Queries) |
-| `Abrechnung.tsx` | students, open_items (2 Queries) |
+Alle Stellen mit `text-amber-400`, `text-blue-400`, `text-green-400` etc. werden auf Farben umgestellt, die im hellen Theme funktionieren (dunklere Varianten wie `-600` oder `-700`):
 
-Bei jeder Query wird `.limit(10000)` entfernt und stattdessen `fetchAllRows()` verwendet.
+| Datei | Aenderung |
+|-------|-----------|
+| `Dashboard.tsx` | Stats-Icon-Farben: `text-blue-400` wird `text-blue-600`, `text-amber-400` wird `text-red-600`, etc. Saldo-Badge von amber auf rot umstellen |
+| `Fahrschueler.tsx` | `klasseColors` von `/15 + -400` auf `/10 + -600` Varianten |
+| `FahrschuelerDetail.tsx` | Gleiche Farbanpassungen fuer Klasse-Badges, Saldo, Fortschrittsbalken, Sonderfahrten |
+| `Leistungen.tsx` | Status-Farben von `-400` auf `-600` |
+| `Zahlungen.tsx` | Statistik-Karten Farben |
+| `Tagesabrechnung.tsx` | Falls amber/dark-Farben vorhanden |
 
-### Technisches Detail
+---
 
-Die `fetchAllRows` Funktion nutzt die Supabase `.range()` Methode:
+### 3. Sidebar anpassen (AppSidebar.tsx)
 
-```text
-Aufruf: fetchAllRows(supabase.from("driving_lessons").select("*").order("datum", { ascending: false }))
+- Copyright von "2025" auf "2026" aendern
+- Die Sidebar nutzt CSS-Variablen (`sidebar-background`, etc.) die automatisch durch die CSS-Aenderung hell werden
 
-Intern:
-  Batch 1: .range(0, 999)    -> 1000 Zeilen
-  Batch 2: .range(1000, 1999) -> 208 Zeilen
-  Fertig: 1208 Zeilen total
-```
+---
 
-### Zusammenfassung
+### 4. Login-Seite (Login.tsx)
 
-| Aenderung | Details |
-|-----------|---------|
-| Neue Datei `src/lib/fetchAllRows.ts` | Generische Paginated-Fetch-Funktion |
-| 9 Dashboard-Dateien | Alle `.limit(10000)` Queries durch `fetchAllRows()` ersetzen |
-| Ergebnis | Korrekte Statistik-Zahlen, korrekte "von X" Anzeigen, korrekte Saldo-Berechnungen |
+- Der Glow-Effekt wird dezenter/hell angepasst (nutzt `hsl(var(--primary))`, wird automatisch rot)
+- Keine strukturellen Aenderungen noetig
+
+---
+
+### 5. Index/Landing Page (Index.tsx)
+
+- Nutzt `--gradient-hero` und `--gradient-accent` -- wird automatisch durch CSS-Variablen-Aenderung hell
+- Grid-Overlay Opacity ggf. leicht anpassen
+
+---
+
+### Zusammenfassung der Dateiaenderungen
+
+| Datei | Was wird geaendert |
+|-------|-------------------|
+| `src/index.css` | Alle CSS-Variablen auf helles Theme + rote Primaerfarbe |
+| `src/components/AppSidebar.tsx` | Copyright 2025 auf 2026 |
+| `src/pages/dashboard/Dashboard.tsx` | Icon-Farben und Badge-Farben fuer helles Theme |
+| `src/pages/dashboard/Fahrschueler.tsx` | `klasseColors` Farbanpassung |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Farbanpassungen fuer Badges, Saldo, Fortschritt |
+| `src/pages/dashboard/Leistungen.tsx` | Status-Farben |
+| `src/pages/dashboard/Zahlungen.tsx` | Statistik-Farben |
+
+### Design-Richtung
+
+- **Hintergrund**: Fast-weiss (#FAFAFA / hsl(0 0% 98%))
+- **Cards**: Reines Weiss mit subtilen Borders
+- **Primaerfarbe**: Modernes Rot (hsl(0 80% 50%) -- kraeftiges, aber nicht aggressives Rot)
+- **Text**: Dunkles Anthrazit statt Weiss
+- **Sidebar**: Heller Hintergrund, dunkler Text
+- **Serioes und Clean**: Wenig Schatten, klare Linien, professionell
 
