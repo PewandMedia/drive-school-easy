@@ -113,7 +113,15 @@ const Fahrschueler = () => {
 
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
-      const { error } = await supabase.from("students").insert([
+      // 1. Aktive Preise für Grundbetrag + Lernmaterial laden
+      const { data: prices } = await supabase
+        .from("prices")
+        .select("*")
+        .eq("aktiv", true)
+        .in("bezeichnung", ["Grundbetrag", "Lernmaterial"]);
+
+      // 2. Schüler anlegen, ID zurückbekommen
+      const { data: newStudent, error } = await supabase.from("students").insert([
         {
           vorname: values.vorname,
           nachname: values.nachname,
@@ -126,11 +134,26 @@ const Fahrschueler = () => {
           status: values.status || null,
           geburtsdatum: values.geburtsdatum ? format(values.geburtsdatum, "yyyy-MM-dd") : null,
         },
-      ]);
+      ]).select("id").single();
       if (error) throw error;
+
+      // 3. Automatisch Leistungen einfügen (Grundbetrag + Lernmaterial)
+      if (prices && prices.length > 0 && newStudent) {
+        const servicesToInsert = prices.map((p) => ({
+          student_id: newStudent.id,
+          preis_id: p.id,
+          bezeichnung: p.bezeichnung,
+          preis: p.preis,
+          status: "offen" as const,
+        }));
+        await supabase.from("services").insert(servicesToInsert);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["services_saldo"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
       setOpen(false);
       setForm(defaultForm);
       setGeburtsdatumText("");
