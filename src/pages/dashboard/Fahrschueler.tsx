@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, Search, ChevronRight, ArrowUpDown, CalendarIcon } from "lucide-react";
+import { Users, Plus, Search, ChevronRight, ArrowUpDown, CalendarIcon, CheckCircle2 } from "lucide-react";
 import { format, parse, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +93,20 @@ const Fahrschueler = () => {
     queryKey: ["payments_saldo"],
     queryFn: () => fetchAllRows(supabase.from("payments").select("student_id, betrag")),
   });
+
+  const { data: autoPrices = [] } = useQuery({
+    queryKey: ["auto_prices_display"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("prices")
+        .select("*")
+        .eq("aktiv", true)
+        .in("bezeichnung", ["Grundbetrag", "Lernmaterial"]);
+      return data || [];
+    },
+  });
+
+  const autoPricesTotal = autoPrices.reduce((sum, p) => sum + Number(p.preis), 0);
 
   const saldoMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -496,6 +511,30 @@ const Fahrschueler = () => {
               />
               <Label>Umschreiber</Label>
             </div>
+
+            {autoPrices.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+                <p className="text-sm font-medium text-foreground">Automatisch hinzugefügte Leistungen:</p>
+                <div className="space-y-1.5">
+                  {autoPrices.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        {p.bezeichnung}
+                      </span>
+                      <span className="text-foreground font-medium">
+                        {Number(p.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span>Gesamt</span>
+                  <span>{autoPricesTotal.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                </div>
+              </div>
+            )}
 
             {formError && (
               <p className="text-sm text-destructive">{formError}</p>
