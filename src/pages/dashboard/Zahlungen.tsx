@@ -3,6 +3,7 @@ import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark, Search } fr
 import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +46,7 @@ type PaymentForm = {
   datum: string;
   selectedOpenItems: string[];
   istGutschrift: boolean;
+  gutschriftNotiz: string;
 };
 
 const defaultForm = (): PaymentForm => ({
@@ -54,6 +56,7 @@ const defaultForm = (): PaymentForm => ({
   datum: new Date().toISOString().slice(0, 10),
   selectedOpenItems: [],
   istGutschrift: false,
+  gutschriftNotiz: "",
 });
 
 const ZAHLUNGSART_LABELS: Record<Zahlungsart, string> = {
@@ -133,7 +136,7 @@ const Zahlungen = () => {
           typ: "gutschrift",
           referenz_id: paymentData.id,
           datum: new Date(form.datum).toISOString(),
-          beschreibung: "Gutschrift",
+          beschreibung: form.gutschriftNotiz ? `Gutschrift – ${form.gutschriftNotiz}` : "Gutschrift",
           betrag_gesamt: betrag,
           status: "bezahlt",
         } as any);
@@ -445,6 +448,18 @@ const Zahlungen = () => {
                 onChange={(e) => setForm((f) => ({ ...f, betrag: e.target.value }))}
               />
             </div>
+
+            {form.istGutschrift && (
+              <div className="space-y-1.5">
+                <Label>Notiz (optional)</Label>
+                <Textarea
+                  placeholder="Grund für die Gutschrift…"
+                  value={form.gutschriftNotiz}
+                  onChange={(e) => setForm((f) => ({ ...f, gutschriftNotiz: e.target.value }))}
+                  className="min-h-[60px]"
+                />
+              </div>
+            )}
 
             {!form.istGutschrift && form.student_id && openItemsForStudent.length > 0 && (() => {
               const betragNum = parseFloat(form.betrag) || 0;

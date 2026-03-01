@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -132,6 +133,7 @@ const FahrschuelerDetail = () => {
     datum: new Date().toISOString().slice(0, 10),
     selectedOpenItems: [] as string[],
     istGutschrift: false,
+    gutschriftNotiz: "",
   });
 
   // ── Data queries ──
@@ -356,7 +358,7 @@ const FahrschuelerDetail = () => {
           typ: "gutschrift",
           referenz_id: paymentData.id,
           datum: new Date(fsZahlung.datum).toISOString(),
-          beschreibung: "Gutschrift",
+          beschreibung: fsZahlung.gutschriftNotiz ? `Gutschrift – ${fsZahlung.gutschriftNotiz}` : "Gutschrift",
           betrag_gesamt: betrag,
           status: "bezahlt",
         } as any);
@@ -388,7 +390,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
       setDlgZahlung(false);
-      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false });
+      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" });
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -1426,7 +1428,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
@@ -1458,6 +1460,18 @@ const FahrschuelerDetail = () => {
               <Label>Betrag (€)</Label>
               <Input type="number" step="0.01" min="0.01" placeholder="0,00" value={fsZahlung.betrag} onChange={(e) => setFsZahlung((f) => ({ ...f, betrag: e.target.value }))} />
             </div>
+
+            {fsZahlung.istGutschrift && (
+              <div className="space-y-1.5">
+                <Label>Notiz (optional)</Label>
+                <Textarea
+                  placeholder="Grund für die Gutschrift…"
+                  value={fsZahlung.gutschriftNotiz}
+                  onChange={(e) => setFsZahlung((f) => ({ ...f, gutschriftNotiz: e.target.value }))}
+                  className="min-h-[60px]"
+                />
+              </div>
+            )}
 
             {/* Offene Posten */}
             {!fsZahlung.istGutschrift && (() => {
