@@ -1,0 +1,1 @@
+ALTER TABLE theory_sessions ADD COLUMN instructor_id uuid REFERENCES instructors(id);

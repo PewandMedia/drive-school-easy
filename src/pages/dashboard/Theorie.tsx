@@ -38,9 +38,11 @@ import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useToast } from "@/hooks/use-toast";
 
 type Student = { id: string; vorname: string; nachname: string; geburtsdatum: string | null };
+type Instructor = { id: string; vorname: string; nachname: string };
 type TheorySession = {
   id: string;
   student_id: string;
+  instructor_id: string | null;
   datum: string;
   typ: "grundstoff" | "klassenspezifisch";
   lektion: number | null;
@@ -48,6 +50,7 @@ type TheorySession = {
 
 const defaultForm = {
   student_id: "",
+  instructor_id: "",
   lektion: 1,
   datum: new Date().toISOString().slice(0, 16),
 };
@@ -67,14 +70,25 @@ const Theorie = () => {
 
   const { data: sessions = [] } = useQuery<TheorySession[]>({
     queryKey: ["theory_sessions"],
-    queryFn: () => fetchAllRows(supabase.from("theory_sessions").select("id, student_id, datum, typ, lektion").order("datum", { ascending: false })) as Promise<TheorySession[]>,
+    queryFn: () => fetchAllRows(supabase.from("theory_sessions").select("id, student_id, instructor_id, datum, typ, lektion").order("datum", { ascending: false })) as Promise<TheorySession[]>,
+  });
+
+  const { data: instructors = [] } = useQuery<Instructor[]>({
+    queryKey: ["instructors_active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname");
+      if (error) throw error;
+      return data;
+    },
   });
 
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
+      if (!values.instructor_id) throw new Error("Bitte einen Fahrlehrer auswählen");
       const typ = lektionToTyp(values.lektion);
       const { error } = await supabase.from("theory_sessions").insert({
         student_id: values.student_id,
+        instructor_id: values.instructor_id,
         datum: new Date(values.datum).toISOString(),
         typ,
         lektion: values.lektion,
@@ -112,11 +126,19 @@ const Theorie = () => {
       toast({ title: "Bitte einen Schüler auswählen", variant: "destructive" });
       return;
     }
+    if (!form.instructor_id) {
+      toast({ title: "Bitte einen Fahrlehrer auswählen", variant: "destructive" });
+      return;
+    }
     insertMutation.mutate(form);
   };
 
   const studentMap = Object.fromEntries(
     students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])
+  );
+
+  const instructorMap = Object.fromEntries(
+    instructors.map((i) => [i.id, `${i.vorname} ${i.nachname}`])
   );
 
   // Session numbering
@@ -168,6 +190,9 @@ const Theorie = () => {
           </Badge>
         </TableCell>
         <TableCell className="text-muted-foreground">
+          {session.instructor_id ? instructorMap[session.instructor_id] ?? "–" : "–"}
+        </TableCell>
+        <TableCell className="text-muted-foreground">
           {sessionNumberMap[session.id]}. Stunde
         </TableCell>
         <TableCell>
@@ -211,6 +236,25 @@ const Theorie = () => {
                     value={form.student_id}
                     onValueChange={(v) => setForm((f) => ({ ...f, student_id: v }))}
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Fahrlehrer</Label>
+                  <Select
+                    value={form.instructor_id}
+                    onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Fahrlehrer wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {instructors.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.vorname} {i.nachname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -316,6 +360,7 @@ const Theorie = () => {
               <TableHead>Schüler</TableHead>
               <TableHead>Datum</TableHead>
               <TableHead>Lektion</TableHead>
+              <TableHead>Fahrlehrer</TableHead>
               <TableHead>Einheit</TableHead>
               <TableHead className="w-12" />
             </TableRow>
@@ -323,7 +368,7 @@ const Theorie = () => {
           <TableBody>
             {todaySessions.length === 0 && olderSessions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                   <BookMarked className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   Heute noch keine Theoriestunden hinzugefügt
                 </TableCell>
@@ -332,7 +377,7 @@ const Theorie = () => {
               <>
                 {todaySessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-4 text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-4 text-sm text-muted-foreground">
                       Heute noch keine Theoriestunden hinzugefügt
                     </TableCell>
                   </TableRow>
@@ -341,7 +386,7 @@ const Theorie = () => {
                 )}
                 {visibleOlder.length > 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
+                    <TableCell colSpan={6} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
                       Ältere Einträge
                     </TableCell>
                   </TableRow>

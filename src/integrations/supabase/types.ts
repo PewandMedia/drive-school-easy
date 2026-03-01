@@ -437,6 +437,7 @@ export type Database = {
           created_at: string
           datum: string
           id: string
+          instructor_id: string | null
           lektion: number | null
           student_id: string
           typ: Database["public"]["Enums"]["theory_session_typ"]
@@ -445,6 +446,7 @@ export type Database = {
           created_at?: string
           datum?: string
           id?: string
+          instructor_id?: string | null
           lektion?: number | null
           student_id: string
           typ: Database["public"]["Enums"]["theory_session_typ"]
@@ -453,11 +455,19 @@ export type Database = {
           created_at?: string
           datum?: string
           id?: string
+          instructor_id?: string | null
           lektion?: number | null
           student_id?: string
           typ?: Database["public"]["Enums"]["theory_session_typ"]
         }
         Relationships: [
+          {
+            foreignKeyName: "theory_sessions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "instructors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "theory_sessions_student_id_fkey"
             columns: ["student_id"]
