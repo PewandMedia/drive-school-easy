@@ -131,6 +131,7 @@ const FahrschuelerDetail = () => {
     zahlungsart: "bar" as Zahlungsart,
     datum: new Date().toISOString().slice(0, 10),
     selectedOpenItems: [] as string[],
+    istGutschrift: false,
   });
 
   // ── Data queries ──
@@ -337,7 +338,8 @@ const FahrschuelerDetail = () => {
 
   const mutZahlung = useMutation({
     mutationFn: async () => {
-      const betrag = parseFloat(fsZahlung.betrag) || 0;
+      const rawBetrag = parseFloat(fsZahlung.betrag) || 0;
+      const betrag = fsZahlung.istGutschrift ? -Math.abs(rawBetrag) : rawBetrag;
       // Insert payment
       const { data: paymentData, error: paymentError } = await supabase.from("payments").insert({
         student_id: id!,
@@ -347,13 +349,25 @@ const FahrschuelerDetail = () => {
       }).select("id").single();
       if (paymentError) throw paymentError;
 
-      // Allocate to selected open items
-      if (fsZahlung.selectedOpenItems.length > 0) {
+      if (fsZahlung.istGutschrift) {
+        // Create negative open_item to reduce saldo
+        const { error: oiError } = await supabase.from("open_items").insert({
+          student_id: id!,
+          typ: "gutschrift",
+          referenz_id: paymentData.id,
+          datum: new Date(fsZahlung.datum).toISOString(),
+          beschreibung: "Gutschrift",
+          betrag_gesamt: betrag,
+          status: "bezahlt",
+        } as any);
+        if (oiError) throw oiError;
+      } else if (fsZahlung.selectedOpenItems.length > 0) {
+        // Allocate to selected open items
         const selectedItems = openItems
           .filter((oi: any) => fsZahlung.selectedOpenItems.includes(oi.id))
           .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
 
-        let remaining = betrag;
+        let remaining = rawBetrag;
         const allocations: { payment_id: string; open_item_id: string; betrag: number }[] = [];
         for (const item of selectedItems) {
           if (remaining <= 0) break;
@@ -372,9 +386,10 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payments", id] });
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
       setDlgZahlung(false);
-      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [] });
-      toast({ title: "Zahlung erfasst" });
+      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false });
+      toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
@@ -1411,12 +1426,19 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [] }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Zahlung erfassen</DialogTitle>
+            <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={fsZahlung.istGutschrift}
+                onCheckedChange={(c) => setFsZahlung((f) => ({ ...f, istGutschrift: !!c, selectedOpenItems: [] }))}
+              />
+              <span className="text-sm font-medium text-foreground">Gutschrift</span>
+            </label>
             <div className="space-y-1.5">
               <Label>Datum</Label>
               <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
@@ -1438,8 +1460,8 @@ const FahrschuelerDetail = () => {
             </div>
 
             {/* Offene Posten */}
-            {(() => {
-              const offenePosten = openItems.filter((oi: any) => oi.status !== "bezahlt");
+            {!fsZahlung.istGutschrift && (() => {
+              const offenePosten = openItems.filter((oi: any) => oi.status !== "bezahlt" && Number(oi.betrag_gesamt) > 0);
               if (offenePosten.length === 0) return null;
 
               const betragNum = parseFloat(fsZahlung.betrag) || 0;
