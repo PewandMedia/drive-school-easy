@@ -7,11 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Euro, Car, BookOpen, BarChart3 } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend,
-} from "recharts";
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
-import { de } from "date-fns/locale";
+import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
 const MONTHS = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -67,26 +63,8 @@ const Auswertung = () => {
     return { revenue, lessons, theory };
   }, [payments, drivingLessons, theorySessions, selectedMonth, selectedYear]);
 
-  // Chart data: last 12 months
-  const chartData = useMemo(() => {
-    const months: { label: string; umsatz: number; fahrstunden: number; theorie: number; isCurrent: boolean }[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = subMonths(selectedDate, i);
-      const s = startOfMonth(d);
-      const e = endOfMonth(d);
-      const iv = { start: s, end: e };
-      const inIv = (datum: string) => isWithinInterval(new Date(datum), iv);
 
-      months.push({
-        label: format(d, "MMM yy", { locale: de }),
-        umsatz: payments.filter((p) => inIv(p.datum)).reduce((sum, p) => sum + Number(p.betrag), 0),
-        fahrstunden: drivingLessons.filter((l) => inIv(l.datum)).length,
-        theorie: theorySessions.filter((t) => inIv(t.datum)).length,
-        isCurrent: i === 0,
-      });
-    }
-    return months;
-  }, [payments, drivingLessons, theorySessions, selectedMonth, selectedYear]);
+
 
   const kpiCards = [
     { title: "Gesamtumsatz", value: formatEUR(kpis.revenue), icon: Euro },
@@ -142,44 +120,6 @@ const Auswertung = () => {
         </div>
       )}
 
-      {/* Chart */}
-      {!isLoading && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Verlauf der letzten 12 Monate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    formatter={(value: number, name: string) => {
-                      if (name === "umsatz") return [formatEUR(value), "Umsatz"];
-                      if (name === "fahrstunden") return [value, "Fahrstunden"];
-                      return [value, "Theorie"];
-                    }}
-                  />
-                  <Legend
-                    formatter={(value: string) =>
-                      value === "umsatz" ? "Umsatz (€)" : value === "fahrstunden" ? "Fahrstunden" : "Theorie"
-                    }
-                  />
-                  <Bar yAxisId="left" dataKey="umsatz" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Bar yAxisId="right" dataKey="fahrstunden" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                  <Bar yAxisId="right" dataKey="theorie" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
