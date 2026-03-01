@@ -1,31 +1,26 @@
 
 
-## Notiz-Feld fuer Gutschriften
+## Sortier-Toggle auf der Abrechnungsseite
 
 ### Uebersicht
 
-Ein optionales Textfeld "Notiz / Vermerk" wird im Gutschrift-Dialog hinzugefuegt (sowohl im Schuelerprofil als auch auf der Zahlungen-Seite). Die Notiz wird in der `beschreibung` des `open_items`-Eintrags gespeichert, sodass sie im Schuelerprofil bei den offenen Posten sichtbar ist. Keine DB-Migration noetig, da `open_items.beschreibung` bereits existiert.
+Die Tabelle ist bereits standardmaessig nach hoechstem Saldo sortiert. Es wird ein Toggle-Button hinzugefuegt, mit dem zwischen zwei Sortierungen gewechselt werden kann: **nach offenem Saldo (absteigend)** und **alphabetisch nach Name**.
 
 ### Aenderungen
 
-**Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
+**Datei: `src/pages/dashboard/Abrechnung.tsx`**
 
-1. `fsZahlung`-State um `gutschriftNotiz: string` erweitern (Default: `""`)
-2. Im Dialog: Wenn `istGutschrift` aktiv, ein Textarea-Feld "Notiz (optional)" nach dem Betrag-Feld anzeigen
-3. In `mutZahlung`: Die `beschreibung` des `open_items`-Eintrags wird auf `"Gutschrift"` + ggf. ` – [Notiz]` gesetzt, falls eine Notiz vorhanden ist
-4. Reset beim Schliessen des Dialogs anpassen
-
-**Datei: `src/pages/dashboard/Zahlungen.tsx`**
-
-1. `PaymentForm`-Typ um `gutschriftNotiz: string` erweitern
-2. Gleiches Textarea-Feld im Dialog wenn Gutschrift aktiv
-3. Gleiche Logik in `saveMutation` fuer die `beschreibung`
-4. Reset anpassen
+1. **Neuer State**: `sortBySaldo: boolean` (Default: `true`, da bereits so sortiert)
+2. **Toggle-Button** neben dem Suchfeld im Tabellenkopf-Bereich: 
+   - Icon: `ArrowDownWideNarrow` (aus lucide-react)
+   - Text: "Nach Saldo" / "Nach Name" je nach aktuellem Zustand
+   - Aktiver Zustand (Saldo-Sortierung) wird visuell hervorgehoben (z.B. `variant="default"` vs `variant="outline"`)
+3. **Sortierlogik anpassen**: Die bestehende `sorted`-Variable wird abhaengig vom State entweder nach `saldo` (absteigend) oder nach `nachname` (alphabetisch aufsteigend) sortiert
+4. **Untertitel anpassen**: Der Text "Sortiert nach offenstem Saldo" wird dynamisch auf die aktive Sortierung angepasst
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Notiz-Feld im Gutschrift-Dialog, beschreibung in open_items anpassen |
-| `src/pages/dashboard/Zahlungen.tsx` | Notiz-Feld im Gutschrift-Dialog, beschreibung in open_items anpassen |
+| `src/pages/dashboard/Abrechnung.tsx` | State, Toggle-Button, dynamische Sortierlogik |
 
