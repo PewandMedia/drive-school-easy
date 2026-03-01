@@ -258,7 +258,7 @@ const Zahlungen = () => {
               ))}
             </div>
           ) : (
-            <span className="text-xs text-muted-foreground italic">Freie Zahlung</span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium italic">Vorauszahlung / Guthaben</span>
           )}
         </TableCell>
         <TableCell className={`text-right font-semibold ${Number(p.betrag) < 0 ? "text-purple-600 dark:text-purple-400" : "text-green-600"}`}>

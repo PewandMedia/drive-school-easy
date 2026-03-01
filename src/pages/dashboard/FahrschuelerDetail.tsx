@@ -217,6 +217,23 @@ const FahrschuelerDetail = () => {
     enabled: !!id,
   });
 
+  // Payment allocations for Guthaben calculation
+  const { data: paymentAllocations = [] } = useQuery({
+    queryKey: ["payment_allocations", id],
+    queryFn: async () => {
+      const { data: paymentIds } = await supabase.from("payments").select("id").eq("student_id", id!);
+      if (!paymentIds || paymentIds.length === 0) return [];
+      const ids = paymentIds.map((p: any) => p.id);
+      const { data, error } = await supabase
+        .from("payment_allocations")
+        .select("*")
+        .in("payment_id", ids);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
+
   // Additional queries for modals
   const { data: prices = [] } = useQuery({
     queryKey: ["prices", "active"],
@@ -394,6 +411,7 @@ const FahrschuelerDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments", id] });
       queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
       setDlgZahlung(false);
@@ -403,7 +421,67 @@ const FahrschuelerDetail = () => {
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
-  // ── Derived data ────────────────────────────────────────────────────────────
+  // ── Guthaben verrechnen Mutation ──
+  const mutGuthabenVerrechnen = useMutation({
+    mutationFn: async () => {
+      // Find unallocated payments (positive, with remaining unallocated amount)
+      const paymentIds = payments.filter((p: any) => Number(p.betrag) > 0).map((p: any) => p.id);
+      if (paymentIds.length === 0) return;
+
+      const { data: existingAllocs } = await supabase
+        .from("payment_allocations")
+        .select("payment_id, betrag")
+        .in("payment_id", paymentIds);
+
+      const allocByPayment = new Map<string, number>();
+      for (const a of (existingAllocs ?? [])) {
+        allocByPayment.set(a.payment_id, (allocByPayment.get(a.payment_id) || 0) + Number(a.betrag));
+      }
+
+      // Build list of payments with remaining unallocated amounts
+      const unallocated: { id: string; remaining: number }[] = [];
+      for (const p of payments.filter((p: any) => Number(p.betrag) > 0)) {
+        const allocated = allocByPayment.get(p.id) || 0;
+        const rem = Number(p.betrag) - allocated;
+        if (rem > 0.005) unallocated.push({ id: p.id, remaining: rem });
+      }
+
+      // Get open items that need payment
+      const offene = openItems
+        .filter((oi: any) => oi.status !== "bezahlt" && oi.typ !== "gutschrift")
+        .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
+
+      const newAllocations: { payment_id: string; open_item_id: string; betrag: number }[] = [];
+      let uIdx = 0;
+
+      for (const oi of offene) {
+        if (uIdx >= unallocated.length) break;
+        let oiOffen = Number(oi.betrag_gesamt) - Number(oi.betrag_bezahlt);
+        while (oiOffen > 0.005 && uIdx < unallocated.length) {
+          const zuordnung = Math.min(oiOffen, unallocated[uIdx].remaining);
+          newAllocations.push({ payment_id: unallocated[uIdx].id, open_item_id: oi.id, betrag: zuordnung });
+          oiOffen -= zuordnung;
+          unallocated[uIdx].remaining -= zuordnung;
+          if (unallocated[uIdx].remaining < 0.005) uIdx++;
+        }
+      }
+
+      if (newAllocations.length > 0) {
+        const { error } = await supabase.from("payment_allocations").insert(newAllocations as any);
+        if (error) throw error;
+      } else {
+        throw new Error("Keine offenen Posten zum Verrechnen vorhanden");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      toast({ title: "Guthaben verrechnet", description: "Guthaben wurde auf offene Posten verteilt" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
   const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingExams || loadingPayments;
 
   const initials = student
@@ -488,7 +566,14 @@ const FahrschuelerDetail = () => {
   // Saldo aus open_items berechnen
   const totalForderungen = openItems.reduce((sum: number, oi: any) => sum + Number(oi.betrag_gesamt), 0);
   const totalBezahlt = openItems.reduce((sum: number, oi: any) => sum + Number(oi.betrag_bezahlt), 0);
-  const saldo = totalForderungen - totalBezahlt;
+
+  // Guthaben = positive Zahlungen - zugeordnete Beträge
+  const positiveZahlungen = payments.filter((p: any) => Number(p.betrag) > 0).reduce((s: number, p: any) => s + Number(p.betrag), 0);
+  const summeAllocations = paymentAllocations.reduce((s: number, a: any) => s + Number(a.betrag), 0);
+  const guthaben = Math.max(0, positiveZahlungen - summeAllocations);
+
+  const saldoRoh = totalForderungen - totalBezahlt;
+  const saldo = Math.max(0, saldoRoh - guthaben);
 
   const previewPrice = calculatePrice(fsFahrstunde.dauer_minuten);
 
@@ -674,17 +759,42 @@ const FahrschuelerDetail = () => {
                 </span>
               </div>
             ))}
+            {guthaben > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Guthaben (Vorauszahlung)</span>
+                <span className="font-medium text-green-600">
+                  −{guthaben.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                </span>
+              </div>
+            )}
             <div className="border-t border-border pt-2 flex justify-between text-sm">
               <span className="font-semibold text-foreground">
-                {saldo > 0 ? "Offener Saldo" : "Ausgeglichen"}
+                {saldo > 0 ? "Offener Saldo" : guthaben > 0 ? "Guthaben" : "Ausgeglichen"}
               </span>
               <span className={`font-bold ${saldo > 0 ? "text-red-600" : "text-green-600"}`}>
-                {saldo.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                {saldo > 0
+                  ? saldo.toLocaleString("de-DE", { style: "currency", currency: "EUR" })
+                  : guthaben > 0
+                    ? guthaben.toLocaleString("de-DE", { style: "currency", currency: "EUR" })
+                    : (0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })
+                }
               </span>
             </div>
           </div>
 
-          {/* Gutschriften */}
+          {/* Guthaben verrechnen Button */}
+          {guthaben > 0 && openItems.some((oi: any) => oi.status !== "bezahlt" && oi.typ !== "gutschrift") && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs border-green-500/30 text-green-700 hover:bg-green-500/10"
+              onClick={() => mutGuthabenVerrechnen.mutate()}
+              disabled={mutGuthabenVerrechnen.isPending}
+            >
+              {mutGuthabenVerrechnen.isPending ? "Verrechne…" : "Guthaben verrechnen"}
+            </Button>
+          )}
+
           {(() => {
             const gutschriften = openItems.filter((oi: any) => oi.typ === "gutschrift");
             if (gutschriften.length === 0) return null;
