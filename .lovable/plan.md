@@ -1,49 +1,64 @@
 
+## Automatische Leistungen bei Schueler-Anlage
 
-## Sidebar modernisieren: Aktiver Reiter mit roetlicher Markierung
+### Uebersicht
 
-### Was wird geaendert
+Beim Erstellen eines neuen Fahrschuelers werden automatisch zwei Leistungen (Grundbetrag + Lernmaterial) aus der Preisliste erzeugt. Die bestehende Preisanpassbarkeit im Formular bleibt erhalten. Bestehende Schueler sind nicht betroffen.
 
-Der aktive Sidebar-Eintrag bekommt eine dezente roetliche Hintergrundfarbe und der Text/Icon wird in der Branding-Rot-Farbe hervorgehoben. Zusaetzlich erhaelt der aktive Eintrag einen kleinen roten Balken links als visuellen Indikator.
+### Aenderung
 
-### Aenderungen
+**Datei: `src/pages/dashboard/Fahrschueler.tsx`**
 
-**1. CSS-Variablen anpassen (`src/index.css`)**
+Die `createMutation` wird erweitert:
 
-Die `--sidebar-accent` Variable wird von neutralem Grau auf ein zartes Rot geaendert:
+1. **Preise aus der Preisliste laden** -- Vor dem Insert wird die `prices`-Tabelle nach den aktiven Eintraegen "Grundbetrag" und "Lernmaterial" abgefragt.
+
+2. **Schueler anlegen und ID zurueckbekommen** -- Der `.insert()` Aufruf wird um `.select("id")` ergaenzt, damit die neue Schueler-ID zurueckgegeben wird.
+
+3. **Zwei Services automatisch einfuegen** -- Mit der neuen Schueler-ID werden zwei Eintraege in die `services`-Tabelle eingefuegt:
+   - Grundbetrag (Preis aus Preisliste, z.B. 299 EUR)
+   - Lernmaterial (Preis aus Preisliste, z.B. 80 EUR)
+
+   Beide mit `status: "offen"` und Verweis auf die jeweilige `preis_id`.
+
+4. **Query-Invalidierung erweitern** -- Neben `["students"]` werden auch `["services"]`, `["services_saldo"]` und `["open_items"]` invalidiert, damit Leistungen und Saldo sofort aktualisiert werden.
+
+### Ablauf im Code (Pseudocode)
 
 ```text
-Light-Theme (:root):
-  --sidebar-accent:            0 78% 50% / 0.08   (sehr zartes Rot)
-  --sidebar-accent-foreground: 0 78% 45%           (roter Text)
+mutationFn: async (values) => {
+  // 1. Aktive Preise fuer Grundbetrag + Lernmaterial laden
+  const prices = await supabase.from("prices")
+    .select("*").eq("aktiv", true)
+    .in("bezeichnung", ["Grundbetrag", "Lernmaterial"])
 
-Dark-Theme (.dark):
-  --sidebar-accent:            0 78% 50% / 0.12   (zartes Rot, etwas kraeftiger)
-  --sidebar-accent-foreground: 0 78% 60%           (helles Rot)
+  // 2. Schueler anlegen, ID zurueckbekommen
+  const { data: newStudent } = await supabase.from("students")
+    .insert([...]).select("id").single()
+
+  // 3. Zwei Leistungen einfuegen
+  const servicesToInsert = prices.map(p => ({
+    student_id: newStudent.id,
+    preis_id: p.id,
+    bezeichnung: p.bezeichnung,
+    preis: p.preis,
+    status: "offen"
+  }))
+  await supabase.from("services").insert(servicesToInsert)
+}
 ```
 
-**2. Aktiver Sidebar-Button mit linkem Balken (`src/components/ui/sidebar.tsx`)**
+### Wichtige Details
 
-In der `sidebarMenuButtonVariants` wird der aktive Zustand ergaenzt:
-
-- `data-[active=true]:bg-sidebar-accent` bleibt (wird jetzt roetlich durch CSS-Variable)
-- Zusaetzlich: `data-[active=true]:border-l-2 data-[active=true]:border-primary` fuer einen roten Strich links
-- Der Hover-Effekt bleibt neutral, nur der aktive Zustand wird rot
-
-### Ergebnis
-
-| Zustand | Vorher | Nachher |
-|---------|--------|---------|
-| Normal | Grauer Text | Unveraendert |
-| Hover | Grauer Hintergrund | Unveraendert |
-| Aktiv | Grauer Hintergrund + fett | Zartrosa Hintergrund + roter Text + roter Balken links |
+- Die Preise werden zum Zeitpunkt der Anlage aus der Preisliste kopiert. Spaetere Preisaenderungen betreffen nur neue Schueler.
+- Falls ein Preis in der Preisliste nicht gefunden wird (z.B. deaktiviert), wird die entsprechende Leistung einfach nicht angelegt -- kein Fehler.
+- Der bestehende Datenbank-Trigger `create_open_item_for_service` erzeugt automatisch die offenen Posten, sodass der Saldo sofort korrekt ist.
+- Im Leistungsformular bleibt der Preis weiterhin individuell anpassbar (keine Aenderung noetig).
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/index.css` | `--sidebar-accent` und `--sidebar-accent-foreground` in Light und Dark auf Rot-Toene |
-| `src/components/ui/sidebar.tsx` | `data-[active=true]` Klassen um Border-Left ergaenzen |
+| `src/pages/dashboard/Fahrschueler.tsx` | `createMutation` erweitern: Preise laden, Schueler-ID zurueckbekommen, 2 Services einfuegen, Query-Invalidierung erweitern |
 
-Keine Logik oder Funktionen werden veraendert.
-
+Nur eine Datei wird geaendert. Keine neuen Abhaengigkeiten, keine Schema-Aenderungen.
