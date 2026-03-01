@@ -648,9 +648,42 @@ const FahrschuelerDetail = () => {
             </div>
           </div>
 
+          {/* Gutschriften */}
+          {(() => {
+            const gutschriften = openItems.filter((oi: any) => oi.typ === "gutschrift");
+            if (gutschriften.length === 0) return null;
+            return (
+              <div className="space-y-2 mt-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Gutschriften ({gutschriften.length})
+                </p>
+                <div className="space-y-1.5">
+                  {gutschriften.map((oi: any) => (
+                    <div key={oi.id} className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-muted-foreground shrink-0">
+                          {format(new Date(oi.datum), "dd.MM.yy")}
+                        </span>
+                        <span className="text-foreground truncate">{oi.beschreibung}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-medium text-green-600">
+                          {Number(oi.betrag_gesamt).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-500/10 text-green-600 border border-green-500/20">
+                          Gutschrift
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Offene Posten Liste */}
           {(() => {
-            const offene = openItems.filter((oi: any) => oi.status !== "bezahlt");
+            const offene = openItems.filter((oi: any) => oi.status !== "bezahlt" && oi.typ !== "gutschrift");
             if (offene.length === 0) return null;
             const sorted = [...offene].sort((a: any, b: any) => new Date(b.datum).getTime() - new Date(a.datum).getTime());
             return (

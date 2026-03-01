@@ -44,6 +44,7 @@ type PaymentForm = {
   zahlungsart: Zahlungsart;
   datum: string;
   selectedOpenItems: string[];
+  istGutschrift: boolean;
 };
 
 const defaultForm = (): PaymentForm => ({
@@ -52,6 +53,7 @@ const defaultForm = (): PaymentForm => ({
   zahlungsart: "bar",
   datum: new Date().toISOString().slice(0, 10),
   selectedOpenItems: [],
+  istGutschrift: false,
 });
 
 const ZAHLUNGSART_LABELS: Record<Zahlungsart, string> = {
@@ -110,7 +112,8 @@ const Zahlungen = () => {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const betrag = parseFloat(form.betrag) || 0;
+      const rawBetrag = parseFloat(form.betrag) || 0;
+      const betrag = form.istGutschrift ? -Math.abs(rawBetrag) : rawBetrag;
       const { data: paymentData, error: paymentError } = await supabase
         .from("payments")
         .insert({
@@ -123,7 +126,19 @@ const Zahlungen = () => {
         .single();
       if (paymentError) throw paymentError;
 
-      if (form.selectedOpenItems.length > 0) {
+      if (form.istGutschrift) {
+        // Create negative open_item to reduce saldo
+        const { error: oiError } = await supabase.from("open_items").insert({
+          student_id: form.student_id,
+          typ: "gutschrift",
+          referenz_id: paymentData.id,
+          datum: new Date(form.datum).toISOString(),
+          beschreibung: "Gutschrift",
+          betrag_gesamt: betrag,
+          status: "bezahlt",
+        } as any);
+        if (oiError) throw oiError;
+      } else if (form.selectedOpenItems.length > 0) {
         const selectedItems = openItemsForStudent
           .filter((oi: any) => form.selectedOpenItems.includes(oi.id))
           .sort((a: any, b: any) => new Date(a.datum).getTime() - new Date(b.datum).getTime());
@@ -147,7 +162,8 @@ const Zahlungen = () => {
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
       qc.invalidateQueries({ queryKey: ["open_items_student", form.student_id] });
-      toast({ title: "Zahlung gespeichert" });
+      qc.invalidateQueries({ queryKey: ["open_items"] });
+      toast({ title: form.istGutschrift ? "Gutschrift gespeichert" : "Zahlung gespeichert" });
       setOpen(false);
       setForm(defaultForm());
     },
@@ -227,7 +243,9 @@ const Zahlungen = () => {
           </span>
         </TableCell>
         <TableCell>
-          {allocations.length > 0 ? (
+          {Number(p.betrag) < 0 ? (
+            <span className="text-xs text-purple-600 dark:text-purple-400 font-medium italic">Gutschrift</span>
+          ) : allocations.length > 0 ? (
             <div className="space-y-0.5">
               {allocations.map((a: any) => (
                 <p key={a.id} className="text-xs text-muted-foreground">
@@ -240,8 +258,8 @@ const Zahlungen = () => {
             <span className="text-xs text-muted-foreground italic">Freie Zahlung</span>
           )}
         </TableCell>
-        <TableCell className="text-right font-semibold text-green-600">
-          +{eur(Number(p.betrag))}
+        <TableCell className={`text-right font-semibold ${Number(p.betrag) < 0 ? "text-purple-600 dark:text-purple-400" : "text-green-600"}`}>
+          {Number(p.betrag) < 0 ? "" : "+"}{eur(Number(p.betrag))}
         </TableCell>
         <TableCell>
           <Button
@@ -272,7 +290,7 @@ const Zahlungen = () => {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-2xl font-bold text-green-600">{eur(eingegangeneMonat)}</p>
           <p className="text-sm text-muted-foreground mt-1">Eingegangen (dieser Monat)</p>
@@ -280,6 +298,12 @@ const Zahlungen = () => {
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-2xl font-bold text-foreground">{eur(gesamtEingegangen)}</p>
           <p className="text-sm text-muted-foreground mt-1">Gesamt eingegangen</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {eur(Math.abs(payments.filter((p: any) => Number(p.betrag) < 0).reduce((s: number, p: any) => s + Number(p.betrag), 0)))}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">Gutschriften</p>
         </div>
       </div>
 
@@ -362,10 +386,18 @@ const Zahlungen = () => {
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setForm(defaultForm()); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Zahlung erfassen</DialogTitle>
+            <DialogTitle>{form.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={form.istGutschrift}
+                onCheckedChange={(c) => setForm((f) => ({ ...f, istGutschrift: !!c, selectedOpenItems: [] }))}
+              />
+              <span className="text-sm font-medium text-foreground">Gutschrift</span>
+            </label>
+
             <div className="space-y-1.5">
               <Label>Schüler</Label>
               <StudentCombobox
@@ -414,7 +446,7 @@ const Zahlungen = () => {
               />
             </div>
 
-            {form.student_id && openItemsForStudent.length > 0 && (() => {
+            {!form.istGutschrift && form.student_id && openItemsForStudent.length > 0 && (() => {
               const betragNum = parseFloat(form.betrag) || 0;
               const selectedItems = openItemsForStudent
                 .filter((oi: any) => form.selectedOpenItems.includes(oi.id))
