@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Receipt, TrendingUp, Wallet, AlertCircle, Search } from "lucide-react";
+import { Receipt, TrendingUp, Wallet, AlertCircle, Search, ArrowDownWideNarrow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatStudentName } from "@/lib/formatStudentName";
@@ -20,6 +20,7 @@ const Abrechnung = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [sortBySaldo, setSortBySaldo] = useState(true);
 
   // Reset visible count on search change
   useEffect(() => { setVisibleCount(10); }, [searchTerm]);
@@ -43,8 +44,9 @@ const Abrechnung = () => {
     return { ...s, forderungen, bezahlt, saldo };
   });
 
-  // Sortiert: höchster Saldo zuerst
-  const sorted = [...saldoMap].sort((a, b) => b.saldo - a.saldo);
+  const sorted = [...saldoMap].sort((a, b) =>
+    sortBySaldo ? b.saldo - a.saldo : a.nachname.localeCompare(b.nachname, "de")
+  );
 
   // ── Gesamtstatistiken ────────────────────────────────────────────────────────
   const gesamtForderungen = saldoMap.reduce((acc, s) => acc + s.forderungen, 0);
@@ -102,17 +104,28 @@ const Abrechnung = () => {
           <div>
             <h2 className="font-semibold text-foreground">Salden pro Schüler</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Sortiert nach offenstem Saldo · Klick auf Zeile öffnet Schülerdetail
+              {sortBySaldo ? "Sortiert nach offenstem Saldo" : "Sortiert alphabetisch"} · Klick auf Zeile öffnet Schülerdetail
             </p>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2">
+            <Button
+              variant={sortBySaldo ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSortBySaldo((v) => !v)}
+              className="gap-1.5"
+            >
+              <ArrowDownWideNarrow className="h-4 w-4" />
+              {sortBySaldo ? "Nach Saldo" : "Nach Name"}
+            </Button>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Schüler suchen…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-full sm:w-64"
-            />
+                className="pl-9 w-full sm:w-64"
+              />
+            </div>
           </div>
         </div>
         {(() => {
