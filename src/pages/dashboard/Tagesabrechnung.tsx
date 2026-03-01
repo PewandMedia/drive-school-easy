@@ -83,22 +83,22 @@ const Tagesabrechnung = () => {
     setLoading(false);
   };
 
+  const filteredPayments = useMemo(() => {
+    if (filterZahlungsart === "alle") return payments;
+    return payments.filter((p) => p.zahlungsart === filterZahlungsart);
+  }, [payments, filterZahlungsart]);
+
   const totals = useMemo(() => {
     const t = { bar: 0, ec: 0, ueberweisung: 0, gesamt: 0 };
     const c = { bar: 0, ec: 0, ueberweisung: 0, gesamt: 0 };
-    payments.forEach((p) => {
+    filteredPayments.forEach((p) => {
       t[p.zahlungsart] += p.betrag;
       t.gesamt += p.betrag;
       c[p.zahlungsart]++;
       c.gesamt++;
     });
     return { amounts: t, counts: c };
-  }, [payments]);
-
-  const filteredPayments = useMemo(() => {
-    if (filterZahlungsart === "alle") return payments;
-    return payments.filter((p) => p.zahlungsart === filterZahlungsart);
-  }, [payments, filterZahlungsart]);
+  }, [filteredPayments]);
 
   const summaryCards = [
     { key: "bar", label: "Bar gesamt", icon: Banknote, amount: totals.amounts.bar, count: totals.counts.bar },
@@ -141,9 +141,9 @@ const Tagesabrechnung = () => {
           );
         })}
       </TableBody>
-      {showSubtotals && filterZahlungsart === "alle" && (
+      {showSubtotals && (
         <TableFooter>
-          {(["bar", "ec", "ueberweisung"] as const).filter(z => totals.counts[z] > 0).map((z) => {
+          {filterZahlungsart === "alle" && (["bar", "ec", "ueberweisung"] as const).filter(z => totals.counts[z] > 0).map((z) => {
             const Icon = zahlungsartIcon[z];
             return (
               <TableRow key={z}>
@@ -263,9 +263,12 @@ const Tagesabrechnung = () => {
           <p className="text-lg mt-1">
             Datum: {format(new Date(selectedDate), "dd.MM.yyyy", { locale: de })}
           </p>
+          {filterZahlungsart !== "alle" && (
+            <p className="text-sm mt-1 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
+          )}
         </div>
 
-        {payments.length > 0 && (
+        {filteredPayments.length > 0 && (
           <>
             <table className="w-full text-sm border-collapse mb-6">
               <thead>
@@ -278,7 +281,7 @@ const Tagesabrechnung = () => {
                 </tr>
               </thead>
               <tbody>
-                {payments.map((p) => (
+                {filteredPayments.map((p) => (
                   <tr key={p.id} className="border-b">
                     <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
                     <td className="py-1">
@@ -293,9 +296,9 @@ const Tagesabrechnung = () => {
             </table>
 
             <div className="mb-6 text-sm space-y-1">
-              <p><strong>Bar gesamt ({totals.counts.bar}):</strong> {formatEUR(totals.amounts.bar)}</p>
-              <p><strong>EC gesamt ({totals.counts.ec}):</strong> {formatEUR(totals.amounts.ec)}</p>
-              <p><strong>Überweisung gesamt ({totals.counts.ueberweisung}):</strong> {formatEUR(totals.amounts.ueberweisung)}</p>
+              {(["bar", "ec", "ueberweisung"] as const).filter(z => filterZahlungsart === "alle" || filterZahlungsart === z).filter(z => totals.counts[z] > 0).map((z) => (
+                <p key={z}><strong>{zahlungsartLabel[z]} gesamt ({totals.counts[z]}):</strong> {formatEUR(totals.amounts[z])}</p>
+              ))}
               <p className="text-base font-bold mt-2">Gesamtbetrag ({totals.counts.gesamt}): {formatEUR(totals.amounts.gesamt)}</p>
             </div>
           </>
