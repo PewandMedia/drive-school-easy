@@ -1,40 +1,31 @@
 
 
-## Gutschrift-Option im Schuelerprofil-Zahlungsdialog
+## Notiz-Feld fuer Gutschriften
 
 ### Uebersicht
 
-Der bestehende Zahlungsdialog im Schuelerprofil (`FahrschuelerDetail.tsx`) wird um die gleiche Gutschrift-Funktion erweitert, die bereits auf der Zahlungen-Seite existiert.
+Ein optionales Textfeld "Notiz / Vermerk" wird im Gutschrift-Dialog hinzugefuegt (sowohl im Schuelerprofil als auch auf der Zahlungen-Seite). Die Notiz wird in der `beschreibung` des `open_items`-Eintrags gespeichert, sodass sie im Schuelerprofil bei den offenen Posten sichtbar ist. Keine DB-Migration noetig, da `open_items.beschreibung` bereits existiert.
 
 ### Aenderungen
 
 **Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
 
-**1. Form-State erweitern**
+1. `fsZahlung`-State um `gutschriftNotiz: string` erweitern (Default: `""`)
+2. Im Dialog: Wenn `istGutschrift` aktiv, ein Textarea-Feld "Notiz (optional)" nach dem Betrag-Feld anzeigen
+3. In `mutZahlung`: Die `beschreibung` des `open_items`-Eintrags wird auf `"Gutschrift"` + ggf. ` – [Notiz]` gesetzt, falls eine Notiz vorhanden ist
+4. Reset beim Schliessen des Dialogs anpassen
 
-`fsZahlung` bekommt ein neues Feld `istGutschrift: boolean` (Default: `false`). Reset beim Schliessen des Dialogs wird entsprechend angepasst.
+**Datei: `src/pages/dashboard/Zahlungen.tsx`**
 
-**2. Gutschrift-Checkbox im Dialog**
-
-Oberhalb der Formularfelder wird eine Checkbox "Gutschrift" eingefuegt (identisch zur Zahlungen-Seite). Wenn aktiviert:
-- Dialog-Titel wechselt zu "Gutschrift erfassen"
-- Offene-Posten-Sektion wird ausgeblendet
-- `selectedOpenItems` wird geleert
-
-**3. Mutation anpassen**
-
-`mutZahlung` wird erweitert: Wenn `istGutschrift === true`:
-- Betrag wird als negativer Wert gespeichert (`-Math.abs(betrag)`)
-- Keine Zuordnung zu offenen Posten
-- Zusaetzlicher `open_items`-Eintrag mit negativem `betrag_gesamt`, Typ `'gutschrift'`, Status `'bezahlt'` wird erstellt (reduziert den Saldo)
-
-**4. Invalidierung**
-
-Nach Speichern werden zusaetzlich `open_items` invalidiert, damit der Saldo sofort aktualisiert wird (ist bereits vorhanden).
+1. `PaymentForm`-Typ um `gutschriftNotiz: string` erweitern
+2. Gleiches Textarea-Feld im Dialog wenn Gutschrift aktiv
+3. Gleiche Logik in `saveMutation` fuer die `beschreibung`
+4. Reset anpassen
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | `fsZahlung` um `istGutschrift` erweitern, Checkbox im Dialog, Mutation fuer Gutschrift-Logik |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Notiz-Feld im Gutschrift-Dialog, beschreibung in open_items anpassen |
+| `src/pages/dashboard/Zahlungen.tsx` | Notiz-Feld im Gutschrift-Dialog, beschreibung in open_items anpassen |
 
