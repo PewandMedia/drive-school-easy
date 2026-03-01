@@ -105,6 +105,7 @@ const FahrschuelerDetail = () => {
   const [fsFahrstunde, setFsFahrstunde] = useState({
     typ: "uebungsstunde" as DrivingLessonTyp,
     fahrzeug_typ: "automatik" as FahrzeugTyp,
+    instructor_id: "",
     dauer_minuten: 45,
     datum: new Date().toISOString().slice(0, 16),
   });
@@ -249,13 +250,15 @@ const FahrschuelerDetail = () => {
   // ── Mutations ──
   const mutFahrstunde = useMutation({
     mutationFn: async () => {
+      if (!fsFahrstunde.instructor_id) throw new Error("Bitte einen Fahrlehrer auswählen");
       const { error } = await supabase.from("driving_lessons").insert({
         student_id: id!,
+        instructor_id: fsFahrstunde.instructor_id,
         typ: fsFahrstunde.typ,
         fahrzeug_typ: fsFahrstunde.fahrzeug_typ,
         dauer_minuten: fsFahrstunde.dauer_minuten,
         datum: new Date(fsFahrstunde.datum).toISOString(),
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -263,7 +266,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       setDlgFahrstunde(false);
-      setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
+      setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: "", dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
       toast({ title: "Fahrstunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -1108,6 +1111,10 @@ const FahrschuelerDetail = () => {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(lesson.datum), "dd.MM.yyyy HH:mm", { locale: de })} · {lesson.dauer_minuten} min · {FAHRZEUG_LABELS[lesson.fahrzeug_typ] ?? lesson.fahrzeug_typ}
+                        {(lesson as any).instructor_id && instructors.length > 0 && (() => {
+                          const instr = instructors.find((i) => i.id === (lesson as any).instructor_id);
+                          return instr ? ` · ${instr.vorname} ${instr.nachname}` : "";
+                        })()}
                       </p>
                     </div>
                     <span className="text-sm font-semibold text-foreground shrink-0">
@@ -1217,6 +1224,17 @@ const FahrschuelerDetail = () => {
                 <SelectContent>
                   {Object.entries(TYP_LABELS).map(([val, label]) => (
                     <SelectItem key={val} value={val}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fahrlehrer</Label>
+              <Select value={fsFahrstunde.instructor_id} onValueChange={(v) => setFsFahrstunde((f) => ({ ...f, instructor_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen…" /></SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
