@@ -1,68 +1,71 @@
 
 
-## Pruefungs-System erweitern: Status-Logik
+## Gutschrift-Funktion ueber Zahlungen
 
 ### Uebersicht
 
-Das bisherige `bestanden` (boolean) wird durch eine neue `status`-Spalte ersetzt, die vier Zustaende unterstuetzt: **angemeldet**, **bestanden**, **nicht_bestanden**, **krank**. Neue Pruefungen starten immer mit "angemeldet". Die Statistik zaehlt nur "bestanden" und "nicht_bestanden".
+Im Zahlungen-Dialog wird eine Option "Gutschrift" hinzugefuegt. Eine Gutschrift ist eine Zahlung mit negativem Betrag, die den Saldo des Schuelers reduziert. Sie wird als normaler `payments`-Eintrag gespeichert (mit negativem `betrag`), ohne Zuordnung zu offenen Posten. Keine DB-Migration noetig.
 
-### Schritt 1: Datenbank-Migration
+### Aenderungen
 
-Neue Spalte `status` als Text mit Standardwert `'angemeldet'` in der `exams`-Tabelle. Bestehende Daten werden migriert (`bestanden=true` wird `'bestanden'`, `bestanden=false` wird `'nicht_bestanden'`). Danach wird die `bestanden`-Spalte entfernt.
+**Datei: `src/pages/dashboard/Zahlungen.tsx`**
+
+**1. Gutschrift-Toggle im Formular**
+
+- Neues State-Feld `istGutschrift: boolean` im `PaymentForm`-Typ (Default: `false`)
+- Im Dialog wird oberhalb der Felder ein Toggle oder Checkbox eingefuegt: "Gutschrift"
+- Wenn aktiv:
+  - Dialog-Titel aendert sich zu "Gutschrift erfassen"
+  - Das Betrag-Feld bleibt positiv (Nutzer gibt z.B. 80 ein), wird aber intern als `-80` gespeichert
+  - Die Sektion "Offene Posten zuordnen" wird ausgeblendet (Gutschriften werden keinen offenen Posten zugeordnet)
+  - Ein optionales Textfeld "Grund" erscheint (wird nicht in der DB gespeichert, nur UX)
+
+**2. Mutation anpassen**
+
+- In `saveMutation`: Wenn `form.istGutschrift === true`, wird `betrag` als negativer Wert eingefuegt (`-Math.abs(betrag)`)
+- Keine `payment_allocations` bei Gutschriften
+
+**3. Tabellen-Darstellung anpassen**
+
+- Gutschriften (negative Betraege) werden in der Tabelle rot/lila dargestellt statt gruen
+- Betrag-Spalte: `-80,00 EUR` statt `+80,00 EUR`
+- In der Zuordnungs-Spalte: "Gutschrift" als Label
+
+**4. Statistik anpassen**
+
+- Die Statistik-Karten beruecksichtigen Gutschriften korrekt (negative Betraege reduzieren die Summe)
+- Optional: Dritte Statistik-Karte "Gutschriften" die nur negative Betraege summiert
+
+**5. Saldo-Auswirkung**
+
+Da der Saldo ueber `open_items` berechnet wird (nicht ueber `payments`), beeinflusst eine Gutschrift den Saldo nicht direkt. Um den Saldo zu reduzieren, muss die Gutschrift als negativer offener Posten erfasst werden. Dafuer wird in der Mutation zusaetzlich ein `open_items`-Eintrag mit negativem `betrag_gesamt` erstellt:
 
 ```text
-ALTER TABLE exams ADD COLUMN status text NOT NULL DEFAULT 'angemeldet';
-
-UPDATE exams SET status = CASE
-  WHEN bestanden = true THEN 'bestanden'
-  ELSE 'nicht_bestanden'
-END;
-
-ALTER TABLE exams DROP COLUMN bestanden;
+INSERT INTO open_items (student_id, typ, referenz_id, datum, beschreibung, betrag_gesamt, status)
+VALUES (student_id, 'gutschrift', payment_id, datum, 'Gutschrift', -betrag, 'bezahlt')
 ```
 
-Ausserdem muss der Trigger `create_open_item_for_exam` angepasst werden, da er bisher `bestanden` nicht verwendet -- er bleibt unveraendert.
+So wird der Saldo korrekt reduziert und die Gutschrift erscheint auch in der offenen-Posten-Liste des Schuelerprofils.
 
-### Schritt 2: Frontend anpassen (`src/pages/dashboard/Pruefungen.tsx`)
+**6. Schuelerprofil: Gutschrift-Darstellung**
 
-**2a. ExamForm-Typ aendern**
-
-- `bestanden: boolean` wird ersetzt durch `status: "angemeldet" | "bestanden" | "nicht_bestanden" | "krank"`
-- Default-Status bei Erstellung: `"angemeldet"`
-
-**2b. Ergebnis-Dropdown im Erstellungsdialog**
-
-- Beim Eintragen einer neuen Pruefung wird das "Ergebnis"-Feld entfernt oder durch ein Status-Feld ersetzt
-- Standardmaessig "Angemeldet" -- der Nutzer kann aber auch direkt einen anderen Status waehlen
-
-**2c. Status in der Tabelle anzeigen**
-
-Vier verschiedene Badge-Styles:
-- Angemeldet: blau/neutral
-- Bestanden: gruen
-- Nicht bestanden: rot
-- Krank: gelb/orange
-
-**2d. Status-Aenderung in der Tabelle**
-
-Jede Zeile bekommt ein klickbares Status-Badge oder einen kleinen Edit-Button, der ein Dropdown oeffnet zum Aendern des Status. Dafuer wird eine `updateStatusMutation` ergaenzt, die per `supabase.from("exams").update({ status }).eq("id", examId)` den Status aktualisiert.
-
-**2e. Statistik anpassen**
-
-- "Bestanden" zaehlt nur `status === 'bestanden'`
-- "Nicht bestanden" zaehlt nur `status === 'nicht_bestanden'`
-- "Gesamt" zeigt alle Pruefungen
-- Optional: "Angemeldet" und "Krank" als zusaetzliche Statistik-Karten
-
-### Schritt 3: Weitere Stellen pruefen
-
-Andere Seiten (z.B. FahrschuelerDetail) die `exam.bestanden` referenzieren, muessen auf `exam.status` umgestellt werden.
+In `FahrschuelerDetail.tsx` werden offene Posten mit negativem `betrag_gesamt` (Typ `gutschrift`) mit gruener Farbe und "Gutschrift"-Label dargestellt.
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| DB-Migration | `status`-Spalte hinzufuegen, Daten migrieren, `bestanden` entfernen |
-| `src/pages/dashboard/Pruefungen.tsx` | Form-Typ, Badge-Logik, Status-Dropdown in Tabelle, Statistik-Berechnung, Update-Mutation |
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | `bestanden` durch `status` ersetzen (falls referenziert) |
+| `src/pages/dashboard/Zahlungen.tsx` | Gutschrift-Toggle, Mutation mit negativem Betrag + open_item, Tabellen-Darstellung |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Gutschrift-Eintraege in offenen Posten farblich hervorheben |
+
+### Ablauf aus Nutzersicht
+
+1. Zahlungen-Seite oeffnen
+2. "Zahlung erfassen" klicken
+3. Checkbox "Gutschrift" aktivieren
+4. Schueler waehlen, Betrag eingeben (z.B. 80 EUR)
+5. Speichern -- Gutschrift erscheint:
+   - In der Zahlungstabelle mit negativem Betrag und "Gutschrift"-Label
+   - Im Saldo des Schuelers als Reduzierung
+   - Im Schuelerprofil als gruener Gutschrift-Eintrag
 
