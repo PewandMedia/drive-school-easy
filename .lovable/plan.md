@@ -1,47 +1,34 @@
 
 
-## Fahrlehrer-Feld fuer Theoriestunden
+## Tagesabrechnung: Filter auf PDF und Summen anwenden
 
-### Uebersicht
+### Problem
 
-Die `theory_sessions`-Tabelle bekommt eine neue Spalte `instructor_id`, und beide Theorie-Formulare (Hauptseite Theorie + Schuelerprofil) werden um ein Fahrlehrer-Dropdown erweitert. Im Schuelerprofil wird der Fahrlehrer bei jeder Lektion in der Checkliste bzw. Liste angezeigt.
+Drei Stellen ignorieren den aktiven Zahlungsart-Filter:
 
-### Aenderungen
+1. **Summen-Berechnung (`totals`)** -- basiert auf `payments` (alle), nicht auf `filteredPayments`
+2. **Summary-Karten** -- zeigen immer alle Zahlungsarten, auch wenn gefiltert
+3. **PDF-Druckbereich** -- rendert `payments` statt `filteredPayments`
 
-**1. Datenbank-Migration**
+### Loesung
 
-```sql
-ALTER TABLE theory_sessions
-  ADD COLUMN instructor_id uuid REFERENCES instructors(id);
-```
+**Datei: `src/pages/dashboard/Tagesabrechnung.tsx`**
 
-Nullable, damit bestehende Eintraege ohne Fahrlehrer bestehen bleiben.
+1. **`totals` auf `filteredPayments` umstellen**: Die `useMemo`-Abhaengigkeit von `payments` auf `filteredPayments` aendern, sodass Betraege und Anzahlen nur die gefilterten Zahlungen widerspiegeln.
 
-**2. Datei: `src/pages/dashboard/Theorie.tsx`**
+2. **Summary-Karten dynamisch anpassen**: Wenn ein Filter aktiv ist (z.B. "bar"), nur die relevante Karte plus Gesamt anzeigen -- oder alternativ alle Karten anzeigen, aber mit den gefilterten Werten (da `totals` jetzt auf `filteredPayments` basiert, passiert das automatisch).
 
-- Instructors-Query hinzufuegen (aktive Fahrlehrer laden)
-- `TheorySession`-Typ um `instructor_id` erweitern
-- `defaultForm` um `instructor_id: ""` erweitern
-- Query: `instructor_id` mitlesen
-- Im Formular: Neues Select-Feld "Fahrlehrer" (Pflichtfeld)
-- Validierung: Ohne Fahrlehrer kein Speichern
-- Insert-Mutation: `instructor_id` mitsenden
-- Tabelle: Neue Spalte "Fahrlehrer" anzeigen (Name aus instructorMap)
+3. **PDF-Druckbereich**: `payments.map(...)` durch `filteredPayments.map(...)` ersetzen. Die Summen im Druckbereich ebenfalls auf die gefilterten `totals` umstellen. Nur Zahlungsart-Zeilen anzeigen, die im Filter enthalten sind.
 
-**3. Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
+4. **Filter-Hinweis im PDF**: Wenn ein Filter aktiv ist, einen Hinweis im PDF-Header anzeigen (z.B. "Filter: Nur Barzahlungen"), damit klar ist, dass es sich um einen Teilbericht handelt.
 
-- `fsTheorie`-State um `instructor_id: ""` erweitern
-- Im Theorie-Dialog: Select-Feld "Fahrlehrer" hinzufuegen (Instructors sind bereits geladen)
-- Validierung: Pflichtfeld
-- Insert-Mutation: `instructor_id` mitsenden
-- Reset beim Schliessen anpassen
-- Theorie-Liste / Lektionen-Checkliste: Fahrlehrer-Name anzeigen (z.B. als Tooltip oder kleiner Text neben der Lektion)
+### Betroffene Stellen
 
-### Betroffene Dateien
-
-| Datei | Aenderung |
-|-------|-----------|
-| Migration (SQL) | `instructor_id` Spalte in `theory_sessions` |
-| `src/pages/dashboard/Theorie.tsx` | Fahrlehrer-Dropdown im Formular, Spalte in Tabelle |
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Fahrlehrer-Dropdown im Dialog, Anzeige bei Lektionen |
+| Zeile(n) | Aenderung |
+|----------|-----------|
+| 86-96 | `totals` basiert auf `filteredPayments` statt `payments` |
+| 103-108 | `summaryCards` nutzt automatisch korrekte Werte |
+| 144-167 | TableFooter-Logik: bei aktivem Filter nur eine Summenzeile |
+| 268-301 | Print-Bereich: `filteredPayments` statt `payments`, Summen filtern |
+| 264 | Filter-Hinweis im PDF-Header |
 
