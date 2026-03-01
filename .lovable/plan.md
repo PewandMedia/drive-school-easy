@@ -1,48 +1,65 @@
 
 
-## Zahlungssystem: Guthaben / Vorauszahlung
+## Fahrlehrer-Statistik zum Leistungs-Dashboard erweitern
 
-### Konzept
+### Uebersicht
 
-Wenn eine Zahlung ohne Zuordnung zu offenen Posten gespeichert wird, entsteht ein **Guthaben** (Vorauszahlung). Dieses Guthaben wird im Schuelerprofil angezeigt und vom offenen Saldo abgezogen. Spaeter kann es automatisch mit neuen Leistungen verrechnet werden.
-
-### Berechnung Guthaben
-
-Guthaben = Summe aller Zahlungen (positiv) - Summe aller payment_allocations
-
-Das heisst: Jeder Euro, der nicht einem offenen Posten zugeordnet wurde, ist Guthaben.
+Die bestehende Fahrlehrer-Statistik-Seite wird von einer reinen Pruefungs-Durchfallquoten-Ansicht zu einem vollstaendigen Leistungs-Dashboard umgebaut. Pro Fahrlehrer werden Fahrstunden, Theoriestunden, Pruefungen, Bestehensquote und Umsatz angezeigt -- filterbar nach Monat/Jahr.
 
 ### Aenderungen
 
-**1. Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
+**Datei: `src/pages/dashboard/FahrlehrerStatistik.tsx`** (komplett ueberarbeiten)
 
-- **Guthaben berechnen**: Neue Variable `guthaben` = `totalZahlungen` (nur positive Zahlungen) minus Summe aller zugeordneten `payment_allocations` fuer diesen Schueler
-- Dazu: Query fuer `payment_allocations` des Schuelers hinzufuegen (oder ueber payments joinen)
-- **Saldo anpassen**: Neuer Saldo = `totalForderungen - totalBezahlt - guthaben` (Guthaben reduziert den offenen Saldo)
-- **Guthaben-Anzeige**: Im Profil-Panel unter der Saldo-Uebersicht eine Zeile "Guthaben" in Gruen anzeigen, wenn > 0
-- **Saldo-Label**: Wenn Guthaben den Saldo uebersteigt, zeigt die Anzeige "Guthaben" statt "Offener Saldo"
+**A) Neue Datenquellen laden**
 
-**2. Datei: `src/pages/dashboard/Zahlungen.tsx`**
+Zusaetzlich zu `instructors` und `exams` werden geladen:
+- `driving_lessons` (mit `fetchAllRows`): Felder `instructor_id`, `datum`, `einheiten`, `preis`, `typ`
+- `theory_sessions` (mit `fetchAllRows`): Felder `instructor_id`, `datum`
 
-- In der Tabelle: Zahlungen ohne Zuordnung als "Vorauszahlung / Guthaben" kennzeichnen (statt "Freie Zahlung")
-- Beide Speicher-Stellen (Zahlungen-Seite und Schuelerdetail) erlauben bereits Zahlungen ohne Zuordnung -- das funktioniert schon korrekt
+Fehlstunden (`typ === "fehlstunde"`) werden bei Fahrstunden ausgeschlossen.
 
-**3. Datei: `src/pages/dashboard/FahrschuelerDetail.tsx` (Automatische Verrechnung)**
+**B) Monats-/Jahresfilter**
 
-- Beim Speichern einer neuen Zahlung im Schuelerdetail: Falls Guthaben vorhanden ist und neue offene Posten existieren, einen Hinweis anzeigen ("Guthaben vorhanden -- soll automatisch verrechnet werden?")
-- Optional: Button "Guthaben verrechnen" im Schuelerdetail, der vorhandenes Guthaben automatisch auf offene Posten verteilt (aelteste zuerst)
+- Zwei Select-Dropdowns oben: Monat (Januar-Dezember) und Jahr (dynamisch aus Daten)
+- Vorbelegung: aktueller Monat/Jahr
+- Alle Berechnungen werden sowohl fuer "Gesamt" als auch fuer den gewaehlten Monat durchgefuehrt
+
+**C) Globale KPI-Karten (4-6 Karten)**
+
+Oberste Zeile mit aggregierten Werten ueber alle Fahrlehrer:
+- Gesamt Fahrstunden (Einheiten) im gewaehlten Monat
+- Gesamt Theoriestunden im gewaehlten Monat
+- Gesamt Pruefungen im gewaehlten Monat
+- Durchschnittliche Bestehensquote
+- Gesamt Umsatz (Summe `preis` der Fahrstunden im Monat)
+
+**D) Detailtabelle pro Fahrlehrer**
+
+Eine Tabelle mit folgenden Spalten:
+| Fahrlehrer | Fahrstunden (E) Monat | Fahrstunden (E) Gesamt | Theorie Monat | Theorie Gesamt | Pruefungen | Bestehensquote | Umsatz Monat |
+
+- Sortierbar ueber Spaltenheader-Klick (Ranking-System)
+- Standard-Sortierung: meiste Fahrstunden im Monat
+- Bestehensquote mit Farbindikator (Gruen/Gelb/Rot wie bisher)
+
+**E) Bisheriges Balkendiagramm entfernen**
+
+Das alte Durchfallquoten-Balkendiagramm wird durch die erweiterte Tabelle ersetzt. Die Pruefungsdaten (bestanden/nicht bestanden) fliessen in die Bestehensquote-Spalte ein.
 
 ### Technische Details
 
-- Neue Query im Schuelerdetail: `payment_allocations` fuer alle Payments des Schuelers laden
-- Berechnung: `guthaben = positiveZahlungen - summeAllocations`
-- Saldo-Formel aendert sich zu: `offenerSaldo = max(0, forderungenOffen - guthaben)`
-- Kein Datenbankschema-Aenderung noetig -- alles ableitbar aus bestehenden Tabellen
+- `driving_lessons` werden mit `fetchAllRows` geladen und nach `instructor_id IS NOT NULL` und `typ !== "fehlstunde"` gefiltert
+- `theory_sessions` werden mit `fetchAllRows` geladen und nach `instructor_id IS NOT NULL` gefiltert
+- Monatsfilter nutzt `isWithinInterval`, `startOfMonth`, `endOfMonth` aus `date-fns`
+- Sortierung ueber einen `sortKey`/`sortDir` State, der beim Klick auf Spaltenheader wechselt
+- Bestehensquote = `bestanden / (bestanden + nicht_bestanden) * 100` (invertiert gegenueber der bisherigen Durchfallquote)
+- Umsatz = `SUM(preis)` der Fahrstunden des Fahrlehrers (ohne Fehlstunden)
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Guthaben berechnen, anzeigen, Saldo anpassen, Verrechnung-Button |
-| `src/pages/dashboard/Zahlungen.tsx` | "Freie Zahlung" -> "Vorauszahlung" Label |
+| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Komplett ueberarbeiten: neue Queries, Filter, KPIs, erweiterte Tabelle mit Sortierung |
+
+Keine Datenbank-Aenderungen noetig -- alle Daten sind bereits vorhanden.
 
