@@ -1,47 +1,47 @@
 
 
-## Fahrlehrer-Feld fuer Fahrstunden
+## Fahrlehrer-Feld fuer Theoriestunden
 
 ### Uebersicht
 
-Die `driving_lessons`-Tabelle bekommt eine neue Spalte `instructor_id`, und beide Fahrstunden-Formulare (Hauptseite + Schuelerprofil) werden um ein Fahrlehrer-Dropdown erweitert. Im Schuelerprofil wird der zugewiesene Fahrlehrer bei jeder Fahrstunde angezeigt.
+Die `theory_sessions`-Tabelle bekommt eine neue Spalte `instructor_id`, und beide Theorie-Formulare (Hauptseite Theorie + Schuelerprofil) werden um ein Fahrlehrer-Dropdown erweitert. Im Schuelerprofil wird der Fahrlehrer bei jeder Lektion in der Checkliste bzw. Liste angezeigt.
 
 ### Aenderungen
 
 **1. Datenbank-Migration**
 
-Neue Spalte `instructor_id` (UUID, nullable, FK auf `instructors.id`) in der Tabelle `driving_lessons`. Nullable, damit bestehende Eintraege ohne Fahrlehrer bestehen bleiben.
-
 ```sql
-ALTER TABLE driving_lessons
+ALTER TABLE theory_sessions
   ADD COLUMN instructor_id uuid REFERENCES instructors(id);
 ```
 
-**2. Datei: `src/pages/dashboard/Fahrstunden.tsx`**
+Nullable, damit bestehende Eintraege ohne Fahrlehrer bestehen bleiben.
+
+**2. Datei: `src/pages/dashboard/Theorie.tsx`**
 
 - Instructors-Query hinzufuegen (aktive Fahrlehrer laden)
+- `TheorySession`-Typ um `instructor_id` erweitern
 - `defaultForm` um `instructor_id: ""` erweitern
-- Im Formular: Neues Select-Feld "Fahrlehrer" (Pflichtfeld, nach Schueler-Auswahl)
+- Query: `instructor_id` mitlesen
+- Im Formular: Neues Select-Feld "Fahrlehrer" (Pflichtfeld)
 - Validierung: Ohne Fahrlehrer kein Speichern
 - Insert-Mutation: `instructor_id` mitsenden
-- `DrivingLesson`-Typ um `instructor_id` erweitern
 - Tabelle: Neue Spalte "Fahrlehrer" anzeigen (Name aus instructorMap)
-- Instructor-Map (id -> Name) fuer die Anzeige
 
 **3. Datei: `src/pages/dashboard/FahrschuelerDetail.tsx`**
 
-- `fsFahrstunde`-State um `instructor_id: ""` erweitern
-- Im Fahrstunden-Dialog: Select-Feld "Fahrlehrer" hinzufuegen (Instructors sind bereits geladen via `instructors`-Query)
+- `fsTheorie`-State um `instructor_id: ""` erweitern
+- Im Theorie-Dialog: Select-Feld "Fahrlehrer" hinzufuegen (Instructors sind bereits geladen)
 - Validierung: Pflichtfeld
 - Insert-Mutation: `instructor_id` mitsenden
 - Reset beim Schliessen anpassen
-- Fahrstunden-Liste: Fahrlehrer-Name neben Datum/Dauer anzeigen (z.B. "· Fahrlehrer: Max Mustermann")
+- Theorie-Liste / Lektionen-Checkliste: Fahrlehrer-Name anzeigen (z.B. als Tooltip oder kleiner Text neben der Lektion)
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| Migration (SQL) | `instructor_id` Spalte in `driving_lessons` |
-| `src/pages/dashboard/Fahrstunden.tsx` | Fahrlehrer-Dropdown im Formular, Spalte in Tabelle, Validierung |
-| `src/pages/dashboard/FahrschuelerDetail.tsx` | Fahrlehrer-Dropdown im Dialog, Anzeige in Fahrstunden-Liste |
+| Migration (SQL) | `instructor_id` Spalte in `theory_sessions` |
+| `src/pages/dashboard/Theorie.tsx` | Fahrlehrer-Dropdown im Formular, Spalte in Tabelle |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` | Fahrlehrer-Dropdown im Dialog, Anzeige bei Lektionen |
 
