@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Plus, Search, ChevronRight, ArrowUpDown, CalendarIcon, CheckCircle2 } from "lucide-react";
@@ -68,6 +68,7 @@ const Fahrschueler = () => {
   const [formError, setFormError] = useState("");
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students"],
@@ -106,7 +107,17 @@ const Fahrschueler = () => {
     },
   });
 
-  const autoPricesTotal = autoPrices.reduce((sum, p) => sum + Number(p.preis), 0);
+  useEffect(() => {
+    if (autoPrices.length > 0) {
+      const initial: Record<string, number> = {};
+      for (const p of autoPrices) {
+        initial[p.id] = Number(p.preis);
+      }
+      setCustomPrices(initial);
+    }
+  }, [autoPrices]);
+
+  const autoPricesTotal = Object.values(customPrices).reduce((sum, v) => sum + v, 0);
 
   const saldoMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -158,7 +169,7 @@ const Fahrschueler = () => {
           student_id: newStudent.id,
           preis_id: p.id,
           bezeichnung: p.bezeichnung,
-          preis: p.preis,
+          preis: customPrices[p.id] ?? p.preis,
           status: "offen" as const,
         }));
         await supabase.from("services").insert(servicesToInsert);
@@ -173,6 +184,9 @@ const Fahrschueler = () => {
       setForm(defaultForm);
       setGeburtsdatumText("");
       setFormError("");
+      const initial: Record<string, number> = {};
+      for (const p of autoPrices) initial[p.id] = Number(p.preis);
+      setCustomPrices(initial);
     },
     onError: (err: Error) => {
       setFormError(err.message);
@@ -517,14 +531,27 @@ const Fahrschueler = () => {
                 <p className="text-sm font-medium text-foreground">Automatisch hinzugefügte Leistungen:</p>
                 <div className="space-y-1.5">
                   {autoPrices.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between text-sm">
+                    <div key={p.id} className="flex items-center justify-between text-sm gap-3">
                       <span className="flex items-center gap-2 text-muted-foreground">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                         {p.bezeichnung}
                       </span>
-                      <span className="text-foreground font-medium">
-                        {Number(p.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="w-24 h-8 text-right text-sm"
+                          value={customPrices[p.id] ?? Number(p.preis)}
+                          onChange={(e) =>
+                            setCustomPrices((prev) => ({
+                              ...prev,
+                              [p.id]: parseFloat(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                        <span className="text-xs text-muted-foreground">€</span>
+                      </div>
                     </div>
                   ))}
                 </div>
