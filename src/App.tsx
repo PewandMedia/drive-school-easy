@@ -26,6 +26,7 @@ import Abrechnung from "./pages/dashboard/Abrechnung";
 
 import FahrlehrerStatistik from "./pages/dashboard/FahrlehrerStatistik";
 import Tagesabrechnung from "./pages/dashboard/Tagesabrechnung";
+import Auswertung from "./pages/dashboard/Auswertung";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ const App = () => (
               
               <Route path="fahrlehrer-statistik" element={<FahrlehrerStatistik />} />
               <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
+              <Route path="auswertung" element={<Auswertung />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
