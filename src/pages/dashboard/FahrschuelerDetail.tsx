@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PFLICHT: Record<string, number> = { ueberland: 5, autobahn: 4, nacht: 3 };
@@ -112,6 +113,7 @@ const FahrschuelerDetail = () => {
   // fsSchaltstunde removed – Fahrstunden-Dialog handles schaltwagen
   const [fsTheorie, setFsTheorie] = useState({
     lektion: 1,
+    instructor_id: "",
     datum: new Date().toISOString().slice(0, 16),
   });
   const [fsPruefung, setFsPruefung] = useState({
@@ -276,9 +278,11 @@ const FahrschuelerDetail = () => {
 
   const mutTheorie = useMutation({
     mutationFn: async () => {
+      if (!fsTheorie.instructor_id) throw new Error("Bitte einen Fahrlehrer auswählen");
       const typ = lektionToTyp(fsTheorie.lektion);
       const { error } = await supabase.from("theory_sessions").insert({
         student_id: id!,
+        instructor_id: fsTheorie.instructor_id,
         datum: new Date(fsTheorie.datum).toISOString(),
         typ,
         lektion: fsTheorie.lektion,
@@ -289,7 +293,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
       setDlgTheorie(false);
-      setFsTheorie({ lektion: 1, datum: new Date().toISOString().slice(0, 16) });
+      setFsTheorie({ lektion: 1, instructor_id: "", datum: new Date().toISOString().slice(0, 16) });
       toast({ title: "Theoriestunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -418,12 +422,24 @@ const FahrschuelerDetail = () => {
 
   const gesamtEinheiten = lessons.filter((l) => l.typ !== "fehlstunde").reduce((s, l) => s + (l.einheiten || 1), 0);
 
+  const instructorMap = Object.fromEntries(
+    instructors.map((i) => [i.id, `${i.vorname} ${i.nachname}`])
+  );
+
   // Unique lesson-based counting
   const completedLektionen = new Set(
     theorySessions
       .filter((s: any) => s.lektion != null)
       .map((s: any) => s.lektion as number)
   );
+
+  // Map lektion -> instructor name for display
+  const lektionInstructorMap: Record<number, string> = {};
+  for (const s of theorySessions as any[]) {
+    if (s.lektion != null && s.instructor_id) {
+      lektionInstructorMap[s.lektion] = instructorMap[s.instructor_id] ?? "";
+    }
+  }
   const uniqueGrundstoff = Array.from(completedLektionen).filter((n) => n >= 1 && n <= 12);
   const uniqueKlassen = Array.from(completedLektionen).filter((n) => n >= 13 && n <= 14);
   // Legacy data without lektion
@@ -908,9 +924,11 @@ const FahrschuelerDetail = () => {
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Grundstoff (Lektion 1–12)</p>
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                    <TooltipProvider delayDuration={200}>
                     {THEORIE_LEKTIONEN.filter((l) => l.nr <= 12).map((l) => {
                       const done = completedLektionen.has(l.nr);
-                      return (
+                      const instrName = lektionInstructorMap[l.nr];
+                      const chip = (
                         <div
                           key={l.nr}
                           className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
@@ -923,15 +941,27 @@ const FahrschuelerDetail = () => {
                           L{l.nr}
                         </div>
                       );
+                      if (done && instrName) {
+                        return (
+                          <Tooltip key={l.nr}>
+                            <TooltipTrigger asChild>{chip}</TooltipTrigger>
+                            <TooltipContent><p>{instrName}</p></TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      return chip;
                     })}
+                    </TooltipProvider>
                   </div>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Klassenspezifisch (Lektion 13–14)</p>
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                    <TooltipProvider delayDuration={200}>
                     {THEORIE_LEKTIONEN.filter((l) => l.nr >= 13).map((l) => {
                       const done = completedLektionen.has(l.nr);
-                      return (
+                      const instrName = lektionInstructorMap[l.nr];
+                      const chip = (
                         <div
                           key={l.nr}
                           className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
@@ -944,7 +974,17 @@ const FahrschuelerDetail = () => {
                           L{l.nr}
                         </div>
                       );
+                      if (done && instrName) {
+                        return (
+                          <Tooltip key={l.nr}>
+                            <TooltipTrigger asChild>{chip}</TooltipTrigger>
+                            <TooltipContent><p>{instrName}</p></TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      return chip;
                     })}
+                    </TooltipProvider>
                   </div>
                 </div>
               </div>
@@ -1306,6 +1346,17 @@ const FahrschuelerDetail = () => {
                   </p>
                 );
               })()}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fahrlehrer</Label>
+              <Select value={fsTheorie.instructor_id} onValueChange={(v) => setFsTheorie((f) => ({ ...f, instructor_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen" /></SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>{i.vorname} {i.nachname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Datum & Uhrzeit</Label>
