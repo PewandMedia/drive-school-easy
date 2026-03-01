@@ -73,9 +73,16 @@ type Vehicle = {
   aktiv: boolean;
 };
 
+type Instructor = {
+  id: string;
+  vorname: string;
+  nachname: string;
+};
+
 type DrivingLesson = {
   id: string;
   student_id: string;
+  instructor_id: string | null;
   typ: DrivingLessonTyp;
   fahrzeug_typ: FahrzeugTyp;
   dauer_minuten: number;
@@ -86,6 +93,7 @@ type DrivingLesson = {
 
 const defaultForm = {
   student_id: "",
+  instructor_id: "",
   typ: "uebungsstunde" as DrivingLessonTyp,
   fahrzeug_typ: "automatik" as FahrzeugTyp,
   vehicle_id: "",
@@ -121,6 +129,19 @@ const Fahrstunden = () => {
     },
   });
 
+  const { data: instructors = [] } = useQuery<Instructor[]>({
+    queryKey: ["instructors_active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("instructors")
+        .select("id, vorname, nachname")
+        .eq("aktiv", true)
+        .order("nachname");
+      if (error) throw error;
+      return (data ?? []) as Instructor[];
+    },
+  });
+
   const { data: lessons = [] } = useQuery<DrivingLesson[]>({
     queryKey: ["driving_lessons"],
     queryFn: () => fetchAllRows(supabase.from("driving_lessons").select("*").order("datum", { ascending: false })) as Promise<DrivingLesson[]>,
@@ -130,11 +151,12 @@ const Fahrstunden = () => {
     mutationFn: async (values: typeof defaultForm) => {
       const { error } = await supabase.from("driving_lessons").insert({
         student_id: values.student_id,
+        instructor_id: values.instructor_id || null,
         typ: values.typ,
         fahrzeug_typ: values.fahrzeug_typ,
         dauer_minuten: values.dauer_minuten,
         datum: new Date(values.datum).toISOString(),
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -171,6 +193,10 @@ const Fahrstunden = () => {
       toast({ title: "Bitte einen Schüler auswählen", variant: "destructive" });
       return;
     }
+    if (!form.instructor_id) {
+      toast({ title: "Bitte einen Fahrlehrer auswählen", variant: "destructive" });
+      return;
+    }
     if (form.dauer_minuten <= 0) {
       toast({ title: "Bitte eine Dauer eingeben", variant: "destructive" });
       return;
@@ -181,6 +207,11 @@ const Fahrstunden = () => {
   const studentMap = useMemo(
     () => Object.fromEntries(students.map((s) => [s.id, formatStudentName(s.nachname, s.vorname, s.geburtsdatum)])),
     [students]
+  );
+
+  const instructorMap = useMemo(
+    () => Object.fromEntries(instructors.map((i) => [i.id, `${i.nachname}, ${i.vorname}`])),
+    [instructors]
   );
 
   const filtered = useMemo(() => {
@@ -218,6 +249,9 @@ const Fahrstunden = () => {
       </TableCell>
       <TableCell>{TYP_LABELS[lesson.typ]}</TableCell>
       <TableCell>{FAHRZEUG_LABELS[lesson.fahrzeug_typ]}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {lesson.instructor_id ? instructorMap[lesson.instructor_id] ?? "–" : "–"}
+      </TableCell>
       <TableCell>{lesson.dauer_minuten} min ({lesson.einheiten ?? Math.floor(lesson.dauer_minuten / 45)} E)</TableCell>
       <TableCell className="text-right font-semibold">
         {Number(lesson.preis).toFixed(2)} €
@@ -262,6 +296,25 @@ const Fahrstunden = () => {
                     value={form.student_id}
                     onValueChange={(v) => setForm((f) => ({ ...f, student_id: v }))}
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Fahrlehrer</Label>
+                  <Select
+                    value={form.instructor_id}
+                    onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Fahrlehrer wählen…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {instructors.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>
+                          {i.nachname}, {i.vorname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -501,6 +554,7 @@ const Fahrstunden = () => {
               <TableHead>Datum</TableHead>
               <TableHead>Typ</TableHead>
               <TableHead>Fahrzeug</TableHead>
+              <TableHead>Fahrlehrer</TableHead>
               <TableHead>Dauer</TableHead>
               <TableHead className="text-right">Preis</TableHead>
               <TableHead className="w-12" />
@@ -509,7 +563,7 @@ const Fahrstunden = () => {
           <TableBody>
             {todayLessons.length === 0 && olderLessons.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-30" />
                   Heute noch keine Fahrstunden eingetragen
                 </TableCell>
@@ -519,7 +573,7 @@ const Fahrstunden = () => {
                 {todayLessons.map(renderRow)}
                 {todayLessons.length > 0 && visibleOlder.length > 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
+                    <TableCell colSpan={8} className="text-center py-2 text-xs text-muted-foreground bg-secondary/30">
                       Ältere Einträge
                     </TableCell>
                   </TableRow>

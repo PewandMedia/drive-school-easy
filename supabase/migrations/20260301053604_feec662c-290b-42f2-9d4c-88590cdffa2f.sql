@@ -1,0 +1,1 @@
+ALTER TABLE driving_lessons ADD COLUMN instructor_id uuid REFERENCES instructors(id);
