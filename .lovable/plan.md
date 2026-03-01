@@ -1,34 +1,44 @@
 
 
-## Tagesabrechnung: Filter auf PDF und Summen anwenden
+## Neue Seite: Monatliche Auswertung
 
-### Problem
+### Uebersicht
 
-Drei Stellen ignorieren den aktiven Zahlungsart-Filter:
+Neue Dashboard-Seite "Auswertung" mit monatlicher Uebersicht ueber Umsatz, Fahrstunden und Theoriestunden. Enthält Monats-/Jahresfilter, KPI-Karten und ein Balkendiagramm.
 
-1. **Summen-Berechnung (`totals`)** -- basiert auf `payments` (alle), nicht auf `filteredPayments`
-2. **Summary-Karten** -- zeigen immer alle Zahlungsarten, auch wenn gefiltert
-3. **PDF-Druckbereich** -- rendert `payments` statt `filteredPayments`
+### Aenderungen
 
-### Loesung
+**1. Neue Datei: `src/pages/dashboard/Auswertung.tsx`**
 
-**Datei: `src/pages/dashboard/Tagesabrechnung.tsx`**
+- **Filter**: Dropdown fuer Monat (Januar-Dezember) und Jahr (dynamisch aus vorhandenen Daten), vorbelegt mit aktuellem Monat/Jahr
+- **Datenquellen**: `payments`, `driving_lessons`, `theory_sessions` -- gefiltert nach gewaehltem Monat/Jahr
+- **KPI-Karten** (3 Stueck):
+  - Gesamtumsatz (Summe aller Zahlungen im Monat)
+  - Anzahl Fahrstunden (absolvierte Fahrstunden im Monat)
+  - Anzahl Theoriestunden (absolvierte Theoriestunden im Monat)
+- **Diagramm**: Recharts BarChart mit allen 3 Werten pro Monat (letzten 6 oder 12 Monate im Ueberblick), aktueller Monat hervorgehoben
+- **Tabelle** (optional): Detailansicht der Monatswerte
 
-1. **`totals` auf `filteredPayments` umstellen**: Die `useMemo`-Abhaengigkeit von `payments` auf `filteredPayments` aendern, sodass Betraege und Anzahlen nur die gefilterten Zahlungen widerspiegeln.
+**2. Datei: `src/App.tsx`**
 
-2. **Summary-Karten dynamisch anpassen**: Wenn ein Filter aktiv ist (z.B. "bar"), nur die relevante Karte plus Gesamt anzeigen -- oder alternativ alle Karten anzeigen, aber mit den gefilterten Werten (da `totals` jetzt auf `filteredPayments` basiert, passiert das automatisch).
+- Import und Route hinzufuegen: `/dashboard/auswertung` -> `<Auswertung />`
 
-3. **PDF-Druckbereich**: `payments.map(...)` durch `filteredPayments.map(...)` ersetzen. Die Summen im Druckbereich ebenfalls auf die gefilterten `totals` umstellen. Nur Zahlungsart-Zeilen anzeigen, die im Filter enthalten sind.
+**3. Datei: `src/components/AppSidebar.tsx`**
 
-4. **Filter-Hinweis im PDF**: Wenn ein Filter aktiv ist, einen Hinweis im PDF-Header anzeigen (z.B. "Filter: Nur Barzahlungen"), damit klar ist, dass es sich um einen Teilbericht handelt.
+- Neuen Menuepunkt "Auswertung" in der Finanzen-Gruppe mit `BarChart3`-Icon hinzufuegen
 
-### Betroffene Stellen
+### Technische Details
 
-| Zeile(n) | Aenderung |
-|----------|-----------|
-| 86-96 | `totals` basiert auf `filteredPayments` statt `payments` |
-| 103-108 | `summaryCards` nutzt automatisch korrekte Werte |
-| 144-167 | TableFooter-Logik: bei aktivem Filter nur eine Summenzeile |
-| 268-301 | Print-Bereich: `filteredPayments` statt `payments`, Summen filtern |
-| 264 | Filter-Hinweis im PDF-Header |
+- Alle drei Tabellen werden mit `fetchAllRows` geladen (bestehendes Pattern)
+- Monatsfilter nutzt `isSameMonth` aus date-fns
+- Diagramm zeigt die letzten 12 Monate als Balken (Umsatz als Hauptbalke, Fahrstunden/Theorie als Zahlenwerte)
+- Recharts `BarChart` mit `ChartContainer` oder direkt `ResponsiveContainer` (wie in FahrlehrerStatistik)
+
+### Betroffene Dateien
+
+| Datei | Aenderung |
+|-------|-----------|
+| `src/pages/dashboard/Auswertung.tsx` | Neue Seite (komplett neu) |
+| `src/App.tsx` | Route hinzufuegen |
+| `src/components/AppSidebar.tsx` | Navigationseintrag hinzufuegen |
 
