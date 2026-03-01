@@ -84,7 +84,7 @@ const Dashboard = () => {
     ...exams.map((e) => ({
       type: "Prüfung",
       studentId: e.student_id,
-      desc: `${e.typ === "theorie" ? "Theorie" : "Praxis"} – ${e.bestanden ? "Bestanden" : "Nicht bestanden"}`,
+      desc: `${e.typ === "theorie" ? "Theorie" : "Praxis"} – ${e.status === "bestanden" ? "Bestanden" : e.status === "nicht_bestanden" ? "Nicht bestanden" : e.status === "krank" ? "Krank" : "Angemeldet"}`,
       date: e.datum,
       createdAt: e.created_at,
     })),

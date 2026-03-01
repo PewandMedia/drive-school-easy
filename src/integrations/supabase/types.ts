@@ -60,35 +60,35 @@ export type Database = {
       }
       exams: {
         Row: {
-          bestanden: boolean
           created_at: string
           datum: string
           fahrzeug_typ: Database["public"]["Enums"]["fahrzeug_typ"]
           id: string
           instructor_id: string | null
           preis: number
+          status: string
           student_id: string
           typ: Database["public"]["Enums"]["exam_typ"]
         }
         Insert: {
-          bestanden?: boolean
           created_at?: string
           datum?: string
           fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
           id?: string
           instructor_id?: string | null
           preis?: number
+          status?: string
           student_id: string
           typ: Database["public"]["Enums"]["exam_typ"]
         }
         Update: {
-          bestanden?: boolean
           created_at?: string
           datum?: string
           fahrzeug_typ?: Database["public"]["Enums"]["fahrzeug_typ"]
           id?: string
           instructor_id?: string | null
           preis?: number
+          status?: string
           student_id?: string
           typ?: Database["public"]["Enums"]["exam_typ"]
         }

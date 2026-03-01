@@ -117,7 +117,7 @@ const FahrschuelerDetail = () => {
     fahrzeug_typ: "automatik" as FahrzeugTyp,
     instructor_id: "",
     datum: new Date().toISOString().slice(0, 10),
-    bestanden: false,
+    status: "angemeldet" as "angemeldet" | "bestanden" | "nicht_bestanden" | "krank",
     preis: "0",
   });
   const [fsLeistung, setFsLeistung] = useState({
@@ -296,7 +296,7 @@ const FahrschuelerDetail = () => {
         typ: fsPruefung.typ,
         fahrzeug_typ: fsPruefung.fahrzeug_typ,
         datum: new Date(fsPruefung.datum).toISOString(),
-        bestanden: fsPruefung.bestanden,
+        status: fsPruefung.status,
         preis: parseFloat(fsPruefung.preis) || 0,
         instructor_id: fsPruefung.typ === "praxis" && fsPruefung.instructor_id ? fsPruefung.instructor_id : null,
       });
@@ -307,7 +307,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["exams_all"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       setDlgPruefung(false);
-      setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), bestanden: false, preis: "0" });
+      setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), status: "angemeldet", preis: "0" });
       toast({ title: "Prüfung eingetragen" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -1009,13 +1009,21 @@ const FahrschuelerDetail = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {exam.bestanden ? (
+                        {exam.status === "bestanden" ? (
                           <span className="inline-flex items-center gap-1 rounded-md border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-700">
                             <CheckCircle2 className="h-3 w-3" /> Bestanden
                           </span>
-                        ) : (
+                        ) : exam.status === "nicht_bestanden" ? (
                           <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
                             <XCircle className="h-3 w-3" /> Nicht bestanden
+                          </span>
+                        ) : exam.status === "krank" ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                            <AlertTriangle className="h-3 w-3" /> Krank
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                            <Calendar className="h-3 w-3" /> Angemeldet
                           </span>
                         )}
                         <span className="text-sm font-semibold text-foreground w-20 text-right">
@@ -1244,7 +1252,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Prüfung ── */}
-      <Dialog open={dlgPruefung} onOpenChange={(v) => { setDlgPruefung(v); if (!v) setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), bestanden: false, preis: "0" }); }}>
+      <Dialog open={dlgPruefung} onOpenChange={(v) => { setDlgPruefung(v); if (!v) setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), status: "angemeldet", preis: "0" }); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Prüfung eintragen</DialogTitle>
@@ -1288,12 +1296,14 @@ const FahrschuelerDetail = () => {
               <Input type="date" value={fsPruefung.datum} onChange={(e) => setFsPruefung((f) => ({ ...f, datum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Ergebnis</Label>
-              <Select value={fsPruefung.bestanden ? "ja" : "nein"} onValueChange={(v) => setFsPruefung((f) => ({ ...f, bestanden: v === "ja" }))}>
+              <Label>Status</Label>
+              <Select value={fsPruefung.status} onValueChange={(v) => setFsPruefung((f) => ({ ...f, status: v as "angemeldet" | "bestanden" | "nicht_bestanden" | "krank" }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ja">Bestanden</SelectItem>
-                  <SelectItem value="nein">Nicht bestanden</SelectItem>
+                  <SelectItem value="angemeldet">Angemeldet</SelectItem>
+                  <SelectItem value="bestanden">Bestanden</SelectItem>
+                  <SelectItem value="nicht_bestanden">Nicht bestanden</SelectItem>
+                  <SelectItem value="krank">Krank</SelectItem>
                 </SelectContent>
               </Select>
             </div>

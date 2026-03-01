@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { formatStudentName } from "@/lib/formatStudentName";
-import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil } from "lucide-react";
+import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil, Calendar, AlertTriangle } from "lucide-react";
 import InstructorManageDialog from "@/components/InstructorManageDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,8 @@ import {
 import StudentCombobox from "@/components/StudentCombobox";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+type ExamStatus = "angemeldet" | "bestanden" | "nicht_bestanden" | "krank";
+
 type ExamForm = {
   student_id: string;
   typ: "theorie" | "praxis";
@@ -36,7 +38,7 @@ type ExamForm = {
   vehicle_id: string;
   instructor_id: string;
   datum: string;
-  bestanden: boolean;
+  status: ExamStatus;
   preis: string;
 };
 
@@ -47,14 +49,16 @@ const defaultForm = (): ExamForm => ({
   vehicle_id: "",
   instructor_id: "",
   datum: new Date().toISOString().slice(0, 10),
-  bestanden: false,
+  status: "angemeldet",
   preis: "0",
 });
 
-const statusBadge = (bestanden: boolean) =>
-  bestanden
-    ? "bg-green-500/15 text-green-400 border-green-500/30"
-    : "bg-red-500/15 text-red-400 border-red-500/30";
+const STATUS_CONFIG: Record<ExamStatus, { label: string; cls: string; icon: React.ElementType }> = {
+  angemeldet: { label: "Angemeldet", cls: "bg-blue-500/15 text-blue-400 border-blue-500/30", icon: Calendar },
+  bestanden: { label: "Bestanden", cls: "bg-green-500/15 text-green-400 border-green-500/30", icon: CheckCircle2 },
+  nicht_bestanden: { label: "Nicht bestanden", cls: "bg-red-500/15 text-red-400 border-red-500/30", icon: XCircle },
+  krank: { label: "Krank", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30", icon: AlertTriangle },
+};
 
 const Pruefungen = () => {
   const [open, setOpen] = useState(false);
@@ -62,6 +66,7 @@ const Pruefungen = () => {
   const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(10);
+  const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
   const typFilter = searchParams.get("typ") || "all";
@@ -145,7 +150,7 @@ const Pruefungen = () => {
         typ: form.typ,
         fahrzeug_typ: form.fahrzeug_typ,
         datum: new Date(form.datum).toISOString(),
-        bestanden: form.bestanden,
+        status: form.status,
         preis: parseFloat(form.preis) || 0,
         instructor_id: form.typ === "praxis" ? form.instructor_id : null,
       });
@@ -162,6 +167,22 @@ const Pruefungen = () => {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ examId, status }: { examId: string; status: ExamStatus }) => {
+      const { error } = await supabase.from("exams").update({ status }).eq("id", examId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["exams_all"] });
+      qc.invalidateQueries({ queryKey: ["exams"] });
+      setEditingStatusId(null);
+      toast({ title: "Status aktualisiert" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Fehler", description: e.message, variant: "destructive" });
+    },
+  });
+
   const filtered = useMemo(() => {
     if (typFilter === "theorie") return exams.filter((e) => e.typ === "theorie");
     if (typFilter === "praxis") return exams.filter((e) => e.typ === "praxis");
@@ -171,8 +192,8 @@ const Pruefungen = () => {
   const visibleExams = filtered.slice(0, visibleCount);
   const remaining = filtered.length - visibleCount;
 
-  const bestanden = filtered.filter((e) => e.bestanden).length;
-  const nichtBestanden = filtered.filter((e) => !e.bestanden).length;
+  const bestanden = filtered.filter((e) => e.status === "bestanden").length;
+  const nichtBestanden = filtered.filter((e) => e.status === "nicht_bestanden").length;
   const gesamt = filtered.length;
 
   const canSave = form.student_id && form.datum && (form.typ === "praxis" ? !!form.instructor_id : true);
@@ -236,7 +257,7 @@ const Pruefungen = () => {
           <span>Typ</span>
           <span>Fahrzeug</span>
           <span>Datum</span>
-          <span>Ergebnis</span>
+          <span>Status</span>
         </div>
 
         {loadingExams ? (
@@ -252,6 +273,9 @@ const Pruefungen = () => {
           <div className="divide-y divide-border/50">
             {visibleExams.map((exam) => {
               const st = exam.students as { vorname: string; nachname: string; fuehrerscheinklasse: string; geburtsdatum: string | null } | null;
+              const status = (exam.status || "angemeldet") as ExamStatus;
+              const cfg = STATUS_CONFIG[status];
+              const Icon = cfg.icon;
               return (
                 <div key={exam.id} className="grid grid-cols-6 gap-4 px-5 py-3 items-center text-sm">
                   <div className="col-span-2">
@@ -273,15 +297,31 @@ const Pruefungen = () => {
                       ? format(new Date(exam.datum), "dd.MM.yyyy", { locale: de })
                       : "–"}
                   </span>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold w-fit ${statusBadge(exam.bestanden)}`}
-                  >
-                    {exam.bestanden ? (
-                      <><CheckCircle2 className="h-3 w-3" /> Bestanden</>
+                  <div className="relative">
+                    {editingStatusId === exam.id ? (
+                      <Select
+                        value={status}
+                        onValueChange={(v) => updateStatusMutation.mutate({ examId: exam.id, status: v as ExamStatus })}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-fit">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="angemeldet">Angemeldet</SelectItem>
+                          <SelectItem value="bestanden">Bestanden</SelectItem>
+                          <SelectItem value="nicht_bestanden">Nicht bestanden</SelectItem>
+                          <SelectItem value="krank">Krank</SelectItem>
+                        </SelectContent>
+                      </Select>
                     ) : (
-                      <><XCircle className="h-3 w-3" /> Nicht bestanden</>
+                      <button
+                        onClick={() => setEditingStatusId(exam.id)}
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold w-fit cursor-pointer hover:opacity-80 transition-opacity ${cfg.cls}`}
+                      >
+                        <Icon className="h-3 w-3" /> {cfg.label}
+                      </button>
                     )}
-                  </span>
+                  </div>
                 </div>
               );
             })}
@@ -419,7 +459,7 @@ const Pruefungen = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Datum</Label>
+              <Label>Termin-Datum</Label>
               <Input
                 type="date"
                 value={form.datum}
@@ -428,17 +468,19 @@ const Pruefungen = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Ergebnis</Label>
+              <Label>Status</Label>
               <Select
-                value={form.bestanden ? "ja" : "nein"}
-                onValueChange={(v) => setForm((f) => ({ ...f, bestanden: v === "ja" }))}
+                value={form.status}
+                onValueChange={(v) => setForm((f) => ({ ...f, status: v as ExamStatus }))}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ja">Bestanden</SelectItem>
-                  <SelectItem value="nein">Nicht bestanden</SelectItem>
+                  <SelectItem value="angemeldet">Angemeldet</SelectItem>
+                  <SelectItem value="bestanden">Bestanden</SelectItem>
+                  <SelectItem value="nicht_bestanden">Nicht bestanden</SelectItem>
+                  <SelectItem value="krank">Krank</SelectItem>
                 </SelectContent>
               </Select>
             </div>

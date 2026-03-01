@@ -40,7 +40,7 @@ const FahrlehrerStatistik = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("exams")
-        .select("instructor_id, bestanden")
+        .select("instructor_id, status")
         .eq("typ", "praxis")
         .not("instructor_id", "is", null);
       if (error) throw error;
@@ -53,9 +53,10 @@ const FahrlehrerStatistik = () => {
 
     const grouped: Record<string, { bestanden: number; nichtBestanden: number }> = {};
     for (const e of exams) {
+      if (e.status !== "bestanden" && e.status !== "nicht_bestanden") continue;
       const id = e.instructor_id!;
       if (!grouped[id]) grouped[id] = { bestanden: 0, nichtBestanden: 0 };
-      if (e.bestanden) grouped[id].bestanden++;
+      if (e.status === "bestanden") grouped[id].bestanden++;
       else grouped[id].nichtBestanden++;
     }
 
