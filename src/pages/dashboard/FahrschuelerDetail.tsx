@@ -284,7 +284,6 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
-      setDlgFahrstunde(false);
       setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: "", dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
       toast({ title: "Fahrstunde gespeichert" });
     },
