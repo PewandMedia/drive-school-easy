@@ -1411,7 +1411,7 @@ const FahrschuelerDetail = () => {
                     {d} min
                   </Button>
                 ))}
-                <Input type="number" min={1} step={15} className="w-24" value={fsFahrstunde.dauer_minuten} onChange={(e) => setFsFahrstunde((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 45 }))} />
+                <Input type="number" min={0} step={15} className="w-24" value={fsFahrstunde.dauer_minuten} onChange={(e) => setFsFahrstunde((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 45 }))} />
               </div>
             </div>
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
