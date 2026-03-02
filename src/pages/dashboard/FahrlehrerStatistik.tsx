@@ -41,7 +41,7 @@ const quoteBarClass = (q: number) =>
 const dimZero = (val: number) => val === 0 ? "text-muted-foreground/60" : "";
 
 type ExamSortKey = "name" | "pruefungen" | "bestanden" | "nichtBestanden" | "bestehensquote";
-type HoursSortKey = "name" | "fahrstundenPeriod" | "fahrstundenGesamt" | "theoriePeriod" | "theorieGesamt" | "umsatzPeriod" | "avgEinheiten";
+type HoursSortKey = "name" | "fahrstundenPeriod" | "theoriePeriod" | "umsatzPeriod" | "avgEinheiten";
 type SortDir = "asc" | "desc";
 type ViewMode = "month" | "year";
 
@@ -203,9 +203,7 @@ const FahrlehrerStatistik = () => {
   // ── Totals ───────────────────────────────────────────
   const totals = useMemo(() => ({
     fahrstundenPeriod: stats.reduce((s, x) => s + x.fahrstundenPeriod, 0),
-    fahrstundenGesamt: stats.reduce((s, x) => s + x.fahrstundenGesamt, 0),
     theoriePeriod: stats.reduce((s, x) => s + x.theoriePeriod, 0),
-    theorieGesamt: stats.reduce((s, x) => s + x.theorieGesamt, 0),
     umsatzPeriod: stats.reduce((s, x) => s + x.umsatzPeriod, 0),
     avgEinheiten: stats.length > 0 ? Math.round((stats.reduce((s, x) => s + x.avgEinheiten, 0) / stats.length) * 10) / 10 : 0,
   }), [stats]);
@@ -446,11 +444,9 @@ const FahrlehrerStatistik = () => {
             <TableHeader>
               <TableRow className="bg-muted/40">
                 <SortableHead col="name" label="Fahrlehrer" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} />
-                <SortableHead col="fahrstundenPeriod" label={`Fahrst. ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
-                <SortableHead col="fahrstundenGesamt" label="Fahrst. Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="fahrstundenPeriod" label={`Fahrstunden ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
                 <SortableHead col="avgEinheiten" label="Ø/Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
                 <SortableHead col="theoriePeriod" label={`Theorie ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
-                <SortableHead col="theorieGesamt" label="Theorie Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
                 <SortableHead col="umsatzPeriod" label={`Umsatz ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-right" />
               </TableRow>
             </TableHeader>
@@ -458,14 +454,14 @@ const FahrlehrerStatistik = () => {
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 5 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : sortedHours.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Keine Fahrlehrer vorhanden.
                   </TableCell>
                 </TableRow>
@@ -475,10 +471,8 @@ const FahrlehrerStatistik = () => {
                     <TableRow key={s.id} className="hover:bg-muted/50">
                       <TableCell className="font-medium">{s.name}</TableCell>
                       <TableCell className={cn("text-center", dimZero(s.fahrstundenPeriod))}>{s.fahrstundenPeriod}</TableCell>
-                      <TableCell className={cn("text-center", dimZero(s.fahrstundenGesamt))}>{s.fahrstundenGesamt}</TableCell>
                       <TableCell className={cn("text-center", dimZero(s.avgEinheiten))}>{s.avgEinheiten}</TableCell>
                       <TableCell className={cn("text-center", dimZero(s.theoriePeriod))}>{s.theoriePeriod}</TableCell>
-                      <TableCell className={cn("text-center", dimZero(s.theorieGesamt))}>{s.theorieGesamt}</TableCell>
                       <TableCell className={cn("text-right", dimZero(s.umsatzPeriod))}>
                         {s.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                       </TableCell>
@@ -488,10 +482,8 @@ const FahrlehrerStatistik = () => {
                   <TableRow className="bg-muted/30 font-semibold border-t-2">
                     <TableCell>Gesamt</TableCell>
                     <TableCell className="text-center">{totals.fahrstundenPeriod}</TableCell>
-                    <TableCell className="text-center">{totals.fahrstundenGesamt}</TableCell>
                     <TableCell className="text-center">{totals.avgEinheiten}</TableCell>
                     <TableCell className="text-center">{totals.theoriePeriod}</TableCell>
-                    <TableCell className="text-center">{totals.theorieGesamt}</TableCell>
                     <TableCell className="text-right">
                       {totals.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                     </TableCell>
