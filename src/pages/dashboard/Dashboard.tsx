@@ -65,10 +65,8 @@ const Dashboard = () => {
   const stats = [
     { label: "Aktive Fahrschüler", value: String(students.length), icon: Users, color: "text-blue-600" },
     { label: "Fahrstunden heute", value: String(lessonsToday), icon: Car, color: "text-green-600" },
-    { label: "Offene Zahlungen", value: fmt(openBalance), icon: CreditCard, color: "text-red-600" },
     { label: "Prüfungen diesen Monat", value: String(examsThisMonth), icon: ClipboardCheck, color: "text-purple-600" },
     { label: "Theoriestunden gesamt", value: String(theorySessions.length), icon: BookOpen, color: "text-cyan-600" },
-    { label: "Umsatz (Monat)", value: fmt(monthlyRevenue), icon: TrendingUp, color: "text-emerald-600" },
   ];
 
   // Recent activities (5 newest across tables)
