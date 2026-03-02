@@ -416,6 +416,7 @@ const Fahrstunden = () => {
                     <Input
                       type="number"
                       min={0}
+                      step={15}
                       className="w-24"
                       value={form.dauer_minuten || ""}
                       placeholder="0"

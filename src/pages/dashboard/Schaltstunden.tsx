@@ -296,6 +296,7 @@ const Schaltstunden = () => {
                     <Input
                       type="number"
                       min={1}
+                      step={15}
                       className="w-24"
                       value={form.dauer_minuten}
                       onChange={(e) =>
