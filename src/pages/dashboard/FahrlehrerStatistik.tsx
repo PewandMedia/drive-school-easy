@@ -5,7 +5,7 @@ import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 import {
   UserCheck, Car, BookOpen, ClipboardCheck, TrendingUp, Euro,
-  Settings, ArrowUpDown, ArrowUp, ArrowDown,
+  Settings, ArrowUpDown, ArrowUp, ArrowDown, Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import InstructorManageDialog from "@/components/InstructorManageDialog";
-import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from "date-fns";
 
 const MONTHS = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -31,19 +31,25 @@ const quoteColor = (q: number) =>
 const quoteBarClass = (q: number) =>
   q >= 80 ? "bg-green-500" : q >= 60 ? "bg-yellow-500" : "bg-destructive";
 
-type ExamSortKey = "name" | "pruefungen" | "pruefungenMonat" | "bestehensquote";
-type HoursSortKey = "name" | "fahrstundenMonat" | "fahrstundenGesamt" | "theorieMonat" | "theorieGesamt" | "umsatzMonat";
+const dimZero = (val: number) => val === 0 ? "text-muted-foreground/60" : "";
+
+type ExamSortKey = "name" | "pruefungen" | "pruefungenPeriod" | "bestehensquote";
+type HoursSortKey = "name" | "fahrstundenPeriod" | "fahrstundenGesamt" | "theoriePeriod" | "theorieGesamt" | "umsatzPeriod" | "avgEinheiten";
 type SortDir = "asc" | "desc";
+type ViewMode = "month" | "year";
 
 const FahrlehrerStatistik = () => {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [examSortKey, setExamSortKey] = useState<ExamSortKey>("pruefungen");
   const [examSortDir, setExamSortDir] = useState<SortDir>("desc");
-  const [hoursSortKey, setHoursSortKey] = useState<HoursSortKey>("fahrstundenMonat");
+  const [hoursSortKey, setHoursSortKey] = useState<HoursSortKey>("fahrstundenPeriod");
   const [hoursSortDir, setHoursSortDir] = useState<SortDir>("desc");
   const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
+
+  const periodLabel = viewMode === "year" ? String(year) : MONTHS[month];
 
   // ── Queries ──────────────────────────────────────────
   const { data: instructors, isLoading: l1 } = useQuery({
@@ -96,13 +102,15 @@ const FahrlehrerStatistik = () => {
   const isLoading = l1 || l2 || l3 || l4;
 
   // ── Helpers ──────────────────────────────────────────
-  const monthInterval = useMemo(() => {
+  const periodInterval = useMemo(() => {
     const d = new Date(year, month, 1);
-    return { start: startOfMonth(d), end: endOfMonth(d) };
-  }, [month, year]);
+    return viewMode === "year"
+      ? { start: startOfYear(d), end: endOfYear(d) }
+      : { start: startOfMonth(d), end: endOfMonth(d) };
+  }, [month, year, viewMode]);
 
-  const inMonth = (datum: string) =>
-    isWithinInterval(new Date(datum), monthInterval);
+  const inPeriod = (datum: string) =>
+    isWithinInterval(new Date(datum), periodInterval);
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
@@ -128,33 +136,39 @@ const FahrlehrerStatistik = () => {
 
       const myLessons = validLessons.filter((l) => l.instructor_id === id);
       const fahrstundenGesamt = myLessons.reduce((s, l) => s + Number(l.einheiten), 0);
-      const fahrstundenMonat = myLessons.filter((l) => inMonth(l.datum)).reduce((s, l) => s + Number(l.einheiten), 0);
-      const umsatzMonat = myLessons.filter((l) => inMonth(l.datum)).reduce((s, l) => s + Number(l.preis), 0);
+      const fahrstundenPeriod = myLessons.filter((l) => inPeriod(l.datum)).reduce((s, l) => s + Number(l.einheiten), 0);
+      const umsatzPeriod = myLessons.filter((l) => inPeriod(l.datum)).reduce((s, l) => s + Number(l.preis), 0);
+
+      // Active months for average
+      const activeMonths = new Set(myLessons.map((l) => {
+        const d = new Date(l.datum);
+        return `${d.getFullYear()}-${d.getMonth()}`;
+      }));
+      const avgEinheiten = activeMonths.size > 0 ? Math.round((fahrstundenGesamt / activeMonths.size) * 10) / 10 : 0;
 
       const myTheory = (theorySessions ?? []).filter((t) => t.instructor_id === id);
       const theorieGesamt = myTheory.length;
-      const theorieMonat = myTheory.filter((t) => inMonth(t.datum)).length;
+      const theoriePeriod = myTheory.filter((t) => inPeriod(t.datum)).length;
 
       const myExams = (exams ?? []).filter((e) => e.instructor_id === id);
       const bestanden = myExams.filter((e) => e.status === "bestanden").length;
       const nichtBestanden = myExams.filter((e) => e.status === "nicht_bestanden").length;
       const pruefungenGesamt = bestanden + nichtBestanden;
-      const pruefungenMonat = myExams.filter((e) => inMonth(e.datum) && (e.status === "bestanden" || e.status === "nicht_bestanden")).length;
+      const pruefungenPeriod = myExams.filter((e) => inPeriod(e.datum) && (e.status === "bestanden" || e.status === "nicht_bestanden")).length;
       const bestehensquote = pruefungenGesamt > 0 ? Math.round((bestanden / pruefungenGesamt) * 100) : -1;
 
       return {
         id, name,
-        fahrstundenMonat, fahrstundenGesamt,
-        theorieMonat, theorieGesamt,
-        pruefungen: pruefungenGesamt, pruefungenMonat,
+        fahrstundenPeriod, fahrstundenGesamt, avgEinheiten,
+        theoriePeriod, theorieGesamt,
+        pruefungen: pruefungenGesamt, pruefungenPeriod,
         bestehensquote,
-        umsatzMonat,
+        umsatzPeriod,
       };
     });
-  }, [instructors, validLessons, theorySessions, exams, monthInterval]);
+  }, [instructors, validLessons, theorySessions, exams, periodInterval]);
 
   const examStats = useMemo(() => stats.filter((s) => s.pruefungen > 0), [stats]);
-  const hoursStats = useMemo(() => stats.filter((s) => s.fahrstundenGesamt > 0 || s.theorieGesamt > 0), [stats]);
 
   // ── Sorting ──────────────────────────────────────────
   const sortedExams = useMemo(() => {
@@ -169,7 +183,7 @@ const FahrlehrerStatistik = () => {
   }, [examStats, examSortKey, examSortDir]);
 
   const sortedHours = useMemo(() => {
-    const arr = [...hoursStats];
+    const arr = [...stats]; // show ALL instructors
     arr.sort((a, b) => {
       const va = (a as any)[hoursSortKey];
       const vb = (b as any)[hoursSortKey];
@@ -177,7 +191,17 @@ const FahrlehrerStatistik = () => {
       return hoursSortDir === "asc" ? va - vb : vb - va;
     });
     return arr;
-  }, [hoursStats, hoursSortKey, hoursSortDir]);
+  }, [stats, hoursSortKey, hoursSortDir]);
+
+  // ── Totals ───────────────────────────────────────────
+  const totals = useMemo(() => ({
+    fahrstundenPeriod: stats.reduce((s, x) => s + x.fahrstundenPeriod, 0),
+    fahrstundenGesamt: stats.reduce((s, x) => s + x.fahrstundenGesamt, 0),
+    theoriePeriod: stats.reduce((s, x) => s + x.theoriePeriod, 0),
+    theorieGesamt: stats.reduce((s, x) => s + x.theorieGesamt, 0),
+    umsatzPeriod: stats.reduce((s, x) => s + x.umsatzPeriod, 0),
+    avgEinheiten: stats.length > 0 ? Math.round((stats.reduce((s, x) => s + x.avgEinheiten, 0) / stats.length) * 10) / 10 : 0,
+  }), [stats]);
 
   const toggleExamSort = (key: ExamSortKey) => {
     if (examSortKey === key) setExamSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -192,14 +216,17 @@ const FahrlehrerStatistik = () => {
   // ── Global KPIs ──────────────────────────────────────
   const kpis = useMemo(() => {
     if (!stats.length) return null;
-    const fahrstundenMonat = stats.reduce((s, x) => s + x.fahrstundenMonat, 0);
-    const theorieMonat = stats.reduce((s, x) => s + x.theorieMonat, 0);
-    const pruefungenMonat = stats.reduce((s, x) => s + x.pruefungenMonat, 0);
-    const umsatzMonat = stats.reduce((s, x) => s + x.umsatzMonat, 0);
+    const pruefungenPeriod = stats.reduce((s, x) => s + x.pruefungenPeriod, 0);
     const withQuote = stats.filter((s) => s.bestehensquote >= 0);
     const avgQuote = withQuote.length > 0 ? Math.round(withQuote.reduce((s, x) => s + x.bestehensquote, 0) / withQuote.length) : 0;
-    return { fahrstundenMonat, theorieMonat, pruefungenMonat, umsatzMonat, avgQuote };
-  }, [stats]);
+    return {
+      fahrstundenPeriod: totals.fahrstundenPeriod,
+      theoriePeriod: totals.theoriePeriod,
+      pruefungenPeriod,
+      umsatzPeriod: totals.umsatzPeriod,
+      avgQuote,
+    };
+  }, [stats, totals]);
 
   // ── Render ───────────────────────────────────────────
   return (
@@ -215,16 +242,28 @@ const FahrlehrerStatistik = () => {
         }
       />
 
-      {/* Month/Year Filter */}
-      <div className="flex gap-2 flex-wrap">
-        <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <Select value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <SelectTrigger className="w-[140px]">
+            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            {MONTHS.map((m, i) => (
-              <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-            ))}
+            <SelectItem value="month">Monat</SelectItem>
+            <SelectItem value="year">Ganzes Jahr</SelectItem>
           </SelectContent>
         </Select>
+        {viewMode === "month" && (
+          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((m, i) => (
+                <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
           <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -244,11 +283,11 @@ const FahrlehrerStatistik = () => {
         </div>
       ) : kpis && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <KpiCard icon={Car} label="Fahrstunden (E)" value={kpis.fahrstundenMonat} color="bg-primary/15" iconColor="text-primary" />
-          <KpiCard icon={BookOpen} label="Theoriestunden" value={kpis.theorieMonat} color="bg-blue-500/15" iconColor="text-blue-600" />
-          <KpiCard icon={ClipboardCheck} label="Prüfungen" value={kpis.pruefungenMonat} color="bg-orange-500/15" iconColor="text-orange-600" />
+          <KpiCard icon={Car} label={`Fahrstunden ${periodLabel}`} value={kpis.fahrstundenPeriod} color="bg-primary/15" iconColor="text-primary" />
+          <KpiCard icon={BookOpen} label={`Theorie ${periodLabel}`} value={kpis.theoriePeriod} color="bg-blue-500/15" iconColor="text-blue-600" />
+          <KpiCard icon={ClipboardCheck} label={`Prüfungen ${periodLabel}`} value={kpis.pruefungenPeriod} color="bg-orange-500/15" iconColor="text-orange-600" />
           <KpiCard icon={TrendingUp} label="Ø Bestehensquote" value={`${kpis.avgQuote} %`} color="bg-green-500/15" iconColor="text-green-600" />
-          <KpiCard icon={Euro} label="Umsatz Monat" value={`${kpis.umsatzMonat.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`} color="bg-yellow-500/15" iconColor="text-yellow-600" />
+          <KpiCard icon={Euro} label={`Umsatz ${periodLabel}`} value={`${kpis.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`} color="bg-yellow-500/15" iconColor="text-yellow-600" />
         </div>
       )}
 
@@ -265,8 +304,8 @@ const FahrlehrerStatistik = () => {
             <TableHeader>
               <TableRow>
                 <SortableHead col="name" label="Fahrlehrer" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} />
-                <SortableHead col="pruefungen" label="Prüfungen Gesamt" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
-                <SortableHead col="pruefungenMonat" label="Prüfungen Monat" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
+                <SortableHead col="pruefungen" label="Gesamt" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
+                <SortableHead col="pruefungenPeriod" label={periodLabel} sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
                 <SortableHead col="bestehensquote" label="Bestehensquote" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="w-[180px]" />
               </TableRow>
             </TableHeader>
@@ -287,10 +326,10 @@ const FahrlehrerStatistik = () => {
                 </TableRow>
               ) : (
                 sortedExams.map((s) => (
-                  <TableRow key={s.id}>
+                  <TableRow key={s.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-center">{s.pruefungen}</TableCell>
-                    <TableCell className="text-center">{s.pruefungenMonat}</TableCell>
+                    <TableCell className={cn("text-center", dimZero(s.pruefungen))}>{s.pruefungen}</TableCell>
+                    <TableCell className={cn("text-center", dimZero(s.pruefungenPeriod))}>{s.pruefungenPeriod}</TableCell>
                     <TableCell>
                       {s.bestehensquote >= 0 ? (
                         <div className="flex items-center gap-2">
@@ -329,41 +368,57 @@ const FahrlehrerStatistik = () => {
             <TableHeader>
               <TableRow>
                 <SortableHead col="name" label="Fahrlehrer" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} />
-                <SortableHead col="fahrstundenMonat" label="Fahrst. (E) Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
-                <SortableHead col="fahrstundenGesamt" label="Fahrst. (E) Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
-                <SortableHead col="theorieMonat" label="Theorie Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="fahrstundenPeriod" label={`Fahrst. ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="fahrstundenGesamt" label="Fahrst. Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="avgEinheiten" label="Ø/Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="theoriePeriod" label={`Theorie ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
                 <SortableHead col="theorieGesamt" label="Theorie Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
-                <SortableHead col="umsatzMonat" label="Umsatz Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-right" />
+                <SortableHead col="umsatzPeriod" label={`Umsatz ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-right" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 7 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : sortedHours.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    Keine Stundendaten vorhanden.
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    Keine Fahrlehrer vorhanden.
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedHours.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-center">{s.fahrstundenMonat}</TableCell>
-                    <TableCell className="text-center">{s.fahrstundenGesamt}</TableCell>
-                    <TableCell className="text-center">{s.theorieMonat}</TableCell>
-                    <TableCell className="text-center">{s.theorieGesamt}</TableCell>
+                <>
+                  {sortedHours.map((s) => (
+                    <TableRow key={s.id} className="hover:bg-muted/50">
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className={cn("text-center", dimZero(s.fahrstundenPeriod))}>{s.fahrstundenPeriod}</TableCell>
+                      <TableCell className={cn("text-center", dimZero(s.fahrstundenGesamt))}>{s.fahrstundenGesamt}</TableCell>
+                      <TableCell className={cn("text-center", dimZero(s.avgEinheiten))}>{s.avgEinheiten}</TableCell>
+                      <TableCell className={cn("text-center", dimZero(s.theoriePeriod))}>{s.theoriePeriod}</TableCell>
+                      <TableCell className={cn("text-center", dimZero(s.theorieGesamt))}>{s.theorieGesamt}</TableCell>
+                      <TableCell className={cn("text-right", dimZero(s.umsatzPeriod))}>
+                        {s.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Totals row */}
+                  <TableRow className="bg-muted/30 font-semibold border-t-2">
+                    <TableCell>Gesamt</TableCell>
+                    <TableCell className="text-center">{totals.fahrstundenPeriod}</TableCell>
+                    <TableCell className="text-center">{totals.fahrstundenGesamt}</TableCell>
+                    <TableCell className="text-center">{totals.avgEinheiten}</TableCell>
+                    <TableCell className="text-center">{totals.theoriePeriod}</TableCell>
+                    <TableCell className="text-center">{totals.theorieGesamt}</TableCell>
                     <TableCell className="text-right">
-                      {s.umsatzMonat.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                      {totals.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                     </TableCell>
                   </TableRow>
-                ))
+                </>
               )}
             </TableBody>
           </Table>
