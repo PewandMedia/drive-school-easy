@@ -1,52 +1,57 @@
 
 
-## Fahrlehrer-Statistik: Pruefungen und Stunden in zwei getrennte Tabellen aufteilen
+## Fahrlehrer-Statistik optimieren: Bessere Darstellung und Jahresansicht
 
 ### Uebersicht
 
-Die aktuelle Seite zeigt alles in einer einzigen Tabelle. Der Nutzer moechte zwei separate Bereiche:
-1. **Pruefungen** -- wie vorher: Fahrlehrer, Anzahl Pruefungen, Bestehensquote mit Farbbalken
-2. **Stunden-Tracking** -- darunter: Fahrstunden (Einheiten Monat/Gesamt), Theoriestunden (Monat/Gesamt), Umsatz
+Die Fahrlehrer-Statistik wird visuell verbessert und um eine Jahresansicht erweitert. Der Zeitfilter bekommt eine "Ganzes Jahr"-Option, damit man sowohl einzelne Monate als auch das komplette Jahr auf einen Blick sehen kann. Die Tabellen werden optisch aufgewertet mit besserer Lesbarkeit.
 
 ### Aenderungen
 
 **Datei: `src/pages/dashboard/FahrlehrerStatistik.tsx`**
 
-**A) Erste Tabelle: Pruefungen (oben)**
+**A) Zeitfilter erweitern: Jahresansicht**
 
-Spalten:
-| Fahrlehrer | Pruefungen Gesamt | Pruefungen Monat | Bestehensquote (mit Farbbalken) |
+- Neuer Filter-Modus: "Monat" oder "Ganzes Jahr"
+- Wenn "Ganzes Jahr" gewaehlt: Alle Monatswerte zeigen die Summen fuer das gesamte Jahr
+- KPI-Karten passen sich entsprechend an (Label aendert sich zu "Jahr" statt "Monat")
+- Umsetzung: Ein Toggle oder eine zusaetzliche Select-Option "Ganzes Jahr" im Monatsfilter
 
-Eigene Sortierung (separater State oder gleicher mit angepassten Keys).
+**B) Visuelle Verbesserungen Stunden-Tabelle**
 
-**B) Zweite Tabelle: Stunden-Tracking (darunter)**
+- Farbige Hervorhebung der Monatswerte (leichter Hintergrund bei aktiven Werten)
+- Null-Werte in Grau/gedaempft darstellen statt schwarze "0"
+- Umsatz-Spalte mit Euro-Formatierung und dezenter Farbe
+- Zeilen-Hover-Effekt fuer bessere Lesbarkeit
+- Summenzeile am Ende der Tabelle (Totals ueber alle Fahrlehrer)
 
-Spalten:
-| Fahrlehrer | Fahrst. (E) Monat | Fahrst. (E) Gesamt | Theorie Monat | Theorie Gesamt | Umsatz Monat |
+**C) Stunden-Tabelle: Durchschnitt pro Monat hinzufuegen**
 
-Eigene Sortierung.
+- Neue Spalte oder Zeile: "Durchschnitt Einheiten pro Monat" pro Fahrlehrer
+- Berechnung: Fahrstunden Gesamt / Anzahl aktive Monate
 
-**C) KPI-Karten bleiben oben**
+**D) KPI-Karten: Label dynamisch**
 
-Die 5 KPI-Karten (Fahrstunden, Theorie, Pruefungen, Bestehensquote, Umsatz) bleiben unveraendert.
+- Wenn Jahresansicht aktiv: "Fahrstunden (Jahr)" statt "Fahrstunden (E)"
+- Wenn Monatsansicht: aktueller Monatsname im Label anzeigen (z.B. "Fahrstunden Maerz")
 
-**D) Ueberschriften fuer jeden Bereich**
+**E) Alle Fahrlehrer immer anzeigen**
 
-Jede Tabelle erhaelt eine eigene Card mit Titel:
-- "Pruefungen" mit ClipboardCheck-Icon
-- "Stunden & Umsatz" mit Car-Icon
+- Auch Fahrlehrer ohne Stunden in der Stunden-Tabelle anzeigen (mit 0-Werten)
+- So hat man eine vollstaendige Uebersicht ueber alle registrierten Fahrlehrer
 
 ### Technische Details
 
-- Zwei separate Sort-States: `sortKeyExams`/`sortDirExams` und `sortKeyHours`/`sortDirHours`
-- Zwei separate SortKey-Types fuer die jeweiligen Spalten
-- Bestehende Daten-Berechnung (`stats`) bleibt gleich, nur die Darstellung wird in zwei Tabellen aufgeteilt
-- Pruefungen-Tabelle zeigt nur Fahrlehrer mit mindestens einer Pruefung
-- Stunden-Tabelle zeigt nur Fahrlehrer mit mindestens einer Fahrstunde oder Theoriestunde
+- Neuer State `viewMode: "month" | "year"` oder alternativ einen speziellen Monatswert (z.B. -1) fuer "Ganzes Jahr"
+- `inMonth`-Funktion wird erweitert: Bei Jahresansicht prueft sie nur das Jahr, nicht den Monat
+- `monthInterval` wird bei Jahresansicht auf 1. Januar bis 31. Dezember gesetzt
+- Summenzeile: Zusaetzliche `useMemo`-Berechnung fuer Totals
+- Null-Werte: `cn("text-center", val === 0 && "text-muted-foreground")` fuer gedaempfte Darstellung
+- Queries und Datenberechnung bleiben unberuehrt -- nur Filterung und Darstellung aendert sich
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Eine Tabelle in zwei getrennte Tabellen aufteilen (Pruefungen oben, Stunden unten) |
+| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Jahresansicht, visuelle Optimierung, Summenzeile, dynamische Labels |
 
