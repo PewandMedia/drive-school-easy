@@ -1,57 +1,60 @@
 
 
-## Fahrlehrer-Statistik optimieren: Bessere Darstellung und Jahresansicht
+## Fahrlehrer-Statistik optimieren: Premium-Darstellung mit detaillierten Pruefungsdaten
 
 ### Uebersicht
 
-Die Fahrlehrer-Statistik wird visuell verbessert und um eine Jahresansicht erweitert. Der Zeitfilter bekommt eine "Ganzes Jahr"-Option, damit man sowohl einzelne Monate als auch das komplette Jahr auf einen Blick sehen kann. Die Tabellen werden optisch aufgewertet mit besserer Lesbarkeit.
+Die Fahrlehrer-Statistik wird visuell auf Premium-Niveau gehoben. Die Pruefungstabelle zeigt kuenftig pro Fahrlehrer die Aufschluesselung Bestanden/Nicht bestanden neben der Quote. Der Monatsfilter wird prominenter als Button-Leiste gestaltet fuer schnellen Zugriff.
 
 ### Aenderungen
 
 **Datei: `src/pages/dashboard/FahrlehrerStatistik.tsx`**
 
-**A) Zeitfilter erweitern: Jahresansicht**
+**A) Monatsfilter als prominente Button-Leiste**
 
-- Neuer Filter-Modus: "Monat" oder "Ganzes Jahr"
-- Wenn "Ganzes Jahr" gewaehlt: Alle Monatswerte zeigen die Summen fuer das gesamte Jahr
-- KPI-Karten passen sich entsprechend an (Label aendert sich zu "Jahr" statt "Monat")
-- Umsetzung: Ein Toggle oder eine zusaetzliche Select-Option "Ganzes Jahr" im Monatsfilter
+- Ersetze die drei separaten Select-Dropdowns durch eine uebersichtliche Filter-Leiste:
+  - Segmented-Button-Gruppe fuer "Monat" vs "Ganzes Jahr"
+  - Monatsauswahl als kompakte Button-Reihe (Jan, Feb, Marz, ...) mit aktivem Monat hervorgehoben
+  - Jahresauswahl daneben
+- Visuell klar, sofort erkennbar welcher Zeitraum gewaehlt ist
 
-**B) Visuelle Verbesserungen Stunden-Tabelle**
+**B) Pruefungstabelle: Bestanden/Nicht bestanden Spalten hinzufuegen**
 
-- Farbige Hervorhebung der Monatswerte (leichter Hintergrund bei aktiven Werten)
-- Null-Werte in Grau/gedaempft darstellen statt schwarze "0"
-- Umsatz-Spalte mit Euro-Formatierung und dezenter Farbe
-- Zeilen-Hover-Effekt fuer bessere Lesbarkeit
-- Summenzeile am Ende der Tabelle (Totals ueber alle Fahrlehrer)
+Aktuelle Spalten: Fahrlehrer | Gesamt | Monat | Bestehensquote
 
-**C) Stunden-Tabelle: Durchschnitt pro Monat hinzufuegen**
+Neue Spalten: Fahrlehrer | Gesamt | Bestanden | Nicht bestanden | Monat | Bestehensquote
 
-- Neue Spalte oder Zeile: "Durchschnitt Einheiten pro Monat" pro Fahrlehrer
-- Berechnung: Fahrstunden Gesamt / Anzahl aktive Monate
+- Neue Spalte "Bestanden" mit gruener Zahl
+- Neue Spalte "Nicht best." mit roter Zahl
+- Berechnung bereits vorhanden in `stats` (bestanden/nichtBestanden), muss nur in die Rueckgabe und Tabelle aufgenommen werden
 
-**D) KPI-Karten: Label dynamisch**
+**C) Stats-Objekt erweitern**
 
-- Wenn Jahresansicht aktiv: "Fahrstunden (Jahr)" statt "Fahrstunden (E)"
-- Wenn Monatsansicht: aktueller Monatsname im Label anzeigen (z.B. "Fahrstunden Maerz")
+Im `stats`-useMemo die Werte `bestanden` und `nichtBestanden` zum Rueckgabeobjekt hinzufuegen (werden aktuell berechnet aber nicht zurueckgegeben).
 
-**E) Alle Fahrlehrer immer anzeigen**
+**D) Visuelle Aufwertung der KPI-Karten**
 
-- Auch Fahrlehrer ohne Stunden in der Stunden-Tabelle anzeigen (mit 0-Werten)
-- So hat man eine vollstaendige Uebersicht ueber alle registrierten Fahrlehrer
+- Groessere Karten mit mehr Abstand
+- Dezente Trennlinien und Schatten
+- Werte-Formatierung verbessern (Tausendertrennzeichen bei Umsatz)
+
+**E) Gesamtlayout aufgeraeumt**
+
+- Mehr vertikaler Abstand zwischen den Sektionen
+- Tabellen-Header mit dezenter Hintergrundfarbe
+- Aktiver Zeitraum wird als Badge/Pill prominent ueber den Tabellen angezeigt
 
 ### Technische Details
 
-- Neuer State `viewMode: "month" | "year"` oder alternativ einen speziellen Monatswert (z.B. -1) fuer "Ganzes Jahr"
-- `inMonth`-Funktion wird erweitert: Bei Jahresansicht prueft sie nur das Jahr, nicht den Monat
-- `monthInterval` wird bei Jahresansicht auf 1. Januar bis 31. Dezember gesetzt
-- Summenzeile: Zusaetzliche `useMemo`-Berechnung fuer Totals
-- Null-Werte: `cn("text-center", val === 0 && "text-muted-foreground")` fuer gedaempfte Darstellung
-- Queries und Datenberechnung bleiben unberuehrt -- nur Filterung und Darstellung aendert sich
+- `stats` Return-Objekt erhaelt zwei neue Felder: `bestanden: number` und `nichtBestanden: number`
+- `ExamSortKey` Type erhaelt zwei neue Werte: `"bestanden"` und `"nichtBestanden"`
+- Pruefungstabelle bekommt zwei neue `SortableHead` und `TableCell` Spalten
+- Monatsfilter: Die 12 Monate als kleine Buttons (`variant="ghost"` oder `variant="outline"`, aktiver Monat mit `variant="default"`)
+- `colSpan` in leeren Zustaenden anpassen (4 auf 6)
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Jahresansicht, visuelle Optimierung, Summenzeile, dynamische Labels |
+| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Filter-Leiste, erweiterte Pruefungstabelle (Bestanden/Nicht bestanden), visuelle Verbesserungen |
 
