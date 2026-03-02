@@ -1,28 +1,24 @@
 
+## Zahlungen in der Saldo-Uebersicht anzeigen
 
-## Fahrlehrer-Auswahl nach Speichern beibehalten
-
-### Problem
-Beim Eintragen mehrerer Fahrstunden hintereinander wird der Fahrlehrer nach jedem Speichern zurueckgesetzt, sodass er jedes Mal neu gewaehlt werden muss.
-
-### Loesung
-Im `onSuccess`-Callback der Fahrstunden-Mutation wird beim Zuruecksetzen des Formulars der aktuelle `instructor_id`-Wert beibehalten statt ihn auf `""` zu setzen.
+### Ziel
+Die eingegangenen Zahlungen sollen direkt in der linken Saldo-Uebersicht im Schuelerprofil angezeigt werden -- unterhalb der offenen Posten. So hat man alles auf einen Blick: Gutschriften, offene Posten und eingegangene Zahlungen.
 
 ### Aenderung
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` (Zeile ~287) | `instructor_id` im Reset auf den aktuellen Wert setzen statt `""` |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` (nach Zeile ~871) | Neue Sektion "Zahlungen" einfuegen, die alle Zahlungen des Schuelers auflistet |
 
-Konkret wird aus:
-```typescript
-setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: "", dauer_minuten: 45, datum: ... });
-```
+### Details
+Nach der bestehenden "Offene Posten"-Liste (Zeile ~871) wird eine neue Sektion eingefuegt:
 
-Dies:
-```typescript
-setFsFahrstunde(prev => ({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: prev.instructor_id, dauer_minuten: 45, datum: ... }));
-```
+- Ueberschrift: **ZAHLUNGEN (n)** im gleichen Stil wie "GUTSCHRIFTEN" und "OFFENE POSTEN"
+- Jede Zahlung wird als Zeile dargestellt mit:
+  - Datum (dd.MM.yy)
+  - Zahlungsart (Bar / EC / Ueberweisung)
+  - Betrag (gruen fuer positive Zahlungen, rot fuer negative/Gutschriften)
+- Sortierung: neueste zuerst
+- Die bestehende separate Zahlungen-Karte in der rechten Spalte bleibt erhalten
 
-Eine Zeile Aenderung.
-
+Die Daten (`payments`) sind bereits geladen und verfuegbar -- es muss kein neuer Query hinzugefuegt werden. Das Styling orientiert sich exakt an den bestehenden Gutschriften- und Offene-Posten-Listen (gleiche Schriftgroessen, Abstande, Farben).
