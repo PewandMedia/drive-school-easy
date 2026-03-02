@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil, Calendar, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { logActivity } from "@/lib/activityLog";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import InstructorManageDialog from "@/components/InstructorManageDialog";
 import { Button } from "@/components/ui/button";
@@ -161,10 +160,7 @@ const Pruefungen = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      if (data?.id && user) {
-        logActivity({ action: "erstellt", entity_type: "pruefung", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["exams_all"] });
       toast({ title: "Prüfung eingetragen" });
       setOpen(false);
@@ -181,10 +177,7 @@ const Pruefungen = () => {
       if (error) throw error;
       return examId;
     },
-    onSuccess: (examId) => {
-      if (user) {
-        logActivity({ action: "bearbeitet", entity_type: "pruefung", entity_id: examId }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["exams_all"] });
       qc.invalidateQueries({ queryKey: ["exams"] });
       setEditingStatusId(null);

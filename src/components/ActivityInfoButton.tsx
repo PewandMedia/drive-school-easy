@@ -27,20 +27,23 @@ const ActivityInfoButton = ({ entityId }: Props) => {
   if (!isAdmin) return null;
 
   const loadLogs = async () => {
-    if (logs) return;
+    // Always reload on open
     setLoading(true);
     const { data } = await supabase
       .from("activity_log")
       .select("id, user_name, action, created_at, details")
       .eq("entity_id", entityId)
-      .order("created_at", { ascending: false })
-      .limit(10) as any;
+      .order("created_at", { ascending: true })
+      .limit(20) as any;
     setLogs(data ?? []);
     setLoading(false);
   };
 
-  const actionLabel = (a: string) =>
-    a === "erstellt" ? "Erstellt" : a === "bearbeitet" ? "Bearbeitet" : a === "geloescht" ? "Gelöscht" : a;
+  const erstelltLog = logs?.find((l) => l.action === "erstellt") ?? logs?.[0];
+  const letzteAenderung = logs && logs.length > 1 ? logs[logs.length - 1] : null;
+
+  const formatDatum = (iso: string) => format(new Date(iso), "dd.MM.yyyy", { locale: de });
+  const formatUhrzeit = (iso: string) => format(new Date(iso), "HH:mm", { locale: de });
 
   return (
     <Popover onOpenChange={(open) => open && loadLogs()}>
@@ -56,18 +59,40 @@ const ActivityInfoButton = ({ entityId }: Props) => {
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : !logs || logs.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Keine Einträge vorhanden</p>
+          <p className="text-xs text-muted-foreground">Kein Protokoll vorhanden (vor Audit-Aktivierung erstellt)</p>
         ) : (
-          <div className="space-y-2">
-            {logs.map((log) => (
-              <div key={log.id} className="text-xs border-b border-border pb-1.5 last:border-0">
-                <p className="font-medium text-foreground">{actionLabel(log.action)} von {log.user_name}</p>
-                <p className="text-muted-foreground">
-                  {format(new Date(log.created_at), "dd.MM.yyyy", { locale: de })} um {format(new Date(log.created_at), "HH:mm", { locale: de })} Uhr
-                </p>
-                {log.details && <p className="text-muted-foreground mt-0.5">{log.details}</p>}
-              </div>
-            ))}
+          <div className="space-y-1.5 text-xs">
+            {erstelltLog && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Eingetragen von</span>
+                  <span className="font-medium text-foreground">{erstelltLog.user_name ?? "–"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Datum</span>
+                  <span className="text-foreground">{formatDatum(erstelltLog.created_at)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Uhrzeit</span>
+                  <span className="text-foreground">{formatUhrzeit(erstelltLog.created_at)} Uhr</span>
+                </div>
+              </>
+            )}
+            {letzteAenderung && (
+              <>
+                <div className="border-t border-border my-1.5" />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Letzte Änderung</span>
+                  <span className="text-foreground">
+                    {formatDatum(letzteAenderung.created_at)} {formatUhrzeit(letzteAenderung.created_at)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Von</span>
+                  <span className="font-medium text-foreground">{letzteAenderung.user_name ?? "–"}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </PopoverContent>

@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListChecks, Plus, ChevronRight, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { logActivity } from "@/lib/activityLog";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
@@ -108,10 +107,7 @@ const Leistungen = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      if (data?.id && user) {
-        logActivity({ action: "erstellt", entity_type: "leistung", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       setOpen(false);
       setForm(defaultForm);
@@ -126,10 +122,7 @@ const Leistungen = () => {
       if (error) throw error;
       return id;
     },
-    onSuccess: (id) => {
-      if (user) {
-        logActivity({ action: "bearbeitet", entity_type: "leistung", entity_id: id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
     },
   });
