@@ -1,29 +1,30 @@
 
 
-## Dialog kompakter machen - alles auf einen Bildschirm
+## Alle Demo-Daten aus der Datenbank loeschen
 
-### Problem
-Der "Neuer Fahrschueler"-Dialog hat zu viele Felder untereinander, sodass man scrollen muss.
+### Was geloescht wird
 
-### Loesung
-Mehr Felder nebeneinander in 2-Spalten-Grids anordnen und Abstaende reduzieren, damit alles auf einen Bildschirm passt.
+Alle Daten aus folgenden Tabellen werden komplett geleert (in der richtigen Reihenfolge wegen Abhaengigkeiten):
 
-### Konkrete Aenderungen in `src/pages/dashboard/Fahrschueler.tsx`
+1. **payment_allocations** - Zahlungszuordnungen
+2. **payments** - Zahlungen
+3. **open_items** - Offene Posten
+4. **driving_lessons** - Fahrstunden
+5. **exams** - Pruefungen
+6. **services** - Leistungen
+7. **theory_sessions** - Theoriestunden
+8. **gear_lessons** - Schaltstunden
+9. **activity_log** - Aktivitaetsprotokoll
+10. **students** - Fahrschueler
 
-**Layout-Verdichtung (Felder nebeneinander statt untereinander):**
+### Was NICHT geloescht wird
 
-1. **Vorname + Nachname** - bleibt 2-spaltig (schon so)
-2. **Geburtsdatum + E-Mail** - in eine Zeile (2-spaltig)
-3. **Telefon + Fuehrerscheinklasse** - bleibt 2-spaltig (schon so)
-4. **Fahrschule + Adresse** - in eine Zeile (2-spaltig)
-5. **Umschreiber-Switch** - bleibt einzeilig
+- **prices** - Preisliste (Konfigurationsdaten, keine Demo-Daten)
+- **instructors** - Fahrlehrer
+- **vehicles** - Fahrzeuge
+- **profiles / user_roles** - Benutzerkonten
 
-**Weitere Komprimierung:**
-- Form-Spacing von `space-y-3` auf `space-y-2` reduzieren
-- Label-Spacing von `space-y-2` auf `space-y-1` reduzieren
-- Leistungen-Block: Padding von `p-4` auf `p-3` reduzieren
-- Textarea `min-h-[60px]` auf `min-h-[40px]` reduzieren
-- DialogFooter padding von `pt-3` auf `pt-2` reduzieren
+### Technische Umsetzung
 
-### Ergebnis
-Durch das Zusammenlegen von 4 einzelnen Zeilen (Geburtsdatum, E-Mail, Fahrschule, Adresse) in 2 Zeilen spart man ca. 120px Hoehe. Zusammen mit den reduzierten Abstaenden sollte alles ohne Scrollen sichtbar sein.
+Ausfuehrung ueber das Supabase Insert-Tool mit DELETE-Statements in der richtigen Reihenfolge, um Foreign-Key-Konflikte zu vermeiden.
+
