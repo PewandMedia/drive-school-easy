@@ -869,6 +869,36 @@ const FahrschuelerDetail = () => {
               </div>
             );
           })()}
+
+          {/* ── Zahlungen ── */}
+          {payments && payments.length > 0 && (() => {
+            const sorted = [...payments].sort((a: any, b: any) => new Date(b.datum).getTime() - new Date(a.datum).getTime());
+            const zahlungsartLabel: Record<string, string> = { bar: "Bar", ec: "EC", ueberweisung: "Überweisung" };
+            return (
+              <div className="space-y-2 mt-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Zahlungen ({payments.length})
+                </p>
+                <div className="space-y-1.5">
+                  {sorted.map((p: any) => (
+                    <div key={p.id} className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-muted-foreground shrink-0">
+                          {format(new Date(p.datum), "dd.MM.yy")}
+                        </span>
+                        <span className="text-foreground truncate">
+                          {zahlungsartLabel[p.zahlungsart] || p.zahlungsart}
+                        </span>
+                      </div>
+                      <span className={`font-medium shrink-0 ${Number(p.betrag) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Right Column ── */}
