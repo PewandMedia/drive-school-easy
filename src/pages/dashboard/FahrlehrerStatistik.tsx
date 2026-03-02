@@ -40,7 +40,7 @@ const quoteBarClass = (q: number) =>
 
 const dimZero = (val: number) => val === 0 ? "text-muted-foreground/60" : "";
 
-type ExamSortKey = "name" | "pruefungen" | "bestanden" | "nichtBestanden" | "pruefungenPeriod" | "bestehensquote";
+type ExamSortKey = "name" | "pruefungen" | "bestanden" | "nichtBestanden" | "bestehensquote";
 type HoursSortKey = "name" | "fahrstundenPeriod" | "fahrstundenGesamt" | "theoriePeriod" | "theorieGesamt" | "umsatzPeriod" | "avgEinheiten";
 type SortDir = "asc" | "desc";
 type ViewMode = "month" | "year";
@@ -158,18 +158,17 @@ const FahrlehrerStatistik = () => {
       const theoriePeriod = myTheory.filter((t) => inPeriod(t.datum)).length;
 
       const myExams = (exams ?? []).filter((e) => e.instructor_id === id);
-      const bestanden = myExams.filter((e) => e.status === "bestanden").length;
-      const nichtBestanden = myExams.filter((e) => e.status === "nicht_bestanden").length;
-      const pruefungenGesamt = bestanden + nichtBestanden;
-      const pruefungenPeriod = myExams.filter((e) => inPeriod(e.datum) && (e.status === "bestanden" || e.status === "nicht_bestanden")).length;
-      const bestehensquote = pruefungenGesamt > 0 ? Math.round((bestanden / pruefungenGesamt) * 100) : -1;
+      const myPeriodExams = myExams.filter((e) => inPeriod(e.datum));
+      const bestanden = myPeriodExams.filter((e) => e.status === "bestanden").length;
+      const nichtBestanden = myPeriodExams.filter((e) => e.status === "nicht_bestanden").length;
+      const pruefungen = bestanden + nichtBestanden;
+      const bestehensquote = pruefungen > 0 ? Math.round((bestanden / pruefungen) * 100) : -1;
 
       return {
         id, name,
         fahrstundenPeriod, fahrstundenGesamt, avgEinheiten,
         theoriePeriod, theorieGesamt,
-        pruefungen: pruefungenGesamt, pruefungenPeriod,
-        bestanden, nichtBestanden,
+        pruefungen, bestanden, nichtBestanden,
         bestehensquote,
         umsatzPeriod,
       };
@@ -224,7 +223,7 @@ const FahrlehrerStatistik = () => {
   // ── Global KPIs ──────────────────────────────────────
   const kpis = useMemo(() => {
     if (!stats.length) return null;
-    const pruefungenPeriod = stats.reduce((s, x) => s + x.pruefungenPeriod, 0);
+    const totalPruefungen = stats.reduce((s, x) => s + x.pruefungen, 0);
     const totalBestanden = stats.reduce((s, x) => s + x.bestanden, 0);
     const totalNichtBestanden = stats.reduce((s, x) => s + x.nichtBestanden, 0);
     const withQuote = stats.filter((s) => s.bestehensquote >= 0);
@@ -232,7 +231,7 @@ const FahrlehrerStatistik = () => {
     return {
       fahrstundenPeriod: totals.fahrstundenPeriod,
       theoriePeriod: totals.theoriePeriod,
-      pruefungenPeriod,
+      totalPruefungen,
       totalBestanden,
       totalNichtBestanden,
       umsatzPeriod: totals.umsatzPeriod,
@@ -333,7 +332,7 @@ const FahrlehrerStatistik = () => {
           <KpiCard
             icon={ClipboardCheck}
             label={`Prüfungen ${periodLabel}`}
-            value={kpis.pruefungenPeriod}
+            value={kpis.totalPruefungen}
             color="bg-orange-500/15"
             iconColor="text-orange-600"
             detail={
@@ -373,7 +372,6 @@ const FahrlehrerStatistik = () => {
                 <SortableHead col="pruefungen" label="Gesamt" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
                 <SortableHead col="bestanden" label="Bestanden" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
                 <SortableHead col="nichtBestanden" label="Nicht best." sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
-                <SortableHead col="pruefungenPeriod" label={periodLabel} sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
                 <SortableHead col="bestehensquote" label="Bestehensquote" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="w-[180px]" />
               </TableRow>
             </TableHeader>
@@ -381,14 +379,14 @@ const FahrlehrerStatistik = () => {
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
+                    {Array.from({ length: 5 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : sortedExams.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Keine Prüfungsdaten vorhanden.
                   </TableCell>
                 </TableRow>
@@ -409,7 +407,6 @@ const FahrlehrerStatistik = () => {
                         {s.nichtBestanden}
                       </span>
                     </TableCell>
-                    <TableCell className={cn("text-center", dimZero(s.pruefungenPeriod))}>{s.pruefungenPeriod}</TableCell>
                     <TableCell>
                       {s.bestehensquote >= 0 ? (
                         <div className="flex items-center gap-2">
