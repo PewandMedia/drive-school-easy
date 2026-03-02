@@ -5,7 +5,8 @@ import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 import {
   UserCheck, Car, BookOpen, ClipboardCheck, TrendingUp, Euro,
-  Settings, ArrowUpDown, ArrowUp, ArrowDown, Calendar,
+  Settings, ArrowUpDown, ArrowUp, ArrowDown, CalendarDays,
+  CheckCircle2, XCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -25,6 +27,11 @@ const MONTHS = [
   "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
 
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+];
+
 const quoteColor = (q: number) =>
   q >= 80 ? "text-green-600" : q >= 60 ? "text-yellow-600" : "text-destructive";
 
@@ -33,7 +40,7 @@ const quoteBarClass = (q: number) =>
 
 const dimZero = (val: number) => val === 0 ? "text-muted-foreground/60" : "";
 
-type ExamSortKey = "name" | "pruefungen" | "pruefungenPeriod" | "bestehensquote";
+type ExamSortKey = "name" | "pruefungen" | "bestanden" | "nichtBestanden" | "pruefungenPeriod" | "bestehensquote";
 type HoursSortKey = "name" | "fahrstundenPeriod" | "fahrstundenGesamt" | "theoriePeriod" | "theorieGesamt" | "umsatzPeriod" | "avgEinheiten";
 type SortDir = "asc" | "desc";
 type ViewMode = "month" | "year";
@@ -162,6 +169,7 @@ const FahrlehrerStatistik = () => {
         fahrstundenPeriod, fahrstundenGesamt, avgEinheiten,
         theoriePeriod, theorieGesamt,
         pruefungen: pruefungenGesamt, pruefungenPeriod,
+        bestanden, nichtBestanden,
         bestehensquote,
         umsatzPeriod,
       };
@@ -183,7 +191,7 @@ const FahrlehrerStatistik = () => {
   }, [examStats, examSortKey, examSortDir]);
 
   const sortedHours = useMemo(() => {
-    const arr = [...stats]; // show ALL instructors
+    const arr = [...stats];
     arr.sort((a, b) => {
       const va = (a as any)[hoursSortKey];
       const vb = (b as any)[hoursSortKey];
@@ -217,12 +225,16 @@ const FahrlehrerStatistik = () => {
   const kpis = useMemo(() => {
     if (!stats.length) return null;
     const pruefungenPeriod = stats.reduce((s, x) => s + x.pruefungenPeriod, 0);
+    const totalBestanden = stats.reduce((s, x) => s + x.bestanden, 0);
+    const totalNichtBestanden = stats.reduce((s, x) => s + x.nichtBestanden, 0);
     const withQuote = stats.filter((s) => s.bestehensquote >= 0);
     const avgQuote = withQuote.length > 0 ? Math.round(withQuote.reduce((s, x) => s + x.bestehensquote, 0) / withQuote.length) : 0;
     return {
       fahrstundenPeriod: totals.fahrstundenPeriod,
       theoriePeriod: totals.theoriePeriod,
       pruefungenPeriod,
+      totalBestanden,
+      totalNichtBestanden,
       umsatzPeriod: totals.umsatzPeriod,
       avgQuote,
     };
@@ -230,7 +242,7 @@ const FahrlehrerStatistik = () => {
 
   // ── Render ───────────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PageHeader
         title="Fahrlehrer-Statistik"
         icon={UserCheck}
@@ -242,69 +254,125 @@ const FahrlehrerStatistik = () => {
         }
       />
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <Select value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <SelectTrigger className="w-[140px]">
-            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="month">Monat</SelectItem>
-            <SelectItem value="year">Ganzes Jahr</SelectItem>
-          </SelectContent>
-        </Select>
-        {viewMode === "month" && (
-          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => (
-                <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-          <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {availableYears.map((y) => (
-              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* ── Filter Bar ────────────────────────────────── */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4">
+            {/* Row 1: View mode toggle + Year select + Period badge */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="inline-flex rounded-lg border bg-muted p-1 gap-0.5">
+                <Button
+                  size="sm"
+                  variant={viewMode === "month" ? "default" : "ghost"}
+                  className="h-8 px-4 text-xs font-semibold"
+                  onClick={() => setViewMode("month")}
+                >
+                  Monat
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === "year" ? "default" : "ghost"}
+                  className="h-8 px-4 text-xs font-semibold"
+                  onClick={() => setViewMode("year")}
+                >
+                  Ganzes Jahr
+                </Button>
+              </div>
 
-      {/* KPI Cards */}
+              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                <SelectTrigger className="w-[100px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Badge variant="secondary" className="h-8 px-3 text-sm font-medium gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {viewMode === "year" ? `Jahr ${year}` : `${MONTHS[month]} ${year}`}
+              </Badge>
+            </div>
+
+            {/* Row 2: Month buttons (only when viewMode=month) */}
+            {viewMode === "month" && (
+              <div className="flex gap-1 flex-wrap">
+                {MONTHS_SHORT.map((m, i) => (
+                  <Button
+                    key={i}
+                    size="sm"
+                    variant={month === i ? "default" : "outline"}
+                    className={cn(
+                      "h-8 px-3 text-xs font-medium transition-all",
+                      month === i && "shadow-sm"
+                    )}
+                    onClick={() => setMonth(i)}
+                  >
+                    {m}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── KPI Cards ──────────────────────────────────── */}
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>
+            <Card key={i}><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
           ))}
         </div>
       ) : kpis && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KpiCard icon={Car} label={`Fahrstunden ${periodLabel}`} value={kpis.fahrstundenPeriod} color="bg-primary/15" iconColor="text-primary" />
           <KpiCard icon={BookOpen} label={`Theorie ${periodLabel}`} value={kpis.theoriePeriod} color="bg-blue-500/15" iconColor="text-blue-600" />
-          <KpiCard icon={ClipboardCheck} label={`Prüfungen ${periodLabel}`} value={kpis.pruefungenPeriod} color="bg-orange-500/15" iconColor="text-orange-600" />
+          <KpiCard
+            icon={ClipboardCheck}
+            label={`Prüfungen ${periodLabel}`}
+            value={kpis.pruefungenPeriod}
+            color="bg-orange-500/15"
+            iconColor="text-orange-600"
+            detail={
+              <span className="text-xs text-muted-foreground mt-0.5">
+                <span className="text-green-600 font-medium">{kpis.totalBestanden}</span>
+                {" ✓ / "}
+                <span className="text-destructive font-medium">{kpis.totalNichtBestanden}</span>
+                {" ✗"}
+              </span>
+            }
+          />
           <KpiCard icon={TrendingUp} label="Ø Bestehensquote" value={`${kpis.avgQuote} %`} color="bg-green-500/15" iconColor="text-green-600" />
-          <KpiCard icon={Euro} label={`Umsatz ${periodLabel}`} value={`${kpis.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`} color="bg-yellow-500/15" iconColor="text-yellow-600" />
+          <KpiCard
+            icon={Euro}
+            label={`Umsatz ${periodLabel}`}
+            value={`${kpis.umsatzPeriod.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`}
+            color="bg-yellow-500/15"
+            iconColor="text-yellow-600"
+          />
         </div>
       )}
 
       {/* ── Prüfungen Table ── */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg">
             <ClipboardCheck className="h-5 w-5 text-orange-600" />
             Prüfungen
+            <Badge variant="outline" className="ml-auto text-xs font-normal">{periodLabel}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40">
                 <SortableHead col="name" label="Fahrlehrer" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} />
                 <SortableHead col="pruefungen" label="Gesamt" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
+                <SortableHead col="bestanden" label="Bestanden" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
+                <SortableHead col="nichtBestanden" label="Nicht best." sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
                 <SortableHead col="pruefungenPeriod" label={periodLabel} sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
                 <SortableHead col="bestehensquote" label="Bestehensquote" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="w-[180px]" />
               </TableRow>
@@ -313,14 +381,14 @@ const FahrlehrerStatistik = () => {
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 4 }).map((_, j) => (
+                    {Array.from({ length: 6 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : sortedExams.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     Keine Prüfungsdaten vorhanden.
                   </TableCell>
                 </TableRow>
@@ -328,18 +396,30 @@ const FahrlehrerStatistik = () => {
                 sortedExams.map((s) => (
                   <TableRow key={s.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className={cn("text-center", dimZero(s.pruefungen))}>{s.pruefungen}</TableCell>
+                    <TableCell className={cn("text-center font-semibold", dimZero(s.pruefungen))}>{s.pruefungen}</TableCell>
+                    <TableCell className="text-center">
+                      <span className={cn("inline-flex items-center gap-1 font-semibold", s.bestanden > 0 ? "text-green-600" : "text-muted-foreground/60")}>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {s.bestanden}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className={cn("inline-flex items-center gap-1 font-semibold", s.nichtBestanden > 0 ? "text-destructive" : "text-muted-foreground/60")}>
+                        <XCircle className="h-3.5 w-3.5" />
+                        {s.nichtBestanden}
+                      </span>
+                    </TableCell>
                     <TableCell className={cn("text-center", dimZero(s.pruefungenPeriod))}>{s.pruefungenPeriod}</TableCell>
                     <TableCell>
                       {s.bestehensquote >= 0 ? (
                         <div className="flex items-center gap-2">
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-secondary">
                             <div
                               className={cn("h-full rounded-full transition-all", quoteBarClass(s.bestehensquote))}
                               style={{ width: `${s.bestehensquote}%` }}
                             />
                           </div>
-                          <span className={cn("text-xs font-medium w-10 text-right", quoteColor(s.bestehensquote))}>
+                          <span className={cn("text-xs font-bold w-10 text-right", quoteColor(s.bestehensquote))}>
                             {s.bestehensquote} %
                           </span>
                         </div>
@@ -356,17 +436,18 @@ const FahrlehrerStatistik = () => {
       </Card>
 
       {/* ── Stunden & Umsatz Table ── */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Car className="h-5 w-5 text-primary" />
             Stunden & Umsatz
+            <Badge variant="outline" className="ml-auto text-xs font-normal">{periodLabel}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40">
                 <SortableHead col="name" label="Fahrlehrer" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} />
                 <SortableHead col="fahrstundenPeriod" label={`Fahrst. ${periodLabel}`} sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
                 <SortableHead col="fahrstundenGesamt" label="Fahrst. Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
@@ -432,18 +513,19 @@ const FahrlehrerStatistik = () => {
 
 // ── Small helper components ──────────────────────────
 
-function KpiCard({ icon: Icon, label, value, color, iconColor }: {
-  icon: any; label: string; value: string | number; color: string; iconColor: string;
+function KpiCard({ icon: Icon, label, value, color, iconColor, detail }: {
+  icon: any; label: string; value: string | number; color: string; iconColor: string; detail?: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", color)}>
-          <Icon className={cn("h-5 w-5", iconColor)} />
+    <Card className="shadow-sm">
+      <CardContent className="p-5 flex items-center gap-4">
+        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", color)}>
+          <Icon className={cn("h-6 w-6", iconColor)} />
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold">{value}</p>
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground truncate">{label}</p>
+          <p className="text-2xl font-bold leading-tight">{value}</p>
+          {detail}
         </div>
       </CardContent>
     </Card>
