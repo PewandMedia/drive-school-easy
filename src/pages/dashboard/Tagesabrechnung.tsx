@@ -261,7 +261,7 @@ const Tagesabrechnung = () => {
         <div className="mb-6 border-b pb-4">
           <h1 className="text-2xl font-bold">Fahrschulverwaltung – Tagesabrechnung</h1>
           <p className="text-lg mt-1">
-            Datum: {format(new Date(selectedDate), "dd.MM.yyyy", { locale: de })}
+            Datum: {selectedDate ? format(new Date(selectedDate), "dd.MM.yyyy", { locale: de }) : "–"}
           </p>
           {filterZahlungsart !== "alle" && (
             <p className="text-sm mt-1 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
