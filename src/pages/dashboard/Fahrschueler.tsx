@@ -385,11 +385,11 @@ const Fahrschueler = () => {
 
       {/* New Student Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Neuer Fahrschüler</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2 overflow-y-auto flex-1 min-h-0 pr-1">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="vorname">Vorname *</Label>
@@ -581,7 +581,7 @@ const Fahrschueler = () => {
               <p className="text-sm text-destructive">{formError}</p>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="sticky bottom-0 bg-background pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Abbrechen
               </Button>
