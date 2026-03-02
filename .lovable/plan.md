@@ -1,81 +1,52 @@
 
-Kurzdiagnose aus der aktuellen Analyse:
-- `activity_log` ist aktuell komplett leer (`count = 0`), obwohl neue Fahrstunden vorhanden sind.
-- Die Fahrstunden von 06:09 wurden in einer Dilan-Session erstellt, aber beim Admin-Info-Button kommt `[]` zurück.
-- Damit ist die aktuelle clientseitige Protokollierung nicht zuverlässig genug für dein Ziel „immer sichtbar, wer es eingetragen hat“.
+## Benutzerverwaltung vereinfachen + Historie-Button
 
-Um das dauerhaft und manipulationssicher zu lösen, setze ich auf serverseitiges Audit-Logging per DB-Trigger (statt nur Frontend-Aufruf).
+### Was wird entfernt
+- Spalte "Letzter Login"
+- Spalte "Status" (Aktiv/Inaktiv Badge)
+- Aktiv/Deaktiv-Button (UserX/UserCheck) aus der Aktionen-Spalte
+- `toggleAktivMutation` (wird nicht mehr gebraucht)
 
-Geplante Umsetzung:
+### Was wird hinzugefuegt
+Ein **Historie-Button** (z.B. History-Icon) pro Benutzer in der Aktionen-Spalte. Beim Klick oeffnet sich ein Dialog, der alle Aktivitaeten dieses Benutzers aus `activity_log` anzeigt -- gefiltert nach `user_id`.
 
-1) Audit-Logging auf Datenbankebene erzwingen (wichtigster Fix)
-- Neue Migration:
-  - `activity_log` härten:
-    - `user_id` auf `NOT NULL`
-    - `entity_id` auf `NOT NULL`
-    - optional FK `activity_log.user_id -> profiles.id`
-    - optional Enum/Constraint für `action` (`erstellt|bearbeitet|geloescht`)
-  - Trigger-Funktion erstellen, z. B. `public.audit_entity_change()`:
-    - liest `auth.uid()` (aktueller User)
-    - lädt Namen aus `profiles.display_name` (Fallback: E-Mail)
-    - schreibt bei INSERT/UPDATE/DELETE automatisch in `activity_log`
-  - Trigger auf alle relevanten Tabellen:
-    - `driving_lessons`
-    - `theory_sessions`
-    - `exams`
-    - `payments`
-    - `services`
-    - (Gutschriften laufen über `payments` mit negativem Betrag)
-- Effekt: Jeder Eintrag wird zentral protokolliert, unabhängig davon, ob Frontend-Code gerade korrekt feuert.
+Der Dialog zeigt eine chronologische Liste mit:
+- Aktion (erstellt/bearbeitet/geloescht)
+- Typ (Fahrstunde, Theorie, Pruefung, Zahlung, Leistung)
+- Datum und Uhrzeit
+- Optional: Details
 
-2) Manipulationsschutz des Protokolls schließen
-- RLS für `activity_log` finalisieren:
-  - `SELECT` nur Admin
-  - kein `UPDATE`, kein `DELETE` für App-User
-  - direkte `INSERT` durch Clients entfernen/verbieten (nur Trigger schreibt)
-- Dadurch kann niemand (auch Sekretärinnen nicht) das Protokoll bearbeiten oder fälschen.
+So kann der Admin direkt in der Benutzerverwaltung sehen, was z.B. Jiyan oder Dilan alles eingetragen hat, ohne in jede einzelne Seite gehen zu muessen.
 
-3) Frontend von unsicherem Logging entkoppeln
-- In den Seiten `Fahrstunden`, `Theorie`, `Pruefungen`, `Zahlungen`, `Leistungen` die direkten `logActivity(...)`-Aufrufe entfernen.
-- Grund: sonst doppelte Einträge oder weiterhin Abhängigkeit vom Clientzustand.
-- `src/lib/activityLog.ts` kann danach entfallen oder als Legacy markiert werden.
+### Neue Tabellenstruktur
 
-4) Info-Button exakt nach deinem gewünschten Format anzeigen
-- `ActivityInfoButton` anpassen:
-  - nicht nur „Liste aller Logs“, sondern gezielte Anzeige:
-    - Eingetragen von: [Name]
-    - Datum: [TT.MM.JJJJ]
-    - Uhrzeit: [HH:MM]
-    - Letzte Änderung: [Datum/Uhrzeit]
-  - Datenlogik:
-    - „Eingetragen von“ = ältester `erstellt`-Eintrag
-    - „Letzte Änderung“ = neuester Logeintrag (egal ob bearbeitet/gelöscht)
-- Admin-only Sichtbarkeit bleibt strikt (`isAdmin`).
-- Zusätzlich: Refresh-Logik verbessern (bei Popover-Öffnen neu laden), damit nie ein alter Leerzustand gecacht bleibt.
+| Name | E-Mail | Rolle | Aktionen |
+|------|--------|-------|----------|
+| Dilan | dilan@... | Sekretaerin | [Passwort] [Historie] |
+| Jiyan | jiyan@... | Sekretaerin | [Passwort] [Historie] |
 
-5) Umgang mit bestehenden Alt-Daten (wichtig für Erwartungsmanagement)
-- Bereits vorhandene Datensätze ohne Log können nicht sicher rückwirkend einem User zugeordnet werden.
-- Ich baue deshalb:
-  - ab jetzt 100% verlässliche Erfassung durch Trigger
-  - optionalen Hinweis im Popup für Alt-Datensätze ohne Historie („Kein Protokoll vorhanden / vor Audit-Aktivierung“).
+### Technische Umsetzung
 
-Technischer Scope (Dateien):
-- Neu: `supabase/migrations/<timestamp>_audit_trigger_fix.sql`
-- Ändern:
-  - `src/components/ActivityInfoButton.tsx`
-  - `src/pages/dashboard/Fahrstunden.tsx`
-  - `src/pages/dashboard/Theorie.tsx`
-  - `src/pages/dashboard/Pruefungen.tsx`
-  - `src/pages/dashboard/Zahlungen.tsx`
-  - `src/pages/dashboard/Leistungen.tsx`
-  - optional `src/lib/activityLog.ts` (entfernen oder stilllegen)
+**Datei: `src/pages/dashboard/Benutzerverwaltung.tsx`**
 
-Abnahmetest nach Umsetzung:
-1. Mit Dilan eintragen (z. B. Fahrstunde).
-2. Als Admin denselben Datensatz öffnen.
-3. Popup muss zeigen:
-   - Dilan als Eintragende
-   - Datum/Uhrzeit
-   - Letzte Änderung
-4. Sekretärin darf den Info-Button nicht sehen.
-5. Direkte Änderungen am `activity_log` durch Nicht-Admin dürfen nicht möglich sein.
+1. Entfernen:
+   - Import von `Badge`, `UserX`, `UserCheck`
+   - `toggleAktivMutation`
+   - Spalten "Letzter Login" und "Status" aus Header und Body
+   - Aktiv/Deaktiv-Button
+   - `colSpan` von 6 auf 4 anpassen
+
+2. Hinzufuegen:
+   - Import von `History` Icon aus lucide-react
+   - Import von `ScrollArea` fuer lange Listen
+   - State: `historieOpen` (boolean) und `historieUserId` / `historieUserName` (string)
+   - Historie-Button in der Aktionen-Spalte
+   - Neuer Dialog "Historie von [Name]":
+     - Laedt `activity_log` gefiltert nach `user_id = historieUserId`
+     - Sortiert nach `created_at DESC` (neueste zuerst)
+     - Zeigt: Datum/Uhrzeit, Aktion, Typ, Details
+     - ScrollArea fuer lange Listen
+     - Hinweis wenn keine Eintraege vorhanden
+
+### Keine Datenbank-Aenderungen noetig
+Die `activity_log`-Tabelle hat bereits `user_id` -- der Admin kann per SELECT darauf zugreifen (RLS erlaubt SELECT fuer Admins).
