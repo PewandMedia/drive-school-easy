@@ -389,105 +389,76 @@ const Fahrschueler = () => {
           <DialogHeader>
             <DialogTitle>Neuer Fahrschüler</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3 mt-1">
+          <form onSubmit={handleSubmit} className="space-y-2 mt-1">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label htmlFor="vorname">Vorname *</Label>
-                <Input
-                  id="vorname"
-                  placeholder="Max"
-                  value={form.vorname}
-                  onChange={(e) => setForm({ ...form, vorname: e.target.value })}
-                />
+                <Input id="vorname" placeholder="Max" value={form.vorname} onChange={(e) => setForm({ ...form, vorname: e.target.value })} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label htmlFor="nachname">Nachname *</Label>
-                <Input
-                  id="nachname"
-                  placeholder="Mustermann"
-                  value={form.nachname}
-                  onChange={(e) => setForm({ ...form, nachname: e.target.value })}
-                />
+                <Input id="nachname" placeholder="Mustermann" value={form.nachname} onChange={(e) => setForm({ ...form, nachname: e.target.value })} />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Geburtsdatum *</Label>
-              <div className="relative">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <CalendarIcon className="h-4 w-4" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={form.geburtsdatum}
-                      onSelect={(date) => {
-                        setForm({ ...form, geburtsdatum: date });
-                        setGeburtsdatumText(date ? format(date, "dd.MM.yyyy") : "");
-                      }}
-                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <Input
-                  placeholder="TT.MM.JJJJ"
-                  className="pl-9"
-                  value={geburtsdatumText}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setGeburtsdatumText(val);
-                    if (val.length === 10) {
-                      const parsed = parse(val, "dd.MM.yyyy", new Date());
-                      if (isValid(parsed) && parsed <= new Date() && parsed >= new Date("1900-01-01")) {
-                        setForm((f) => ({ ...f, geburtsdatum: parsed }));
-                      }
-                    } else {
-                      setForm((f) => ({ ...f, geburtsdatum: undefined }));
-                    }
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">E-Mail</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="max@example.de"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="telefon">Telefon</Label>
-                <Input
-                  id="telefon"
-                  placeholder="+49 123 456789"
-                  value={form.telefon}
-                  onChange={(e) => setForm({ ...form, telefon: e.target.value })}
-                />
+              <div className="space-y-1">
+                <Label>Geburtsdatum *</Label>
+                <div className="relative">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                        <CalendarIcon className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.geburtsdatum}
+                        onSelect={(date) => {
+                          setForm({ ...form, geburtsdatum: date });
+                          setGeburtsdatumText(date ? format(date, "dd.MM.yyyy") : "");
+                        }}
+                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Input
+                    placeholder="TT.MM.JJJJ"
+                    className="pl-9"
+                    value={geburtsdatumText}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGeburtsdatumText(val);
+                      if (val.length === 10) {
+                        const parsed = parse(val, "dd.MM.yyyy", new Date());
+                        if (isValid(parsed) && parsed <= new Date() && parsed >= new Date("1900-01-01")) {
+                          setForm((f) => ({ ...f, geburtsdatum: parsed }));
+                        }
+                      } else {
+                        setForm((f) => ({ ...f, geburtsdatum: undefined }));
+                      }
+                    }}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
+                <Label htmlFor="email">E-Mail</Label>
+                <Input id="email" type="email" placeholder="max@example.de" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="telefon">Telefon</Label>
+                <Input id="telefon" placeholder="+49 123 456789" value={form.telefon} onChange={(e) => setForm({ ...form, telefon: e.target.value })} />
+              </div>
+              <div className="space-y-1">
                 <Label>Führerscheinklasse *</Label>
-                <Select
-                  value={form.fuehrerscheinklasse}
-                  onValueChange={(v) =>
-                    setForm({ ...form, fuehrerscheinklasse: v as "B" | "B78" | "B197" })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={form.fuehrerscheinklasse} onValueChange={(v) => setForm({ ...form, fuehrerscheinklasse: v as "B" | "B78" | "B197" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="B">Klasse B</SelectItem>
                     <SelectItem value="B78">Klasse B78</SelectItem>
@@ -496,30 +467,22 @@ const Fahrschueler = () => {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Fahrschule *</Label>
-              <Select
-                value={form.fahrschule}
-                onValueChange={(v) => setForm({ ...form, fahrschule: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="riemke">Riemke Markt</SelectItem>
-                  <SelectItem value="rathaus">Rathaus</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="adresse">Adresse</Label>
-              <Input
-                id="adresse"
-                placeholder="Musterstraße 1, 44791 Bochum"
-                value={form.adresse}
-                onChange={(e) => setForm({ ...form, adresse: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Fahrschule *</Label>
+                <Select value={form.fahrschule} onValueChange={(v) => setForm({ ...form, fahrschule: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="riemke">Riemke Markt</SelectItem>
+                    <SelectItem value="rathaus">Rathaus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="adresse">Adresse</Label>
+                <Input id="adresse" placeholder="Musterstraße 1, 44791 Bochum" value={form.adresse} onChange={(e) => setForm({ ...form, adresse: e.target.value })} />
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -531,7 +494,7 @@ const Fahrschueler = () => {
             </div>
 
             {autoPrices.length > 0 && (
-              <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-2">
+              <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
                 <p className="text-sm font-medium text-foreground">Automatisch hinzugefügte Leistungen:</p>
                 <div className="space-y-1.5">
                   {autoPrices.map((p) => (
@@ -564,12 +527,12 @@ const Fahrschueler = () => {
                   <span>Gesamt</span>
                   <span>{autoPricesTotal.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
                 </div>
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-1 pt-1">
                   <Label htmlFor="angebotsNotiz" className="text-xs text-muted-foreground">Notiz / Angebot</Label>
                   <Textarea
                     id="angebotsNotiz"
                     placeholder="z.B. Weihnachtsangebot, Sonderkonditionen..."
-                    className="min-h-[60px] text-sm"
+                    className="min-h-[40px] text-sm"
                     value={angebotsNotiz}
                     onChange={(e) => setAngebotsNotiz(e.target.value)}
                   />
@@ -581,7 +544,7 @@ const Fahrschueler = () => {
               <p className="text-sm text-destructive">{formError}</p>
             )}
 
-            <DialogFooter className="pt-3">
+            <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Abbrechen
               </Button>
