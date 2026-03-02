@@ -284,7 +284,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
-      setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: "", dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) });
+      setFsFahrstunde(prev => ({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: prev.instructor_id, dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) }));
       toast({ title: "Fahrstunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
