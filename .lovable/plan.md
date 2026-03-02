@@ -1,28 +1,25 @@
 
-## Notizfeld fuer automatische Leistungen beim Schueler-Anlegen
 
-### Ziel
-Ein Textfeld unterhalb der automatisch hinzugefuegten Leistungen (Grundbetrag/Lernmaterial), in das man z.B. "Weihnachtsangebot" schreiben kann. Diese Notiz wird bei den zugehoerigen Leistungen gespeichert.
+## Dialog scrollbar machen
 
-### Umsetzung
+### Problem
+Der "Neuer Fahrschueler"-Dialog ist zu lang fuer den Bildschirm. Die Buttons "Abbrechen" und "Speichern" sind abgeschnitten und nicht erreichbar.
 
-**1. Migration: `notiz`-Spalte in `services` hinzufuegen**
-- `ALTER TABLE services ADD COLUMN notiz TEXT DEFAULT NULL;`
-- Kein Pflichtfeld, rein optional
+### Loesung
+Den Dialog-Inhalt (Formular) in einen scrollbaren Bereich packen, sodass der Header oben und die Buttons unten immer sichtbar bleiben.
 
-**2. Frontend: `src/pages/dashboard/Fahrschueler.tsx`**
-- Neuen State `angebotsNotiz` (string) hinzufuegen
-- Textarea-Feld im Leistungen-Block einbauen (unter der Gesamt-Zeile), Placeholder: "z.B. Weihnachtsangebot, Sonderkonditionen..."
-- Beim Speichern (`createMutation`) die Notiz an jede automatisch erstellte Leistung uebergeben (`notiz: angebotsNotiz || null`)
-- Import von `Textarea` aus `@/components/ui/textarea`
-- State im `onSuccess`-Callback zuruecksetzen
+### Technische Umsetzung
 
-**3. Supabase Types**
-- `types.ts` wird automatisch aktualisiert mit dem neuen `notiz`-Feld in der `services`-Tabelle
+**Datei: `src/pages/dashboard/Fahrschueler.tsx`**
 
-### Betroffene Dateien
-| Datei | Aenderung |
-|-------|-----------|
-| Migration (SQL) | `ALTER TABLE services ADD COLUMN notiz TEXT` |
-| `src/pages/dashboard/Fahrschueler.tsx` | Textarea + State + Insert-Logik |
-| `src/integrations/supabase/types.ts` | Neues Feld `notiz` |
+1. `DialogContent` bekommt `max-h-[90vh] flex flex-col` damit er nie groesser als 90% des Bildschirms wird
+2. Das `<form>` bekommt `overflow-y-auto flex-1 min-h-0` damit der Formularinhalt scrollbar wird
+3. Die `DialogFooter` wird aus dem scrollbaren Bereich herausgenommen und ans Ende des Dialogs gesetzt (immer sichtbar, nicht abgeschnitten)
+
+Konkret:
+- `DialogContent`: `className="max-w-lg max-h-[90vh] flex flex-col"`
+- `form`: `className="space-y-4 mt-2 overflow-y-auto flex-1 min-h-0 pr-1"` (pr-1 fuer Scrollbar-Abstand)
+- `DialogFooter` bleibt innerhalb des Forms aber bekommt `sticky bottom-0 bg-background pt-4` oder alternativ wird das Form-Layout so umstrukturiert, dass die Footer-Buttons immer sichtbar sind
+
+Ergebnis: Auf kleinen Bildschirmen kann man durch das Formular scrollen, die Buttons bleiben immer erreichbar.
+
