@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Shield, Plus, RotateCcw, UserX, UserCheck } from "lucide-react";
+import { Shield, Plus, RotateCcw, History } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -16,6 +15,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,31 @@ type UserRole = {
   role: string;
 };
 
+type ActivityLog = {
+  id: string;
+  action: string;
+  entity_type: string;
+  details: string | null;
+  created_at: string;
+};
+
+const entityTypeLabels: Record<string, string> = {
+  driving_lessons: "Fahrstunde",
+  theory_sessions: "Theorie",
+  exams: "Prüfung",
+  payments: "Zahlung",
+  services: "Leistung",
+};
+
+const actionLabels: Record<string, string> = {
+  erstellt: "Erstellt",
+  bearbeitet: "Bearbeitet",
+  geloescht: "Gelöscht",
+  INSERT: "Erstellt",
+  UPDATE: "Bearbeitet",
+  DELETE: "Gelöscht",
+};
+
 const Benutzerverwaltung = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -42,6 +67,9 @@ const Benutzerverwaltung = () => {
   const [resetUserId, setResetUserId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [form, setForm] = useState({ email: "", password: "", display_name: "", role: "sekretaerin" });
+  const [historieOpen, setHistorieOpen] = useState(false);
+  const [historieUserId, setHistorieUserId] = useState("");
+  const [historieUserName, setHistorieUserName] = useState("");
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin_profiles"],
@@ -59,6 +87,21 @@ const Benutzerverwaltung = () => {
       if (error) throw error;
       return data as UserRole[];
     },
+  });
+
+  const { data: userLogs = [], isLoading: logsLoading } = useQuery({
+    queryKey: ["user_activity_log", historieUserId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("activity_log")
+        .select("id, action, entity_type, details, created_at")
+        .eq("user_id", historieUserId)
+        .order("created_at", { ascending: false })
+        .limit(200) as any;
+      if (error) throw error;
+      return data as ActivityLog[];
+    },
+    enabled: !!historieUserId && historieOpen,
   });
 
   const roleMap = Object.fromEntries(roles.map((r) => [r.user_id, r.role]));
@@ -97,20 +140,8 @@ const Benutzerverwaltung = () => {
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
 
-  const toggleAktivMutation = useMutation({
-    mutationFn: async ({ id, aktiv }: { id: string; aktiv: boolean }) => {
-      const { error } = await supabase.from("profiles").update({ aktiv }).eq("id", id) as any;
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin_profiles"] });
-      toast({ title: "Status aktualisiert" });
-    },
-  });
-
   const changeRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: string }) => {
-      // Delete old role, insert new
       await (supabase.from("user_roles").delete().eq("user_id", userId) as any);
       const { error } = await (supabase.from("user_roles").insert({ user_id: userId, role: newRole } as any) as any);
       if (error) throw error;
@@ -141,21 +172,19 @@ const Benutzerverwaltung = () => {
               <TableHead>Name</TableHead>
               <TableHead>E-Mail</TableHead>
               <TableHead>Rolle</TableHead>
-              <TableHead>Letzter Login</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead className="w-32">Aktionen</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12">
+                <TableCell colSpan={4} className="text-center py-12">
                   <div className="h-4 w-48 bg-secondary/60 rounded animate-pulse mx-auto" />
                 </TableCell>
               </TableRow>
             ) : profiles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
                   Keine Accounts vorhanden
                 </TableCell>
               </TableRow>
@@ -178,14 +207,6 @@ const Benutzerverwaltung = () => {
                       </SelectContent>
                     </Select>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {p.last_sign_in ? format(new Date(p.last_sign_in), "dd.MM.yyyy HH:mm", { locale: de }) : "–"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={p.aktiv ? "default" : "secondary"}>
-                      {p.aktiv ? "Aktiv" : "Inaktiv"}
-                    </Badge>
-                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button
@@ -201,10 +222,14 @@ const Benutzerverwaltung = () => {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
-                        title={p.aktiv ? "Deaktivieren" : "Aktivieren"}
-                        onClick={() => toggleAktivMutation.mutate({ id: p.id, aktiv: !p.aktiv })}
+                        title="Historie anzeigen"
+                        onClick={() => {
+                          setHistorieUserId(p.id);
+                          setHistorieUserName(p.display_name || p.email || "Benutzer");
+                          setHistorieOpen(true);
+                        }}
                       >
-                        {p.aktiv ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                        <History className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>
@@ -272,6 +297,49 @@ const Benutzerverwaltung = () => {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Historie Dialog */}
+      <Dialog open={historieOpen} onOpenChange={setHistorieOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Historie von {historieUserName}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] mt-2">
+            {logsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 bg-secondary/60 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : userLogs.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-8">
+                Keine Aktivitäten vorhanden
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {userLogs.map((log) => (
+                  <div key={log.id} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">
+                        {actionLabels[log.action] || log.action}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        {format(new Date(log.created_at), "dd.MM.yyyy HH:mm", { locale: de })}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground mt-0.5">
+                      {entityTypeLabels[log.entity_type] || log.entity_type}
+                    </p>
+                    {log.details && (
+                      <p className="text-xs text-muted-foreground mt-1">{log.details}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
