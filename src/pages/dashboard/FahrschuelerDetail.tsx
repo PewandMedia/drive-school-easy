@@ -101,6 +101,7 @@ const FahrschuelerDetail = () => {
   const [dlgPruefung, setDlgPruefung] = useState(false);
   const [dlgLeistung, setDlgLeistung] = useState(false);
   const [dlgZahlung, setDlgZahlung] = useState(false);
+  const [editingExamStatusId, setEditingExamStatusId] = useState<string | null>(null);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -335,6 +336,21 @@ const FahrschuelerDetail = () => {
       setDlgPruefung(false);
       setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), status: "angemeldet", preis: "0" });
       toast({ title: "Prüfung eingetragen" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutExamStatus = useMutation({
+    mutationFn: async ({ examId, status }: { examId: string; status: string }) => {
+      const { error } = await supabase.from("exams").update({ status }).eq("id", examId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams", id] });
+      queryClient.invalidateQueries({ queryKey: ["exams_all"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      setEditingExamStatusId(null);
+      toast({ title: "Status aktualisiert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
@@ -1241,22 +1257,47 @@ const FahrschuelerDetail = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {exam.status === "bestanden" ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-700">
-                            <CheckCircle2 className="h-3 w-3" /> Bestanden
-                          </span>
-                        ) : exam.status === "nicht_bestanden" ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
-                            <XCircle className="h-3 w-3" /> Nicht bestanden
-                          </span>
-                        ) : exam.status === "krank" ? (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                            <AlertTriangle className="h-3 w-3" /> Krank
-                          </span>
+                        {editingExamStatusId === exam.id ? (
+                          <Select
+                            value={exam.status}
+                            onValueChange={(v) => mutExamStatus.mutate({ examId: exam.id, status: v })}
+                            onOpenChange={(open) => { if (!open) setEditingExamStatusId(null); }}
+                            defaultOpen
+                          >
+                            <SelectTrigger className="h-7 w-[150px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="angemeldet">Angemeldet</SelectItem>
+                              <SelectItem value="bestanden">Bestanden</SelectItem>
+                              <SelectItem value="nicht_bestanden">Nicht bestanden</SelectItem>
+                              <SelectItem value="krank">Krank</SelectItem>
+                            </SelectContent>
+                          </Select>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                            <Calendar className="h-3 w-3" /> Angemeldet
-                          </span>
+                          <button
+                            type="button"
+                            className="cursor-pointer"
+                            onClick={() => setEditingExamStatusId(exam.id)}
+                          >
+                            {exam.status === "bestanden" ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                <CheckCircle2 className="h-3 w-3" /> Bestanden
+                              </span>
+                            ) : exam.status === "nicht_bestanden" ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
+                                <XCircle className="h-3 w-3" /> Nicht bestanden
+                              </span>
+                            ) : exam.status === "krank" ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                <AlertTriangle className="h-3 w-3" /> Krank
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                <Calendar className="h-3 w-3" /> Angemeldet
+                              </span>
+                            )}
+                          </button>
                         )}
                         <span className="text-sm font-semibold text-foreground w-20 text-right">
                           {Number(exam.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
