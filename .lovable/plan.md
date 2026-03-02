@@ -1,30 +1,38 @@
 
 
-## Alle Demo-Daten aus der Datenbank loeschen
+## Deployment-Ready machen: Titel, Beschreibung, Favicon, Lovable-Hinweise entfernen
 
-### Was geloescht wird
+### 1. `index.html` - Seitentitel und Meta-Tags aktualisieren
 
-Alle Daten aus folgenden Tabellen werden komplett geleert (in der richtigen Reihenfolge wegen Abhaengigkeiten):
+- Titel: "Fahrschulverwaltung"
+- Beschreibung: "Digitale Verwaltungssoftware fuer Fahrschulen - Fahrschueler, Fahrstunden, Zahlungen und mehr"
+- Autor: eigener Name statt "Lovable"
+- OG/Twitter-Tags: auf "Fahrschulverwaltung" umstellen
+- Lovable OpenGraph-Bild und Twitter-Referenzen entfernen
+- TODO-Kommentare entfernen
+- Sprache von `en` auf `de` aendern
 
-1. **payment_allocations** - Zahlungszuordnungen
-2. **payments** - Zahlungen
-3. **open_items** - Offene Posten
-4. **driving_lessons** - Fahrstunden
-5. **exams** - Pruefungen
-6. **services** - Leistungen
-7. **theory_sessions** - Theoriestunden
-8. **gear_lessons** - Schaltstunden
-9. **activity_log** - Aktivitaetsprotokoll
-10. **students** - Fahrschueler
+### 2. Favicon generieren
 
-### Was NICHT geloescht wird
+- Ein Auto-Icon (passend zum App-Logo mit dem `Car`-Icon) als SVG-Favicon erstellen
+- Rotes Auto auf transparentem Hintergrund, passend zum Primary-Farbschema
+- Als `public/favicon.svg` speichern und in `index.html` referenzieren
+- Altes `public/favicon.ico` (Lovable-Logo) loeschen
 
-- **prices** - Preisliste (Konfigurationsdaten, keine Demo-Daten)
-- **instructors** - Fahrlehrer
-- **vehicles** - Fahrzeuge
-- **profiles / user_roles** - Benutzerkonten
+### 3. `vite.config.ts` - Lovable-Tagger entfernen
 
-### Technische Umsetzung
+- Import von `lovable-tagger` entfernen
+- `componentTagger()` aus der Plugins-Liste entfernen
 
-Ausfuehrung ueber das Supabase Insert-Tool mit DELETE-Statements in der richtigen Reihenfolge, um Foreign-Key-Konflikte zu vermeiden.
+### 4. `README.md` - Lovable-Hinweise entfernen
+
+- Durch eine projektspezifische README ersetzen mit Projektname und kurzer Beschreibung
+
+### 5. `public/robots.txt` pruefen
+
+- Sicherstellen, dass keine Lovable-Referenzen enthalten sind
+
+### Ergebnis
+
+Die App hat einen professionellen deutschen Seitentitel, passende Meta-Tags, ein eigenes Favicon und keine Lovable-Branding-Hinweise mehr im Code.
 
