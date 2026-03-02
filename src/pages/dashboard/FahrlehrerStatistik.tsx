@@ -7,7 +7,7 @@ import {
   UserCheck, Car, BookOpen, ClipboardCheck, TrendingUp, Euro,
   Settings, ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableHeader, TableHead, TableBody, TableRow, TableCell,
 } from "@/components/ui/table";
@@ -31,24 +31,18 @@ const quoteColor = (q: number) =>
 const quoteBarClass = (q: number) =>
   q >= 80 ? "bg-green-500" : q >= 60 ? "bg-yellow-500" : "bg-destructive";
 
-type SortKey =
-  | "name"
-  | "fahrstundenMonat"
-  | "fahrstundenGesamt"
-  | "theorieMonat"
-  | "theorieGesamt"
-  | "pruefungen"
-  | "bestehensquote"
-  | "umsatzMonat";
-
+type ExamSortKey = "name" | "pruefungen" | "pruefungenMonat" | "bestehensquote";
+type HoursSortKey = "name" | "fahrstundenMonat" | "fahrstundenGesamt" | "theorieMonat" | "theorieGesamt" | "umsatzMonat";
 type SortDir = "asc" | "desc";
 
 const FahrlehrerStatistik = () => {
   const now = new Date();
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
+  const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
-  const [sortKey, setSortKey] = useState<SortKey>("fahrstundenMonat");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [examSortKey, setExamSortKey] = useState<ExamSortKey>("pruefungen");
+  const [examSortDir, setExamSortDir] = useState<SortDir>("desc");
+  const [hoursSortKey, setHoursSortKey] = useState<HoursSortKey>("fahrstundenMonat");
+  const [hoursSortDir, setHoursSortDir] = useState<SortDir>("desc");
   const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
 
   // ── Queries ──────────────────────────────────────────
@@ -110,7 +104,6 @@ const FahrlehrerStatistik = () => {
   const inMonth = (datum: string) =>
     isWithinInterval(new Date(datum), monthInterval);
 
-  // Available years from data
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     years.add(now.getFullYear());
@@ -120,7 +113,6 @@ const FahrlehrerStatistik = () => {
     return [...years].sort((a, b) => b - a);
   }, [drivingLessons, theorySessions, exams]);
 
-  // Filter driving lessons (exclude Fehlstunde)
   const validLessons = useMemo(
     () => (drivingLessons ?? []).filter((l) => l.typ !== "fehlstunde"),
     [drivingLessons]
@@ -134,19 +126,15 @@ const FahrlehrerStatistik = () => {
       const id = inst.id;
       const name = `${inst.nachname}, ${inst.vorname}`;
 
-      // Driving
       const myLessons = validLessons.filter((l) => l.instructor_id === id);
       const fahrstundenGesamt = myLessons.reduce((s, l) => s + Number(l.einheiten), 0);
       const fahrstundenMonat = myLessons.filter((l) => inMonth(l.datum)).reduce((s, l) => s + Number(l.einheiten), 0);
-      const umsatzGesamt = myLessons.reduce((s, l) => s + Number(l.preis), 0);
       const umsatzMonat = myLessons.filter((l) => inMonth(l.datum)).reduce((s, l) => s + Number(l.preis), 0);
 
-      // Theory
       const myTheory = (theorySessions ?? []).filter((t) => t.instructor_id === id);
       const theorieGesamt = myTheory.length;
       const theorieMonat = myTheory.filter((t) => inMonth(t.datum)).length;
 
-      // Exams (praxis only)
       const myExams = (exams ?? []).filter((e) => e.instructor_id === id);
       const bestanden = myExams.filter((e) => e.status === "bestanden").length;
       const nichtBestanden = myExams.filter((e) => e.status === "nicht_bestanden").length;
@@ -160,33 +148,45 @@ const FahrlehrerStatistik = () => {
         theorieMonat, theorieGesamt,
         pruefungen: pruefungenGesamt, pruefungenMonat,
         bestehensquote,
-        umsatzMonat, umsatzGesamt,
+        umsatzMonat,
       };
-    }).filter((s) =>
-      s.fahrstundenGesamt > 0 || s.theorieGesamt > 0 || s.pruefungen > 0
-    );
+    });
   }, [instructors, validLessons, theorySessions, exams, monthInterval]);
 
+  const examStats = useMemo(() => stats.filter((s) => s.pruefungen > 0), [stats]);
+  const hoursStats = useMemo(() => stats.filter((s) => s.fahrstundenGesamt > 0 || s.theorieGesamt > 0), [stats]);
+
   // ── Sorting ──────────────────────────────────────────
-  const sorted = useMemo(() => {
-    const arr = [...stats];
+  const sortedExams = useMemo(() => {
+    const arr = [...examStats];
     arr.sort((a, b) => {
-      let va: number | string = (a as any)[sortKey];
-      let vb: number | string = (b as any)[sortKey];
-      if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb as string) : (vb as string).localeCompare(va);
-      return sortDir === "asc" ? (va as number) - (vb as number) : (vb as number) - (va as number);
+      const va = (a as any)[examSortKey];
+      const vb = (b as any)[examSortKey];
+      if (typeof va === "string") return examSortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      return examSortDir === "asc" ? va - vb : vb - va;
     });
     return arr;
-  }, [stats, sortKey, sortDir]);
+  }, [examStats, examSortKey, examSortDir]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("desc"); }
+  const sortedHours = useMemo(() => {
+    const arr = [...hoursStats];
+    arr.sort((a, b) => {
+      const va = (a as any)[hoursSortKey];
+      const vb = (b as any)[hoursSortKey];
+      if (typeof va === "string") return hoursSortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      return hoursSortDir === "asc" ? va - vb : vb - va;
+    });
+    return arr;
+  }, [hoursStats, hoursSortKey, hoursSortDir]);
+
+  const toggleExamSort = (key: ExamSortKey) => {
+    if (examSortKey === key) setExamSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setExamSortKey(key); setExamSortDir("desc"); }
   };
 
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  const toggleHoursSort = (key: HoursSortKey) => {
+    if (hoursSortKey === key) setHoursSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setHoursSortKey(key); setHoursSortDir("desc"); }
   };
 
   // ── Global KPIs ──────────────────────────────────────
@@ -252,46 +252,45 @@ const FahrlehrerStatistik = () => {
         </div>
       )}
 
-      {/* Detail Table */}
+      {/* ── Prüfungen Table ── */}
       <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ClipboardCheck className="h-5 w-5 text-orange-600" />
+            Prüfungen
+          </CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableHead col="name" label="Fahrlehrer" toggleSort={toggleSort} SortIcon={SortIcon} />
-                <SortableHead col="fahrstundenMonat" label="Fahrst. (E) Monat" toggleSort={toggleSort} SortIcon={SortIcon} className="text-center" />
-                <SortableHead col="fahrstundenGesamt" label="Fahrst. (E) Ges." toggleSort={toggleSort} SortIcon={SortIcon} className="text-center" />
-                <SortableHead col="theorieMonat" label="Theorie Monat" toggleSort={toggleSort} SortIcon={SortIcon} className="text-center" />
-                <SortableHead col="theorieGesamt" label="Theorie Ges." toggleSort={toggleSort} SortIcon={SortIcon} className="text-center" />
-                <SortableHead col="pruefungen" label="Prüfungen" toggleSort={toggleSort} SortIcon={SortIcon} className="text-center" />
-                <SortableHead col="bestehensquote" label="Bestehensquote" toggleSort={toggleSort} SortIcon={SortIcon} className="w-[180px]" />
-                <SortableHead col="umsatzMonat" label="Umsatz Monat" toggleSort={toggleSort} SortIcon={SortIcon} className="text-right" />
+                <SortableHead col="name" label="Fahrlehrer" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} />
+                <SortableHead col="pruefungen" label="Prüfungen Gesamt" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
+                <SortableHead col="pruefungenMonat" label="Prüfungen Monat" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="text-center" />
+                <SortableHead col="bestehensquote" label="Bestehensquote" sortKey={examSortKey} sortDir={examSortDir} onToggle={toggleExamSort} className="w-[180px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 4 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
-              ) : sorted.length === 0 ? (
+              ) : sortedExams.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    Keine Daten vorhanden.
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    Keine Prüfungsdaten vorhanden.
                   </TableCell>
                 </TableRow>
               ) : (
-                sorted.map((s) => (
+                sortedExams.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-center">{s.fahrstundenMonat}</TableCell>
-                    <TableCell className="text-center">{s.fahrstundenGesamt}</TableCell>
-                    <TableCell className="text-center">{s.theorieMonat}</TableCell>
-                    <TableCell className="text-center">{s.theorieGesamt}</TableCell>
                     <TableCell className="text-center">{s.pruefungen}</TableCell>
+                    <TableCell className="text-center">{s.pruefungenMonat}</TableCell>
                     <TableCell>
                       {s.bestehensquote >= 0 ? (
                         <div className="flex items-center gap-2">
@@ -309,6 +308,57 @@ const FahrlehrerStatistik = () => {
                         <span className="text-xs text-muted-foreground">–</span>
                       )}
                     </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* ── Stunden & Umsatz Table ── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Car className="h-5 w-5 text-primary" />
+            Stunden & Umsatz
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead col="name" label="Fahrlehrer" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} />
+                <SortableHead col="fahrstundenMonat" label="Fahrst. (E) Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="fahrstundenGesamt" label="Fahrst. (E) Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="theorieMonat" label="Theorie Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="theorieGesamt" label="Theorie Ges." sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-center" />
+                <SortableHead col="umsatzMonat" label="Umsatz Monat" sortKey={hoursSortKey} sortDir={hoursSortDir} onToggle={toggleHoursSort} className="text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : sortedHours.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    Keine Stundendaten vorhanden.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedHours.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="text-center">{s.fahrstundenMonat}</TableCell>
+                    <TableCell className="text-center">{s.fahrstundenGesamt}</TableCell>
+                    <TableCell className="text-center">{s.theorieMonat}</TableCell>
+                    <TableCell className="text-center">{s.theorieGesamt}</TableCell>
                     <TableCell className="text-right">
                       {s.umsatzMonat.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                     </TableCell>
@@ -345,18 +395,24 @@ function KpiCard({ icon: Icon, label, value, color, iconColor }: {
   );
 }
 
-function SortableHead({ col, label, toggleSort, SortIcon, className }: {
-  col: SortKey; label: string; toggleSort: (k: SortKey) => void;
-  SortIcon: React.FC<{ col: SortKey }>; className?: string;
+function SortableHead<T extends string>({ col, label, sortKey, sortDir, onToggle, className }: {
+  col: T; label: string; sortKey: T; sortDir: SortDir;
+  onToggle: (k: T) => void; className?: string;
 }) {
   return (
     <TableHead className={className}>
       <button
         type="button"
         className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-        onClick={() => toggleSort(col)}
+        onClick={() => onToggle(col)}
       >
-        {label} <SortIcon col={col} />
+        {label}
+        {sortKey !== col
+          ? <ArrowUpDown className="h-3 w-3 opacity-40" />
+          : sortDir === "asc"
+            ? <ArrowUp className="h-3 w-3" />
+            : <ArrowDown className="h-3 w-3" />
+        }
       </button>
     </TableHead>
   );
