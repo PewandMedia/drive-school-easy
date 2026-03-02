@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       driving_lessons: {
         Row: {
           created_at: string
@@ -342,6 +375,33 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          aktiv: boolean
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          last_sign_in: string | null
+        }
+        Insert: {
+          aktiv?: boolean
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          last_sign_in?: string | null
+        }
+        Update: {
+          aktiv?: boolean
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          last_sign_in?: string | null
+        }
+        Relationships: []
+      }
       services: {
         Row: {
           bezeichnung: string
@@ -477,6 +537,24 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       vehicles: {
         Row: {
           aktiv: boolean
@@ -509,9 +587,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
+      app_role: "admin" | "sekretaerin"
       driving_lesson_typ:
         | "uebungsstunde"
         | "ueberland"
@@ -652,6 +737,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "sekretaerin"],
       driving_lesson_typ: [
         "uebungsstunde",
         "ueberland",

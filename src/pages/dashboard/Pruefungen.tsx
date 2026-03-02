@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil, Calendar, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { logActivity } from "@/lib/activityLog";
+import ActivityInfoButton from "@/components/ActivityInfoButton";
 import InstructorManageDialog from "@/components/InstructorManageDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +64,7 @@ const STATUS_CONFIG: Record<ExamStatus, { label: string; cls: string; icon: Reac
 };
 
 const Pruefungen = () => {
+  const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ExamForm>(defaultForm());
   const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
@@ -145,7 +149,7 @@ const Pruefungen = () => {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("exams").insert({
+      const { data, error } = await supabase.from("exams").insert({
         student_id: form.student_id,
         typ: form.typ,
         fahrzeug_typ: form.fahrzeug_typ,
@@ -153,10 +157,14 @@ const Pruefungen = () => {
         status: form.status,
         preis: parseFloat(form.preis) || 0,
         instructor_id: form.typ === "praxis" ? form.instructor_id : null,
-      });
+      }).select("id").single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.id && user) {
+        logActivity({ action: "erstellt", entity_type: "pruefung", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       qc.invalidateQueries({ queryKey: ["exams_all"] });
       toast({ title: "Prüfung eingetragen" });
       setOpen(false);
@@ -171,8 +179,12 @@ const Pruefungen = () => {
     mutationFn: async ({ examId, status }: { examId: string; status: ExamStatus }) => {
       const { error } = await supabase.from("exams").update({ status }).eq("id", examId);
       if (error) throw error;
+      return examId;
     },
-    onSuccess: () => {
+    onSuccess: (examId) => {
+      if (user) {
+        logActivity({ action: "bearbeitet", entity_type: "pruefung", entity_id: examId }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       qc.invalidateQueries({ queryKey: ["exams_all"] });
       qc.invalidateQueries({ queryKey: ["exams"] });
       setEditingStatusId(null);
@@ -297,7 +309,7 @@ const Pruefungen = () => {
                       ? format(new Date(exam.datum), "dd.MM.yyyy", { locale: de })
                       : "–"}
                   </span>
-                  <div className="relative">
+                  <div className="relative flex items-center gap-1">
                     {editingStatusId === exam.id ? (
                       <Select
                         value={status}
@@ -321,6 +333,7 @@ const Pruefungen = () => {
                         <Icon className="h-3 w-3" /> {cfg.label}
                       </button>
                     )}
+                    <ActivityInfoButton entityId={exam.id} />
                   </div>
                 </div>
               );

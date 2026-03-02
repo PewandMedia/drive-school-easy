@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListChecks, Plus, ChevronRight, Search } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { logActivity } from "@/lib/activityLog";
+import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +63,7 @@ const defaultForm = {
 
 const Leistungen = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
@@ -94,16 +98,20 @@ const Leistungen = () => {
 
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
-      const { error } = await supabase.from("services").insert([{
+      const { data, error } = await supabase.from("services").insert([{
         student_id: values.student_id,
         preis_id: values.preis_id || null,
         bezeichnung: values.bezeichnung,
         preis: parseFloat(values.preis) || 0,
         status: values.status,
-      }]);
+      }]).select("id").single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.id && user) {
+        logActivity({ action: "erstellt", entity_type: "leistung", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       queryClient.invalidateQueries({ queryKey: ["services"] });
       setOpen(false);
       setForm(defaultForm);
@@ -116,8 +124,14 @@ const Leistungen = () => {
     mutationFn: async ({ id, status }: { id: string; status: ServiceStatus }) => {
       const { error } = await supabase.from("services").update({ status }).eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["services"] }),
+    onSuccess: (id) => {
+      if (user) {
+        logActivity({ action: "bearbeitet", entity_type: "leistung", entity_id: id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+    },
   });
 
   const isSonstiges = form.preis_id === "sonstiges";
@@ -290,7 +304,7 @@ const Leistungen = () => {
                 {items.map((service) => (
                   <div
                     key={service.id}
-                    className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 items-center px-5 py-3 border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
+                    className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3 border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
                   >
                     <span className="text-sm text-foreground truncate">{service.bezeichnung}</span>
                     <span className="text-xs text-muted-foreground">
@@ -312,6 +326,7 @@ const Leistungen = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    <ActivityInfoButton entityId={service.id} />
                   </div>
                 ))}
               </div>
