@@ -1,44 +1,30 @@
 
-## Pruefungstabelle: Alle Spalten nach gewaehltem Zeitraum filtern
+
+## Stunden & Umsatz: "Gesamt"-Spalten entfernen
 
 ### Problem
-Wenn man z.B. "Maerz" auswaehlt, zeigen die Spalten "Gesamt", "Bestanden" und "Nicht bestanden" trotzdem die Zahlen seit Beginn -- nicht die Werte fuer Maerz. Nur die Spalte mit dem Monatsnamen wird gefiltert. Das ist verwirrend und macht keinen Sinn.
+Die Tabelle "Stunden & Umsatz" zeigt aktuell sowohl die Werte fuer den gewaehlten Zeitraum als auch "Gesamt"-Spalten (Fahrst. Ges., Theorie Ges.). Das ist ueberfluessig -- wenn man Gesamt sehen will, waehlt man einfach "Ganzes Jahr".
 
 ### Loesung
-Alle Pruefungs-Spalten (Gesamt, Bestanden, Nicht bestanden, Bestehensquote) sollen sich auf den gewaehlten Zeitraum beziehen. Die separate "Monat"-Spalte wird entfernt, da sie dann redundant waere.
+Die Spalten "Fahrst. Ges." und "Theorie Ges." werden entfernt. Die Tabelle zeigt dann nur noch:
+
+**Fahrlehrer | Fahrstunden | Oe/Monat | Theorie | Umsatz** (5 Spalten statt 7)
+
+Die Spaltenheader "Fahrstunden" und "Theorie" zeigen weiterhin den Periodenamen (z.B. "Fahrstunden Februar").
 
 ### Aenderung
 
 | Datei | Was |
 |-------|-----|
-| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Pruefungs-Berechnung und Tabellen-Spalten anpassen |
+| `src/pages/dashboard/FahrlehrerStatistik.tsx` | 2 Spalten aus Tabelle und Totals entfernen |
 
 ### Details
 
-**1. Berechnung anpassen (Zeilen ~160-165)**
+1. **HoursSortKey-Type**: `fahrstundenGesamt` und `theorieGesamt` entfernen
+2. **Tabellen-Header** (Zeilen 448-454): Die zwei `SortableHead` fuer `fahrstundenGesamt` und `theorieGesamt` entfernen
+3. **Tabellen-Body** (Zeilen 477-481): Die zwei `TableCell` fuer `fahrstundenGesamt` und `theorieGesamt` entfernen
+4. **Skeleton-Loader** (Zeile 461): Von 7 auf 5 Spalten reduzieren
+5. **Leere-Zeile colSpan** (Zeile 468): Von 7 auf 5 aendern
+6. **Totals-Zeile** (Zeilen 489-497): Die zwei Zellen fuer `fahrstundenGesamt` und `theorieGesamt` entfernen
+7. **Totals-useMemo** (Zeilen 204-211): `fahrstundenGesamt` und `theorieGesamt` aus der Berechnung entfernen
 
-Statt `bestanden`/`nichtBestanden` ueber alle Exams zu berechnen, werden sie auf `inPeriod` gefiltert:
-
-```
-const myPeriodExams = myExams.filter(e => inPeriod(e.datum));
-const bestanden = myPeriodExams.filter(e => e.status === "bestanden").length;
-const nichtBestanden = myPeriodExams.filter(e => e.status === "nicht_bestanden").length;
-const pruefungen = bestanden + nichtBestanden;
-const bestehensquote = pruefungen > 0 ? Math.round((bestanden / pruefungen) * 100) : -1;
-```
-
-**2. Redundante Spalte entfernen**
-
-Die Spalte `pruefungenPeriod` (die den Monatsnamen als Header hat) wird entfernt, da "Gesamt" jetzt bereits den gewaehlten Zeitraum zeigt.
-
-**3. Tabellen-Header anpassen**
-
-Die Spalten werden: Fahrlehrer | Gesamt | Bestanden | Nicht best. | Bestehensquote (5 Spalten statt 6).
-
-**4. examStats-Filter anpassen**
-
-`examStats` filtert aktuell auf `s.pruefungen > 0`. Da `pruefungen` jetzt periodenbasiert ist, werden nur Fahrlehrer mit Pruefungen im gewaehlten Zeitraum angezeigt.
-
-**5. KPI-Karten Bestanden/Nicht bestanden**
-
-Die KPI-Karte "Pruefungen" zeigt aktuell `totalBestanden`/`totalNichtBestanden` ueber alle Zeiten. Diese werden ebenfalls auf den Zeitraum beschraenkt.
