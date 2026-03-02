@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { Car, Plus, Trash2, Euro, Clock, TrendingUp } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { useAuth } from "@/contexts/AuthContext";
-import { logActivity } from "@/lib/activityLog";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
@@ -164,10 +163,7 @@ const Fahrstunden = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      if (data?.id && user) {
-        logActivity({ action: "erstellt", entity_type: "fahrstunde", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       setForm(defaultForm);
       setOpen(false);
@@ -187,10 +183,7 @@ const Fahrstunden = () => {
       if (error) throw error;
       return id;
     },
-    onSuccess: (id) => {
-      if (user) {
-        logActivity({ action: "geloescht", entity_type: "fahrstunde", entity_id: id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       toast({ title: "Fahrstunde gelöscht" });
     },

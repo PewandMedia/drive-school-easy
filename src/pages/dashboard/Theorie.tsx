@@ -3,7 +3,6 @@ import { BookOpen, Plus, Trash2, Users, GraduationCap, BookMarked } from "lucide
 import { formatStudentName } from "@/lib/formatStudentName";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { useAuth } from "@/contexts/AuthContext";
-import { logActivity } from "@/lib/activityLog";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
@@ -100,10 +99,7 @@ const Theorie = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      if (data?.id && user) {
-        logActivity({ action: "erstellt", entity_type: "theorie", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
       setForm(defaultForm);
       setOpen(false);
@@ -120,10 +116,7 @@ const Theorie = () => {
       if (error) throw error;
       return id;
     },
-    onSuccess: (id) => {
-      if (user) {
-        logActivity({ action: "geloescht", entity_type: "theorie", entity_id: id }, user.id, profile?.display_name ?? user.email ?? "");
-      }
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
       toast({ title: "Theoriestunde gelöscht" });
     },
