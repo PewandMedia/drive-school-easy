@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -69,6 +70,7 @@ const Fahrschueler = () => {
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
+  const [angebotsNotiz, setAngebotsNotiz] = useState("");
 
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["students"],
@@ -171,6 +173,7 @@ const Fahrschueler = () => {
           bezeichnung: p.bezeichnung,
           preis: customPrices[p.id] ?? p.preis,
           status: "offen" as const,
+          notiz: angebotsNotiz.trim() || null,
         }));
         await supabase.from("services").insert(servicesToInsert);
       }
@@ -187,6 +190,7 @@ const Fahrschueler = () => {
       const initial: Record<string, number> = {};
       for (const p of autoPrices) initial[p.id] = Number(p.preis);
       setCustomPrices(initial);
+      setAngebotsNotiz("");
     },
     onError: (err: Error) => {
       setFormError(err.message);
@@ -559,6 +563,16 @@ const Fahrschueler = () => {
                 <div className="flex items-center justify-between text-sm font-semibold">
                   <span>Gesamt</span>
                   <span>{autoPricesTotal.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="angebotsNotiz" className="text-xs text-muted-foreground">Notiz / Angebot</Label>
+                  <Textarea
+                    id="angebotsNotiz"
+                    placeholder="z.B. Weihnachtsangebot, Sonderkonditionen..."
+                    className="min-h-[60px] text-sm"
+                    value={angebotsNotiz}
+                    onChange={(e) => setAngebotsNotiz(e.target.value)}
+                  />
                 </div>
               </div>
             )}
