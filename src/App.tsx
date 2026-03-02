@@ -27,6 +27,7 @@ import Abrechnung from "./pages/dashboard/Abrechnung";
 import FahrlehrerStatistik from "./pages/dashboard/FahrlehrerStatistik";
 import Tagesabrechnung from "./pages/dashboard/Tagesabrechnung";
 import Auswertung from "./pages/dashboard/Auswertung";
+import Benutzerverwaltung from "./pages/dashboard/Benutzerverwaltung";
 
 const queryClient = new QueryClient();
 
@@ -61,9 +62,11 @@ const App = () => (
               <Route path="zahlungen" element={<Zahlungen />} />
               <Route path="abrechnung" element={<Abrechnung />} />
               
-              <Route path="fahrlehrer-statistik" element={<FahrlehrerStatistik />} />
-              <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
-              <Route path="auswertung" element={<Auswertung />} />
+              {/* Admin-only routes */}
+              <Route path="fahrlehrer-statistik" element={<ProtectedRoute requiredRole="admin"><FahrlehrerStatistik /></ProtectedRoute>} />
+              <Route path="tagesabrechnung" element={<ProtectedRoute requiredRole="admin"><Tagesabrechnung /></ProtectedRoute>} />
+              <Route path="auswertung" element={<ProtectedRoute requiredRole="admin"><Auswertung /></ProtectedRoute>} />
+              <Route path="benutzerverwaltung" element={<ProtectedRoute requiredRole="admin"><Benutzerverwaltung /></ProtectedRoute>} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

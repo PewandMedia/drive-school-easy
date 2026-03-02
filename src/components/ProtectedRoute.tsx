@@ -1,8 +1,10 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, loading } = useAuth();
+type AppRole = "admin" | "sekretaerin";
+
+const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode; requiredRole?: AppRole }) => {
+  const { session, loading, role } = useAuth();
 
   if (loading) {
     return (
@@ -13,6 +15,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!session) return <Navigate to="/login" replace />;
+
+  if (requiredRole && role !== requiredRole) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 };

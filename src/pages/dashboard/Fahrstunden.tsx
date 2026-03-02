@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
 import { Car, Plus, Trash2, Euro, Clock, TrendingUp } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
+import { useAuth } from "@/contexts/AuthContext";
+import { logActivity } from "@/lib/activityLog";
+import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, isToday } from "date-fns";
 import { de } from "date-fns/locale";
@@ -103,6 +106,7 @@ const defaultForm = {
 
 const Fahrstunden = () => {
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
@@ -149,17 +153,21 @@ const Fahrstunden = () => {
 
   const insertMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
-      const { error } = await supabase.from("driving_lessons").insert({
+      const { data, error } = await supabase.from("driving_lessons").insert({
         student_id: values.student_id,
         instructor_id: values.instructor_id || null,
         typ: values.typ,
         fahrzeug_typ: values.fahrzeug_typ,
         dauer_minuten: values.dauer_minuten,
         datum: new Date(values.datum).toISOString(),
-      } as any);
+      } as any).select("id").single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.id && user) {
+        logActivity({ action: "erstellt", entity_type: "fahrstunde", entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       setForm(defaultForm);
       setOpen(false);
@@ -177,8 +185,12 @@ const Fahrstunden = () => {
         .delete()
         .eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
+      if (user) {
+        logActivity({ action: "geloescht", entity_type: "fahrstunde", entity_id: id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       toast({ title: "Fahrstunde gelöscht" });
     },
@@ -257,15 +269,18 @@ const Fahrstunden = () => {
         {Number(lesson.preis).toFixed(2)} €
       </TableCell>
       <TableCell>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-destructive"
-          onClick={() => deleteMutation.mutate(lesson.id)}
-          disabled={deleteMutation.isPending}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <ActivityInfoButton entityId={lesson.id} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={() => deleteMutation.mutate(lesson.id)}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );

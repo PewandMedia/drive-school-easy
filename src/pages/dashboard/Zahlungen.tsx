@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark, Search } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { logActivity } from "@/lib/activityLog";
+import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +83,7 @@ const Zahlungen = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
   const { toast } = useToast();
+  const { user, profile } = useAuth();
   const qc = useQueryClient();
 
   const { data: payments = [], isLoading } = useQuery({
@@ -130,7 +134,6 @@ const Zahlungen = () => {
       if (paymentError) throw paymentError;
 
       if (form.istGutschrift) {
-        // Create negative open_item to reduce saldo
         const { error: oiError } = await supabase.from("open_items").insert({
           student_id: form.student_id,
           typ: "gutschrift",
@@ -160,8 +163,13 @@ const Zahlungen = () => {
           if (allocError) throw allocError;
         }
       }
+      return paymentData;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.id && user) {
+        const entityType = form.istGutschrift ? "gutschrift" : "zahlung";
+        logActivity({ action: "erstellt", entity_type: entityType as any, entity_id: data.id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
       qc.invalidateQueries({ queryKey: ["open_items_student", form.student_id] });
@@ -179,8 +187,12 @@ const Zahlungen = () => {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("payments").delete().eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => {
+    onSuccess: (id) => {
+      if (user) {
+        logActivity({ action: "geloescht", entity_type: "zahlung", entity_id: id }, user.id, profile?.display_name ?? user.email ?? "");
+      }
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
       toast({ title: "Zahlung gelöscht" });
@@ -265,15 +277,18 @@ const Zahlungen = () => {
           {Number(p.betrag) < 0 ? "" : "+"}{eur(Number(p.betrag))}
         </TableCell>
         <TableCell>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={() => deleteMutation.mutate(p.id)}
-            disabled={deleteMutation.isPending}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <ActivityInfoButton entityId={p.id} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={() => deleteMutation.mutate(p.id)}
+              disabled={deleteMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
     );

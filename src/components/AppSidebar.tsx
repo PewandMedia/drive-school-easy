@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +26,7 @@ import {
   Receipt,
   FileText,
   BarChart3,
+  Shield,
 } from "lucide-react";
 
 const navItems = [
@@ -37,7 +39,7 @@ const schuelerItems = [
   { title: "Schaltstunden", url: "/dashboard/schaltstunden", icon: ToggleLeft },
   { title: "Theorie", url: "/dashboard/theorie", icon: BookOpen },
   { title: "Prüfungen", url: "/dashboard/pruefungen", icon: ClipboardCheck },
-  { title: "Fahrlehrer-Statistik", url: "/dashboard/fahrlehrer-statistik", icon: UserCheck },
+  { title: "Fahrlehrer-Statistik", url: "/dashboard/fahrlehrer-statistik", icon: UserCheck, adminOnly: true },
 ];
 
 const verwaltungItems = [
@@ -47,22 +49,28 @@ const verwaltungItems = [
 const finanzItems = [
   { title: "Zahlungen", url: "/dashboard/zahlungen", icon: CreditCard },
   { title: "Abrechnung", url: "/dashboard/abrechnung", icon: Receipt },
-  
-  { title: "Tagesabrechnung", url: "/dashboard/tagesabrechnung", icon: FileText },
-  { title: "Auswertung", url: "/dashboard/auswertung", icon: BarChart3 },
+  { title: "Tagesabrechnung", url: "/dashboard/tagesabrechnung", icon: FileText, adminOnly: true },
+  { title: "Auswertung", url: "/dashboard/auswertung", icon: BarChart3, adminOnly: true },
+];
+
+const adminItems = [
+  { title: "Benutzerverwaltung", url: "/dashboard/benutzerverwaltung", icon: Shield },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
+  const { isAdmin } = useAuth();
 
   const isActive = (url: string, exact = false) => {
     if (exact) return location.pathname === url;
     return location.pathname === url || location.pathname.startsWith(url + "/");
   };
 
+  const filterItems = (items: typeof schuelerItems) =>
+    items.filter((item) => !(item as any).adminOnly || isAdmin);
+
   return (
     <Sidebar collapsible="icon">
-      {/* Logo */}
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
@@ -98,7 +106,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Schüler & Ausbildung</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {schuelerItems.map((item) => (
+              {filterItems(schuelerItems).map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
                     <NavLink to={item.url}>
@@ -136,7 +144,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Finanzen</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {finanzItems.map((item) => (
+              {filterItems(finanzItems).map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
                     <NavLink to={item.url}>
@@ -149,6 +157,27 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminItems.map((item) => (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                      <NavLink to={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-2">
