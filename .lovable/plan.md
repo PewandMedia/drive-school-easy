@@ -1,65 +1,52 @@
 
 
-## Fahrlehrer-Statistik zum Leistungs-Dashboard erweitern
+## Fahrlehrer-Statistik: Pruefungen und Stunden in zwei getrennte Tabellen aufteilen
 
 ### Uebersicht
 
-Die bestehende Fahrlehrer-Statistik-Seite wird von einer reinen Pruefungs-Durchfallquoten-Ansicht zu einem vollstaendigen Leistungs-Dashboard umgebaut. Pro Fahrlehrer werden Fahrstunden, Theoriestunden, Pruefungen, Bestehensquote und Umsatz angezeigt -- filterbar nach Monat/Jahr.
+Die aktuelle Seite zeigt alles in einer einzigen Tabelle. Der Nutzer moechte zwei separate Bereiche:
+1. **Pruefungen** -- wie vorher: Fahrlehrer, Anzahl Pruefungen, Bestehensquote mit Farbbalken
+2. **Stunden-Tracking** -- darunter: Fahrstunden (Einheiten Monat/Gesamt), Theoriestunden (Monat/Gesamt), Umsatz
 
 ### Aenderungen
 
-**Datei: `src/pages/dashboard/FahrlehrerStatistik.tsx`** (komplett ueberarbeiten)
+**Datei: `src/pages/dashboard/FahrlehrerStatistik.tsx`**
 
-**A) Neue Datenquellen laden**
+**A) Erste Tabelle: Pruefungen (oben)**
 
-Zusaetzlich zu `instructors` und `exams` werden geladen:
-- `driving_lessons` (mit `fetchAllRows`): Felder `instructor_id`, `datum`, `einheiten`, `preis`, `typ`
-- `theory_sessions` (mit `fetchAllRows`): Felder `instructor_id`, `datum`
+Spalten:
+| Fahrlehrer | Pruefungen Gesamt | Pruefungen Monat | Bestehensquote (mit Farbbalken) |
 
-Fehlstunden (`typ === "fehlstunde"`) werden bei Fahrstunden ausgeschlossen.
+Eigene Sortierung (separater State oder gleicher mit angepassten Keys).
 
-**B) Monats-/Jahresfilter**
+**B) Zweite Tabelle: Stunden-Tracking (darunter)**
 
-- Zwei Select-Dropdowns oben: Monat (Januar-Dezember) und Jahr (dynamisch aus Daten)
-- Vorbelegung: aktueller Monat/Jahr
-- Alle Berechnungen werden sowohl fuer "Gesamt" als auch fuer den gewaehlten Monat durchgefuehrt
+Spalten:
+| Fahrlehrer | Fahrst. (E) Monat | Fahrst. (E) Gesamt | Theorie Monat | Theorie Gesamt | Umsatz Monat |
 
-**C) Globale KPI-Karten (4-6 Karten)**
+Eigene Sortierung.
 
-Oberste Zeile mit aggregierten Werten ueber alle Fahrlehrer:
-- Gesamt Fahrstunden (Einheiten) im gewaehlten Monat
-- Gesamt Theoriestunden im gewaehlten Monat
-- Gesamt Pruefungen im gewaehlten Monat
-- Durchschnittliche Bestehensquote
-- Gesamt Umsatz (Summe `preis` der Fahrstunden im Monat)
+**C) KPI-Karten bleiben oben**
 
-**D) Detailtabelle pro Fahrlehrer**
+Die 5 KPI-Karten (Fahrstunden, Theorie, Pruefungen, Bestehensquote, Umsatz) bleiben unveraendert.
 
-Eine Tabelle mit folgenden Spalten:
-| Fahrlehrer | Fahrstunden (E) Monat | Fahrstunden (E) Gesamt | Theorie Monat | Theorie Gesamt | Pruefungen | Bestehensquote | Umsatz Monat |
+**D) Ueberschriften fuer jeden Bereich**
 
-- Sortierbar ueber Spaltenheader-Klick (Ranking-System)
-- Standard-Sortierung: meiste Fahrstunden im Monat
-- Bestehensquote mit Farbindikator (Gruen/Gelb/Rot wie bisher)
-
-**E) Bisheriges Balkendiagramm entfernen**
-
-Das alte Durchfallquoten-Balkendiagramm wird durch die erweiterte Tabelle ersetzt. Die Pruefungsdaten (bestanden/nicht bestanden) fliessen in die Bestehensquote-Spalte ein.
+Jede Tabelle erhaelt eine eigene Card mit Titel:
+- "Pruefungen" mit ClipboardCheck-Icon
+- "Stunden & Umsatz" mit Car-Icon
 
 ### Technische Details
 
-- `driving_lessons` werden mit `fetchAllRows` geladen und nach `instructor_id IS NOT NULL` und `typ !== "fehlstunde"` gefiltert
-- `theory_sessions` werden mit `fetchAllRows` geladen und nach `instructor_id IS NOT NULL` gefiltert
-- Monatsfilter nutzt `isWithinInterval`, `startOfMonth`, `endOfMonth` aus `date-fns`
-- Sortierung ueber einen `sortKey`/`sortDir` State, der beim Klick auf Spaltenheader wechselt
-- Bestehensquote = `bestanden / (bestanden + nicht_bestanden) * 100` (invertiert gegenueber der bisherigen Durchfallquote)
-- Umsatz = `SUM(preis)` der Fahrstunden des Fahrlehrers (ohne Fehlstunden)
+- Zwei separate Sort-States: `sortKeyExams`/`sortDirExams` und `sortKeyHours`/`sortDirHours`
+- Zwei separate SortKey-Types fuer die jeweiligen Spalten
+- Bestehende Daten-Berechnung (`stats`) bleibt gleich, nur die Darstellung wird in zwei Tabellen aufgeteilt
+- Pruefungen-Tabelle zeigt nur Fahrlehrer mit mindestens einer Pruefung
+- Stunden-Tabelle zeigt nur Fahrlehrer mit mindestens einer Fahrstunde oder Theoriestunde
 
 ### Betroffene Dateien
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Komplett ueberarbeiten: neue Queries, Filter, KPIs, erweiterte Tabelle mit Sortierung |
-
-Keine Datenbank-Aenderungen noetig -- alle Daten sind bereits vorhanden.
+| `src/pages/dashboard/FahrlehrerStatistik.tsx` | Eine Tabelle in zwei getrennte Tabellen aufteilen (Pruefungen oben, Stunden unten) |
 
