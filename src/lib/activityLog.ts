@@ -16,7 +16,7 @@ export const logActivity = async (
   userName: string
 ) => {
   try {
-    await supabase.from("activity_log").insert({
+    const { error } = await supabase.from("activity_log").insert({
       user_id: userId,
       user_name: userName,
       action: params.action,
@@ -24,7 +24,10 @@ export const logActivity = async (
       entity_id: params.entity_id,
       details: params.details ?? null,
     } as any);
+    if (error) {
+      console.error("Activity log insert failed:", error.message, error.details, error.hint);
+    }
   } catch (e) {
-    console.error("Activity log error:", e);
+    console.error("Activity log unexpected error:", e);
   }
 };
