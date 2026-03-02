@@ -407,6 +407,7 @@ export type Database = {
           bezeichnung: string
           created_at: string
           id: string
+          notiz: string | null
           preis: number
           preis_id: string | null
           status: Database["public"]["Enums"]["service_status"]
@@ -416,6 +417,7 @@ export type Database = {
           bezeichnung: string
           created_at?: string
           id?: string
+          notiz?: string | null
           preis?: number
           preis_id?: string | null
           status?: Database["public"]["Enums"]["service_status"]
@@ -425,6 +427,7 @@ export type Database = {
           bezeichnung?: string
           created_at?: string
           id?: string
+          notiz?: string | null
           preis?: number
           preis_id?: string | null
           status?: Database["public"]["Enums"]["service_status"]
