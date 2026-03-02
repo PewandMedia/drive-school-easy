@@ -1,52 +1,74 @@
 
-## Benutzerverwaltung vereinfachen + Historie-Button
 
-### Was wird entfernt
-- Spalte "Letzter Login"
-- Spalte "Status" (Aktiv/Inaktiv Badge)
-- Aktiv/Deaktiv-Button (UserX/UserCheck) aus der Aktionen-Spalte
-- `toggleAktivMutation` (wird nicht mehr gebraucht)
+## Details im Aktivitaetsprotokoll anzeigen
 
-### Was wird hinzugefuegt
-Ein **Historie-Button** (z.B. History-Icon) pro Benutzer in der Aktionen-Spalte. Beim Klick oeffnet sich ein Dialog, der alle Aktivitaeten dieses Benutzers aus `activity_log` anzeigt -- gefiltert nach `user_id`.
+### Problem
+Der Audit-Trigger speichert aktuell nur Aktion + Tabellenname, aber keine Details (z.B. welcher Schueler, welche Art Fahrstunde). Die `details`-Spalte ist immer NULL.
 
-Der Dialog zeigt eine chronologische Liste mit:
-- Aktion (erstellt/bearbeitet/geloescht)
-- Typ (Fahrstunde, Theorie, Pruefung, Zahlung, Leistung)
-- Datum und Uhrzeit
-- Optional: Details
+### Loesung
+Die Trigger-Funktion `audit_entity_change()` erweitern, damit sie automatisch einen aussagekraeftigen `details`-Text generiert -- mit Schuelername und relevanten Infos.
 
-So kann der Admin direkt in der Benutzerverwaltung sehen, was z.B. Jiyan oder Dilan alles eingetragen hat, ohne in jede einzelne Seite gehen zu muessen.
+### Was im Details-Text stehen wird
 
-### Neue Tabellenstruktur
-
-| Name | E-Mail | Rolle | Aktionen |
-|------|--------|-------|----------|
-| Dilan | dilan@... | Sekretaerin | [Passwort] [Historie] |
-| Jiyan | jiyan@... | Sekretaerin | [Passwort] [Historie] |
+| Tabelle | Beispiel-Details |
+|---------|-----------------|
+| driving_lessons | "Uebungsstunde fuer Mustermann, Max (90 Min)" |
+| theory_sessions | "Grundstoff Lektion 3 fuer Mustermann, Max" |
+| exams | "Theorieprüfung fuer Mustermann, Max" |
+| payments | "Zahlung 150.00 EUR (bar) fuer Mustermann, Max" |
+| services | "Grundbetrag (250.00 EUR) fuer Mustermann, Max" |
 
 ### Technische Umsetzung
 
-**Datei: `src/pages/dashboard/Benutzerverwaltung.tsx`**
+**1. Migration: Trigger-Funktion erweitern**
 
-1. Entfernen:
-   - Import von `Badge`, `UserX`, `UserCheck`
-   - `toggleAktivMutation`
-   - Spalten "Letzter Login" und "Status" aus Header und Body
-   - Aktiv/Deaktiv-Button
-   - `colSpan` von 6 auf 4 anpassen
+Die bestehende `audit_entity_change()` wird per `CREATE OR REPLACE` aktualisiert. In der Funktion:
 
-2. Hinzufuegen:
-   - Import von `History` Icon aus lucide-react
-   - Import von `ScrollArea` fuer lange Listen
-   - State: `historieOpen` (boolean) und `historieUserId` / `historieUserName` (string)
-   - Historie-Button in der Aktionen-Spalte
-   - Neuer Dialog "Historie von [Name]":
-     - Laedt `activity_log` gefiltert nach `user_id = historieUserId`
-     - Sortiert nach `created_at DESC` (neueste zuerst)
-     - Zeigt: Datum/Uhrzeit, Aktion, Typ, Details
-     - ScrollArea fuer lange Listen
-     - Hinweis wenn keine Eintraege vorhanden
+- Schuelername wird aus `students` geladen (per `student_id` aus NEW/OLD)
+- Je nach `TG_TABLE_NAME` wird ein spezifischer Details-Text gebaut:
+  - `driving_lessons`: Typ + Schuelername + Dauer
+  - `theory_sessions`: Typ + Lektion + Schuelername
+  - `exams`: Typ + Schuelername
+  - `payments`: Betrag + Zahlungsart + Schuelername
+  - `services`: Bezeichnung + Preis + Schuelername
 
-### Keine Datenbank-Aenderungen noetig
-Die `activity_log`-Tabelle hat bereits `user_id` -- der Admin kann per SELECT darauf zugreifen (RLS erlaubt SELECT fuer Admins).
+```text
+-- Pseudocode der erweiterten Trigger-Funktion
+_record := COALESCE(NEW, OLD);
+_student_name := (SELECT nachname || ', ' || vorname FROM students WHERE id = _record.student_id);
+
+CASE TG_TABLE_NAME
+  WHEN 'driving_lessons' THEN
+    _details := initcap(_record.typ) || ' fuer ' || _student_name || ' (' || _record.dauer_minuten || ' Min)';
+  WHEN 'theory_sessions' THEN
+    _details := initcap(_record.typ) || CASE WHEN _record.lektion IS NOT NULL THEN ' Lektion ' || _record.lektion ELSE '' END || ' fuer ' || _student_name;
+  WHEN 'exams' THEN
+    _details := initcap(_record.typ) || ' fuer ' || _student_name;
+  WHEN 'payments' THEN
+    _details := _record.betrag || ' EUR (' || _record.zahlungsart || ') fuer ' || _student_name;
+  WHEN 'services' THEN
+    _details := _record.bezeichnung || ' (' || _record.preis || ' EUR) fuer ' || _student_name;
+END CASE;
+```
+
+Da die Spalten pro Tabelle unterschiedlich sind, wird innerhalb der Funktion mit dynamischem Record-Zugriff gearbeitet. Da PL/pgSQL keinen generischen Record-Feldzugriff erlaubt, nutze ich `hstore` oder separate IF-Bloecke mit explizitem Casting.
+
+**2. Keine Frontend-Aenderung noetig**
+
+Die `Benutzerverwaltung.tsx` zeigt `log.details` bereits an (Zeile 336). Sobald die Trigger-Funktion Details schreibt, erscheinen sie automatisch im Historie-Dialog.
+
+### Betroffene Dateien
+
+| Datei | Aenderung |
+|-------|-----------|
+| Migration (SQL) | `CREATE OR REPLACE FUNCTION audit_entity_change()` mit Details-Generierung |
+
+### Ergebnis
+
+In der Historie steht dann z.B.:
+- **Erstellt** -- 02.03.2026 07:25
+- Fahrstunde
+- *Uebungsstunde fuer Mustermann, Max (90 Min)*
+
+Statt nur "Erstellt / Fahrstunde" ohne weitere Infos.
+
