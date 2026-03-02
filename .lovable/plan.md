@@ -1,18 +1,28 @@
 
 
-## Fahrstunden-Dialog nach Speichern offen lassen
+## Fahrlehrer-Auswahl nach Speichern beibehalten
 
 ### Problem
-Beim Speichern einer Fahrstunde schliesst sich das "Neue Fahrstunde"-Fenster automatisch. Der Benutzer moechte mehrere Fahrstunden hintereinander eintragen koennen, ohne das Fenster jedes Mal neu oeffnen zu muessen.
+Beim Eintragen mehrerer Fahrstunden hintereinander wird der Fahrlehrer nach jedem Speichern zurueckgesetzt, sodass er jedes Mal neu gewaehlt werden muss.
 
 ### Loesung
-In der `onSuccess`-Callback der Fahrstunden-Mutation wird `setDlgFahrstunde(false)` entfernt. Das Formular wird weiterhin zurueckgesetzt (leere Felder), aber der Dialog bleibt offen. Geschlossen wird nur manuell ueber das X oder den Abbrechen-Button.
+Im `onSuccess`-Callback der Fahrstunden-Mutation wird beim Zuruecksetzen des Formulars der aktuelle `instructor_id`-Wert beibehalten statt ihn auf `""` zu setzen.
 
-### Betroffene Datei
+### Aenderung
 
 | Datei | Aenderung |
 |-------|-----------|
-| `src/pages/dashboard/FahrschuelerDetail.tsx` (Zeile 287) | `setDlgFahrstunde(false)` aus `onSuccess` entfernen |
+| `src/pages/dashboard/FahrschuelerDetail.tsx` (Zeile ~287) | `instructor_id` im Reset auf den aktuellen Wert setzen statt `""` |
+
+Konkret wird aus:
+```typescript
+setFsFahrstunde({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: "", dauer_minuten: 45, datum: ... });
+```
+
+Dies:
+```typescript
+setFsFahrstunde(prev => ({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: prev.instructor_id, dauer_minuten: 45, datum: ... }));
+```
 
 Eine Zeile Aenderung.
 
