@@ -1,89 +1,81 @@
 
+Kurzdiagnose aus der aktuellen Analyse:
+- `activity_log` ist aktuell komplett leer (`count = 0`), obwohl neue Fahrstunden vorhanden sind.
+- Die Fahrstunden von 06:09 wurden in einer Dilan-Session erstellt, aber beim Admin-Info-Button kommt `[]` zurück.
+- Damit ist die aktuelle clientseitige Protokollierung nicht zuverlässig genug für dein Ziel „immer sichtbar, wer es eingetragen hat“.
 
-## Fix: Aktivitaetsprotokoll funktioniert nicht
+Um das dauerhaft und manipulationssicher zu lösen, setze ich auf serverseitiges Audit-Logging per DB-Trigger (statt nur Frontend-Aufruf).
 
-### Problem
-Die `activity_log`-Tabelle ist leer. Kein einziger Log-Eintrag wurde geschrieben, obwohl `logActivity()` aufgerufen wird. Ursache: Die RLS-Policies auf `activity_log` sind als **RESTRICTIVE** erstellt. PostgreSQL erfordert mindestens eine **PERMISSIVE** Policy, damit ueberhaupt Zugriff gewaehrt wird. Restrictive Policies koennen nur zusaetzlich einschraenken.
+Geplante Umsetzung:
 
-Gleiches Problem besteht bei der `profiles`- und `user_roles`-Tabelle.
+1) Audit-Logging auf Datenbankebene erzwingen (wichtigster Fix)
+- Neue Migration:
+  - `activity_log` härten:
+    - `user_id` auf `NOT NULL`
+    - `entity_id` auf `NOT NULL`
+    - optional FK `activity_log.user_id -> profiles.id`
+    - optional Enum/Constraint für `action` (`erstellt|bearbeitet|geloescht`)
+  - Trigger-Funktion erstellen, z. B. `public.audit_entity_change()`:
+    - liest `auth.uid()` (aktueller User)
+    - lädt Namen aus `profiles.display_name` (Fallback: E-Mail)
+    - schreibt bei INSERT/UPDATE/DELETE automatisch in `activity_log`
+  - Trigger auf alle relevanten Tabellen:
+    - `driving_lessons`
+    - `theory_sessions`
+    - `exams`
+    - `payments`
+    - `services`
+    - (Gutschriften laufen über `payments` mit negativem Betrag)
+- Effekt: Jeder Eintrag wird zentral protokolliert, unabhängig davon, ob Frontend-Code gerade korrekt feuert.
 
-### Loesung
+2) Manipulationsschutz des Protokolls schließen
+- RLS für `activity_log` finalisieren:
+  - `SELECT` nur Admin
+  - kein `UPDATE`, kein `DELETE` für App-User
+  - direkte `INSERT` durch Clients entfernen/verbieten (nur Trigger schreibt)
+- Dadurch kann niemand (auch Sekretärinnen nicht) das Protokoll bearbeiten oder fälschen.
 
-**1. Migration: RLS-Policies auf activity_log korrigieren**
+3) Frontend von unsicherem Logging entkoppeln
+- In den Seiten `Fahrstunden`, `Theorie`, `Pruefungen`, `Zahlungen`, `Leistungen` die direkten `logActivity(...)`-Aufrufe entfernen.
+- Grund: sonst doppelte Einträge oder weiterhin Abhängigkeit vom Clientzustand.
+- `src/lib/activityLog.ts` kann danach entfallen oder als Legacy markiert werden.
 
-Die bestehenden restrictive Policies loeschen und als permissive Policies neu erstellen:
+4) Info-Button exakt nach deinem gewünschten Format anzeigen
+- `ActivityInfoButton` anpassen:
+  - nicht nur „Liste aller Logs“, sondern gezielte Anzeige:
+    - Eingetragen von: [Name]
+    - Datum: [TT.MM.JJJJ]
+    - Uhrzeit: [HH:MM]
+    - Letzte Änderung: [Datum/Uhrzeit]
+  - Datenlogik:
+    - „Eingetragen von“ = ältester `erstellt`-Eintrag
+    - „Letzte Änderung“ = neuester Logeintrag (egal ob bearbeitet/gelöscht)
+- Admin-only Sichtbarkeit bleibt strikt (`isAdmin`).
+- Zusätzlich: Refresh-Logik verbessern (bei Popover-Öffnen neu laden), damit nie ein alter Leerzustand gecacht bleibt.
 
-- `activity_log`: INSERT fuer alle authenticated, SELECT nur fuer Admins
-- `profiles`: SELECT/UPDATE/INSERT analog
-- `user_roles`: SELECT/INSERT/UPDATE/DELETE analog
+5) Umgang mit bestehenden Alt-Daten (wichtig für Erwartungsmanagement)
+- Bereits vorhandene Datensätze ohne Log können nicht sicher rückwirkend einem User zugeordnet werden.
+- Ich baue deshalb:
+  - ab jetzt 100% verlässliche Erfassung durch Trigger
+  - optionalen Hinweis im Popup für Alt-Datensätze ohne Historie („Kein Protokoll vorhanden / vor Audit-Aktivierung“).
 
-**2. Logging-Fehler sichtbar machen**
+Technischer Scope (Dateien):
+- Neu: `supabase/migrations/<timestamp>_audit_trigger_fix.sql`
+- Ändern:
+  - `src/components/ActivityInfoButton.tsx`
+  - `src/pages/dashboard/Fahrstunden.tsx`
+  - `src/pages/dashboard/Theorie.tsx`
+  - `src/pages/dashboard/Pruefungen.tsx`
+  - `src/pages/dashboard/Zahlungen.tsx`
+  - `src/pages/dashboard/Leistungen.tsx`
+  - optional `src/lib/activityLog.ts` (entfernen oder stilllegen)
 
-In `src/lib/activityLog.ts` den Fehler in der Konsole besser loggen, damit man Fehler sofort erkennt.
-
-### Betroffene Dateien
-
-| Datei | Aenderung |
-|-------|-----------|
-| Migration (SQL) | Alle restrictive Policies auf activity_log, profiles, user_roles loeschen und als permissive neu erstellen |
-| `src/lib/activityLog.ts` | Fehler-Logging verbessern (optional) |
-
-### SQL-Aenderungen (Migration)
-
-```text
--- activity_log: Drop restrictive, create permissive
-DROP POLICY "Admins can view activity log" ON activity_log;
-DROP POLICY "Authenticated can insert activity log" ON activity_log;
-
-CREATE POLICY "Admins can view activity log"
-  ON activity_log FOR SELECT TO authenticated
-  USING (has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Authenticated can insert activity log"
-  ON activity_log FOR INSERT TO authenticated
-  WITH CHECK (true);
-
--- profiles: Drop restrictive, create permissive
-DROP POLICY "Users can view own profile" ON profiles;
-DROP POLICY "Users can update own profile" ON profiles;
-DROP POLICY "Admins can insert profiles" ON profiles;
-
-CREATE POLICY "Users can view own profile"
-  ON profiles FOR SELECT TO authenticated
-  USING (id = auth.uid() OR has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Users can update own profile"
-  ON profiles FOR UPDATE TO authenticated
-  USING (id = auth.uid() OR has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Admins can insert profiles"
-  ON profiles FOR INSERT TO authenticated
-  WITH CHECK (has_role(auth.uid(), 'admin') OR id = auth.uid());
-
--- user_roles: Drop restrictive, create permissive
-DROP POLICY "Admins can view all roles" ON user_roles;
-DROP POLICY "Admins can insert roles" ON user_roles;
-DROP POLICY "Admins can update roles" ON user_roles;
-DROP POLICY "Admins can delete roles" ON user_roles;
-
-CREATE POLICY "Admins can view all roles"
-  ON user_roles FOR SELECT TO authenticated
-  USING (has_role(auth.uid(), 'admin') OR user_id = auth.uid());
-
-CREATE POLICY "Admins can insert roles"
-  ON user_roles FOR INSERT TO authenticated
-  WITH CHECK (has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Admins can update roles"
-  ON user_roles FOR UPDATE TO authenticated
-  USING (has_role(auth.uid(), 'admin'));
-
-CREATE POLICY "Admins can delete roles"
-  ON user_roles FOR DELETE TO authenticated
-  USING (has_role(auth.uid(), 'admin'));
-```
-
-### Ergebnis
-
-Nach der Migration werden alle Aktionen (Fahrstunde erstellen, loeschen, etc.) korrekt im Aktivitaetsprotokoll gespeichert. Der Info-Button zeigt dann "Eingetragen von: Dilan" mit Datum und Uhrzeit.
-
+Abnahmetest nach Umsetzung:
+1. Mit Dilan eintragen (z. B. Fahrstunde).
+2. Als Admin denselben Datensatz öffnen.
+3. Popup muss zeigen:
+   - Dilan als Eintragende
+   - Datum/Uhrzeit
+   - Letzte Änderung
+4. Sekretärin darf den Info-Button nicht sehen.
+5. Direkte Änderungen am `activity_log` durch Nicht-Admin dürfen nicht möglich sein.
