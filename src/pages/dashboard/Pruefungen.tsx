@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { formatStudentName } from "@/lib/formatStudentName";
-import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil, Calendar, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, Plus, CheckCircle2, XCircle, Car, Filter, Pencil, Calendar, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import InstructorManageDialog from "@/components/InstructorManageDialog";
@@ -188,6 +188,21 @@ const Pruefungen = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("exams").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["exams_all"] });
+      qc.invalidateQueries({ queryKey: ["open_items"] });
+      toast({ title: "Prüfung gelöscht" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Fehler", description: e.message, variant: "destructive" });
+    },
+  });
+
   const filtered = useMemo(() => {
     if (typFilter === "theorie") return exams.filter((e) => e.typ === "theorie");
     if (typFilter === "praxis") return exams.filter((e) => e.typ === "praxis");
@@ -327,6 +342,15 @@ const Pruefungen = () => {
                       </button>
                     )}
                     <ActivityInfoButton entityId={exam.id} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(exam.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               );

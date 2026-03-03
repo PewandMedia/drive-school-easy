@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ListChecks, Plus, ChevronRight, Search } from "lucide-react";
+import { ListChecks, Plus, ChevronRight, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { formatStudentName } from "@/lib/formatStudentName";
@@ -125,6 +125,18 @@ const Leistungen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("services").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+    },
+    onError: (err: Error) => setFormError(err.message),
   });
 
   const isSonstiges = form.preis_id === "sonstiges";
@@ -297,7 +309,7 @@ const Leistungen = () => {
                 {items.map((service) => (
                   <div
                     key={service.id}
-                    className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3 border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
+                    className="grid grid-cols-[2fr_1fr_1fr_1fr_auto_auto] gap-4 items-center px-5 py-3 border-b border-border/20 last:border-0 hover:bg-secondary/20 transition-colors"
                   >
                     <span className="text-sm text-foreground truncate">{service.bezeichnung}</span>
                     <span className="text-xs text-muted-foreground">
@@ -320,6 +332,15 @@ const Leistungen = () => {
                       </SelectContent>
                     </Select>
                     <ActivityInfoButton entityId={service.id} />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(service.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>
