@@ -185,6 +185,7 @@ const Fahrstunden = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
       toast({ title: "Fahrstunde gelöscht" });
     },
     onError: (e: Error) => {
