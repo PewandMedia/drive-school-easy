@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { parse, isValid } from "date-fns";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -112,7 +122,8 @@ const FahrschuelerDetail = () => {
   const [editingService, setEditingService] = useState<any | null>(null);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
   const [editingContact, setEditingContact] = useState(false);
-  const [contactForm, setContactForm] = useState({ email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
+  const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
+  const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -453,6 +464,9 @@ const FahrschuelerDetail = () => {
       const parsedGeb = contactForm.geburtsdatum ? parse(contactForm.geburtsdatum, "dd.MM.yyyy", new Date()) : null;
       const parsedAnm = contactForm.anmeldedatum ? parse(contactForm.anmeldedatum, "dd.MM.yyyy", new Date()) : null;
       const updateData: any = {
+        vorname: contactForm.vorname,
+        nachname: contactForm.nachname,
+        fuehrerscheinklasse: contactForm.fuehrerscheinklasse,
         email: contactForm.email || null,
         telefon: contactForm.telefon || null,
         adresse: contactForm.adresse || null,
@@ -466,6 +480,7 @@ const FahrschuelerDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["student", id] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
       setEditingContact(false);
       toast({ title: "Kontaktdaten aktualisiert" });
     },
@@ -679,6 +694,80 @@ const FahrschuelerDetail = () => {
       toast({ title: "Guthaben verrechnet", description: "Guthaben wurde auf offene Posten verteilt" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  // ── Delete Mutation ──
+  const mutDeleteItem = useMutation({
+    mutationFn: async (item: { type: string; id: string }) => {
+      if (item.type === "fahrstunde") {
+        const { error } = await supabase.from("driving_lessons").delete().eq("id", item.id);
+        if (error) throw error;
+      } else if (item.type === "theorie") {
+        const { error } = await supabase.from("theory_sessions").delete().eq("id", item.id);
+        if (error) throw error;
+      } else if (item.type === "pruefung") {
+        const { error } = await supabase.from("exams").delete().eq("id", item.id);
+        if (error) throw error;
+      } else if (item.type === "leistung") {
+        const { error } = await supabase.from("services").delete().eq("id", item.id);
+        if (error) throw error;
+      } else if (item.type === "zahlung") {
+        const { data: allocations } = await supabase
+          .from("payment_allocations")
+          .select("id, open_item_id, betrag")
+          .eq("payment_id", item.id);
+        const affectedOpenItemIds = [...new Set((allocations ?? []).map(a => a.open_item_id))];
+        if (allocations && allocations.length > 0) {
+          const { error: delAllocErr } = await supabase
+            .from("payment_allocations")
+            .delete()
+            .eq("payment_id", item.id);
+          if (delAllocErr) throw delAllocErr;
+        }
+        for (const oiId of affectedOpenItemIds) {
+          const { data: remainingAllocs } = await supabase
+            .from("payment_allocations")
+            .select("betrag")
+            .eq("open_item_id", oiId);
+          const totalPaid = (remainingAllocs ?? []).reduce((s, a) => s + Number(a.betrag), 0);
+          const { data: oiData } = await supabase
+            .from("open_items")
+            .select("betrag_gesamt")
+            .eq("id", oiId)
+            .single();
+          const gesamt = oiData ? Number(oiData.betrag_gesamt) : 0;
+          const newStatus = totalPaid >= gesamt ? "bezahlt" : totalPaid > 0 ? "teilbezahlt" : "offen";
+          await supabase
+            .from("open_items")
+            .update({ betrag_bezahlt: totalPaid, status: newStatus })
+            .eq("id", oiId);
+        }
+        await supabase.from("open_items").delete().eq("typ", "gutschrift").eq("referenz_id", item.id);
+        const { error } = await supabase.from("payments").delete().eq("id", item.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["exams", id] });
+      queryClient.invalidateQueries({ queryKey: ["exams_all"] });
+      queryClient.invalidateQueries({ queryKey: ["services", id] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setDeletingItem(null);
+      toast({ title: "Eintrag gelöscht" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Fehler beim Löschen", description: e.message, variant: "destructive" });
+      setDeletingItem(null);
+    },
   });
 
   const isLoading = loadingStudent || loadingLessons || loadingServices || loadingTheory || loadingExams || loadingPayments;
@@ -912,6 +1001,9 @@ const FahrschuelerDetail = () => {
                 className="h-6 w-6"
                 onClick={() => {
                   setContactForm({
+                    vorname: student.vorname || "",
+                    nachname: student.nachname || "",
+                    fuehrerscheinklasse: student.fuehrerscheinklasse,
                     email: student.email || "",
                     telefon: student.telefon || "",
                     adresse: student.adresse || "",
@@ -969,6 +1061,27 @@ const FahrschuelerDetail = () => {
                 <DialogTitle>Kontaktdaten bearbeiten</DialogTitle>
               </DialogHeader>
               <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Vorname</Label>
+                    <Input value={contactForm.vorname} onChange={(e) => setContactForm(f => ({ ...f, vorname: e.target.value }))} placeholder="Vorname" />
+                  </div>
+                  <div>
+                    <Label>Nachname</Label>
+                    <Input value={contactForm.nachname} onChange={(e) => setContactForm(f => ({ ...f, nachname: e.target.value }))} placeholder="Nachname" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Führerscheinklasse</Label>
+                  <Select value={contactForm.fuehrerscheinklasse} onValueChange={(v) => setContactForm(f => ({ ...f, fuehrerscheinklasse: v as "B" | "B78" | "B197" }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="B">B</SelectItem>
+                      <SelectItem value="B78">B78</SelectItem>
+                      <SelectItem value="B197">B197</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label>E-Mail</Label>
                   <Input value={contactForm.email} onChange={(e) => setContactForm(f => ({ ...f, email: e.target.value }))} placeholder="E-Mail" />
@@ -1519,6 +1632,9 @@ const FahrschuelerDetail = () => {
                       })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeletingItem({ type: "pruefung", id: exam.id, label: `${isTheorie ? "Theorieprüfung" : "Fahrprüfung"} vom ${format(new Date(exam.datum), "dd.MM.yyyy")}` })}> 
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                       <div className="flex items-center gap-2 shrink-0">
                         {editingExamStatusId === exam.id ? (
                           <Select
@@ -1606,6 +1722,9 @@ const FahrschuelerDetail = () => {
                     })}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeletingItem({ type: "fahrstunde", id: lesson.id, label: `${TYP_LABELS[lesson.typ] ?? lesson.typ} vom ${format(new Date(lesson.datum), "dd.MM.yyyy")}` })}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     <span className="text-sm font-semibold text-foreground shrink-0">
                       {Number(lesson.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
                     </span>
@@ -1668,6 +1787,9 @@ const FahrschuelerDetail = () => {
                       })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeletingItem({ type: "leistung", id: service.id, label: `${service.bezeichnung}` })}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                       <span
                         className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold shrink-0 ${status.cls}`}
                       >
@@ -1715,6 +1837,9 @@ const FahrschuelerDetail = () => {
                       datum: new Date(payment.datum).toISOString().slice(0, 10),
                     })}>
                       <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => setDeletingItem({ type: "zahlung", id: payment.id, label: `${Number(payment.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })} vom ${format(new Date(payment.datum), "dd.MM.yyyy")}` })}>
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                     <span className="text-sm font-semibold text-green-400 shrink-0">
                       {Number(payment.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
@@ -2222,9 +2347,18 @@ const FahrschuelerDetail = () => {
                 <Label>Datum & Uhrzeit</Label>
                 <Input type="datetime-local" value={editingTheory.datum} onChange={(e) => setEditingTheory((prev: any) => ({ ...prev, datum: e.target.value }))} />
               </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <Button type="button" variant="outline" onClick={() => setEditingTheory(null)}>Abbrechen</Button>
-                <Button type="submit" disabled={mutEditTheorie.isPending}>{mutEditTheorie.isPending ? "Speichern…" : "Speichern"}</Button>
+              <div className="flex justify-between pt-1">
+                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => {
+                  const session = editingTheory;
+                  setEditingTheory(null);
+                  setDeletingItem({ type: "theorie", id: session.id, label: `Theorielektion ${session.lektion ?? ""}` });
+                }}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Löschen
+                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEditingTheory(null)}>Abbrechen</Button>
+                  <Button type="submit" disabled={mutEditTheorie.isPending}>{mutEditTheorie.isPending ? "Speichern…" : "Speichern"}</Button>
+                </div>
               </div>
             </form>
           )}
@@ -2374,6 +2508,30 @@ const FahrschuelerDetail = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <AlertDialog open={!!deletingItem} onOpenChange={(open) => { if (!open) setDeletingItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eintrag löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              „{deletingItem?.label}" wird unwiderruflich gelöscht. Alle zugehörigen offenen Posten und Zahlungszuordnungen werden ebenfalls entfernt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deletingItem) mutDeleteItem.mutate({ type: deletingItem.type, id: deletingItem.id });
+              }}
+              disabled={mutDeleteItem.isPending}
+            >
+              {mutDeleteItem.isPending ? "Lösche…" : "Löschen"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
