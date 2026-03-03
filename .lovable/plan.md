@@ -1,21 +1,25 @@
 
-## Fix: Verwaiste Open Items bereinigen
 
-### Problem
-Die neuen Datenbank-Trigger funktionieren fuer zukuenftige Loeschungen, aber es existieren bereits 3 verwaiste Eintraege in `open_items` (insgesamt 325 EUR) von zuvor geloeschten Fahrstunden. Das erklaert die Differenz: 1.535 - 325 = 1.210 EUR (korrekter Saldo).
+## STVA-Gebuehren in die Preisliste einfuegen (korrigiert)
 
-### Loesung
-Eine einmalige SQL-Migration, die alle verwaisten `open_items` bereinigt -- also Eintraege, deren `referenz_id` auf keine existierende Fahrstunde, Pruefung oder Leistung mehr verweist.
+### Aenderungen gegenueber dem urspruenglichen Plan
+- **STVA BF17**: Preis korrigiert von 54,80 auf **54,90 EUR**
+- **STVA Begleiter** umbenannt zu **STVA BEGPER**
+- **STVA Service Begleiter** umbenannt zu **STVA Service Beg**
 
-```sql
-DELETE FROM open_items oi
-WHERE NOT EXISTS (
-  SELECT 1 FROM driving_lessons dl WHERE dl.id = oi.referenz_id
-) AND NOT EXISTS (
-  SELECT 1 FROM exams e WHERE e.id = oi.referenz_id
-) AND NOT EXISTS (
-  SELECT 1 FROM services s WHERE s.id = oi.referenz_id
-);
-```
+### Einzufuegende Leistungen
 
-Eine einzige Datei, eine einzige SQL-Anweisung. Danach zeigt der Saldo korrekt 1.210 EUR an.
+| Bezeichnung | Preis |
+|---|---|
+| STVA Ersterteilung | 45,90 EUR |
+| STVA Service | 24,10 EUR |
+| STVA BF17 | 54,90 EUR |
+| STVA Service BF17 | 20,10 EUR |
+| STVA BEGPER | 12,30 EUR |
+| STVA Service Beg | 12,70 EUR |
+| STVA FSW | 25,60 EUR |
+| STVA FSW Service | 14,40 EUR |
+
+### Technische Umsetzung
+Ein einzelnes SQL-INSERT in die `prices`-Tabelle mit Kategorie "STVA Gebuehren" und `aktiv = true`. Kein Frontend-Code noetig -- die Leistungen erscheinen automatisch im "Leistung zuordnen"-Dialog und in der Auswertung.
+
