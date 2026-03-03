@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { parse, isValid } from "date-fns";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -110,6 +111,8 @@ const FahrschuelerDetail = () => {
   const [editingExam, setEditingExam] = useState<any | null>(null);
   const [editingService, setEditingService] = useState<any | null>(null);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({ email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -440,6 +443,31 @@ const FahrschuelerDetail = () => {
       setDlgZahlung(false);
       setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" });
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  // ── Contact Edit Mutation ──
+  const mutEditContact = useMutation({
+    mutationFn: async () => {
+      const parsedGeb = contactForm.geburtsdatum ? parse(contactForm.geburtsdatum, "dd.MM.yyyy", new Date()) : null;
+      const parsedAnm = contactForm.anmeldedatum ? parse(contactForm.anmeldedatum, "dd.MM.yyyy", new Date()) : null;
+      const updateData: any = {
+        email: contactForm.email || null,
+        telefon: contactForm.telefon || null,
+        adresse: contactForm.adresse || null,
+        geburtsdatum: parsedGeb && isValid(parsedGeb) ? format(parsedGeb, "yyyy-MM-dd") : null,
+      };
+      if (parsedAnm && isValid(parsedAnm)) {
+        updateData.created_at = parsedAnm.toISOString();
+      }
+      const { error } = await supabase.from("students").update(updateData).eq("id", id!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["student", id] });
+      setEditingContact(false);
+      toast({ title: "Kontaktdaten aktualisiert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
@@ -876,6 +904,26 @@ const FahrschuelerDetail = () => {
 
           {/* Kontakt */}
           <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Kontaktdaten</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => {
+                  setContactForm({
+                    email: student.email || "",
+                    telefon: student.telefon || "",
+                    adresse: student.adresse || "",
+                    geburtsdatum: (student as any).geburtsdatum ? format(new Date((student as any).geburtsdatum), "dd.MM.yyyy") : "",
+                    anmeldedatum: format(new Date(student.created_at), "dd.MM.yyyy"),
+                  });
+                  setEditingContact(true);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
             {student.email && (
               <div className="flex items-start gap-3 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -913,6 +961,45 @@ const FahrschuelerDetail = () => {
           {(!student.email && !student.telefon && !student.adresse) && (
             <p className="text-xs text-muted-foreground text-center">Keine Kontaktdaten hinterlegt.</p>
           )}
+
+          {/* Contact Edit Dialog */}
+          <Dialog open={editingContact} onOpenChange={setEditingContact}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Kontaktdaten bearbeiten</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>E-Mail</Label>
+                  <Input value={contactForm.email} onChange={(e) => setContactForm(f => ({ ...f, email: e.target.value }))} placeholder="E-Mail" />
+                </div>
+                <div>
+                  <Label>Telefon</Label>
+                  <Input value={contactForm.telefon} onChange={(e) => setContactForm(f => ({ ...f, telefon: e.target.value }))} placeholder="Telefon" />
+                </div>
+                <div>
+                  <Label>Adresse</Label>
+                  <Textarea value={contactForm.adresse} onChange={(e) => setContactForm(f => ({ ...f, adresse: e.target.value }))} placeholder="Adresse" rows={2} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Geburtsdatum</Label>
+                    <Input value={contactForm.geburtsdatum} onChange={(e) => setContactForm(f => ({ ...f, geburtsdatum: e.target.value }))} placeholder="TT.MM.JJJJ" />
+                  </div>
+                  <div>
+                    <Label>Anmeldedatum</Label>
+                    <Input value={contactForm.anmeldedatum} onChange={(e) => setContactForm(f => ({ ...f, anmeldedatum: e.target.value }))} placeholder="TT.MM.JJJJ" />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingContact(false)}>Abbrechen</Button>
+                <Button onClick={() => mutEditContact.mutate()} disabled={mutEditContact.isPending}>
+                  {mutEditContact.isPending ? "Speichern…" : "Speichern"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="border-t border-border" />
 
