@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,13 @@ const FahrschuelerDetail = () => {
   const [dlgZahlung, setDlgZahlung] = useState(false);
   const [editingExamStatusId, setEditingExamStatusId] = useState<string | null>(null);
   const [visibleLessons, setVisibleLessons] = useState(10);
+
+  // ── Edit states ──
+  const [editingLesson, setEditingLesson] = useState<any | null>(null);
+  const [editingTheory, setEditingTheory] = useState<any | null>(null);
+  const [editingExam, setEditingExam] = useState<any | null>(null);
+  const [editingService, setEditingService] = useState<any | null>(null);
+  const [editingPayment, setEditingPayment] = useState<any | null>(null);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -433,6 +440,154 @@ const FahrschuelerDetail = () => {
       setDlgZahlung(false);
       setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" });
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  // ── Edit Mutations ──
+  const mutEditFahrstunde = useMutation({
+    mutationFn: async (lesson: any) => {
+      const { data, error } = await supabase
+        .from("driving_lessons")
+        .update({
+          typ: lesson.typ,
+          fahrzeug_typ: lesson.fahrzeug_typ,
+          instructor_id: lesson.instructor_id,
+          dauer_minuten: lesson.dauer_minuten,
+          datum: new Date(lesson.datum).toISOString(),
+        })
+        .eq("id", lesson.id)
+        .select("preis, einheiten, dauer_minuten")
+        .single();
+      if (error) throw error;
+      // Sync open_items
+      await supabase.from("open_items")
+        .update({
+          betrag_gesamt: data.preis,
+          beschreibung: `Fahrstunde ${data.dauer_minuten}min (${data.einheiten}E)`,
+          datum: new Date(lesson.datum).toISOString(),
+        })
+        .eq("referenz_id", lesson.id);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingLesson(null);
+      toast({ title: "Fahrstunde aktualisiert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutEditTheorie = useMutation({
+    mutationFn: async (session: any) => {
+      const typ = lektionToTyp(session.lektion);
+      const { error } = await supabase
+        .from("theory_sessions")
+        .update({
+          lektion: session.lektion,
+          instructor_id: session.instructor_id,
+          datum: new Date(session.datum).toISOString(),
+          typ,
+        })
+        .eq("id", session.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
+      setEditingTheory(null);
+      toast({ title: "Theoriestunde aktualisiert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutEditPruefung = useMutation({
+    mutationFn: async (exam: any) => {
+      const { error } = await supabase
+        .from("exams")
+        .update({
+          typ: exam.typ,
+          fahrzeug_typ: exam.fahrzeug_typ,
+          instructor_id: exam.typ === "praxis" && exam.instructor_id ? exam.instructor_id : null,
+          datum: new Date(exam.datum).toISOString(),
+          status: exam.status,
+          preis: parseFloat(exam.preis) || 0,
+        })
+        .eq("id", exam.id);
+      if (error) throw error;
+      // Sync open_items
+      await supabase.from("open_items")
+        .update({
+          betrag_gesamt: parseFloat(exam.preis) || 0,
+          beschreibung: exam.typ === "theorie" ? "Theorieprüfung" : "Fahrprüfung",
+          datum: new Date(exam.datum).toISOString(),
+        })
+        .eq("referenz_id", exam.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exams", id] });
+      queryClient.invalidateQueries({ queryKey: ["exams_all"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingExam(null);
+      toast({ title: "Prüfung aktualisiert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutEditLeistung = useMutation({
+    mutationFn: async (service: any) => {
+      const { error } = await supabase
+        .from("services")
+        .update({
+          bezeichnung: service.bezeichnung,
+          preis: parseFloat(service.preis) || 0,
+          status: service.status,
+        })
+        .eq("id", service.id);
+      if (error) throw error;
+      // Sync open_items
+      await supabase.from("open_items")
+        .update({
+          betrag_gesamt: parseFloat(service.preis) || 0,
+          beschreibung: service.bezeichnung,
+        })
+        .eq("referenz_id", service.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["services", id] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingService(null);
+      toast({ title: "Leistung aktualisiert" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const mutEditZahlung = useMutation({
+    mutationFn: async (payment: any) => {
+      const { error } = await supabase
+        .from("payments")
+        .update({
+          betrag: parseFloat(payment.betrag) || 0,
+          zahlungsart: payment.zahlungsart,
+          datum: new Date(payment.datum).toISOString(),
+        })
+        .eq("id", payment.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payments", id] });
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items", id] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingPayment(null);
+      toast({ title: "Zahlung aktualisiert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
@@ -1084,14 +1239,20 @@ const FahrschuelerDetail = () => {
                     {THEORIE_LEKTIONEN.filter((l) => l.nr <= 12).map((l) => {
                       const done = completedLektionen.has(l.nr);
                       const instrName = lektionInstructorMap[l.nr];
+                      const handleEditTheory = () => {
+                        if (!done) return;
+                        const session = theorySessions.find((s: any) => s.lektion === l.nr);
+                        if (session) setEditingTheory({ ...session, datum: new Date(session.datum).toISOString().slice(0, 16), instructor_id: session.instructor_id || "" });
+                      };
                       const chip = (
                         <div
                           key={l.nr}
                           className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
                             done
-                              ? "border-green-500/20 bg-green-500/10 text-green-700"
+                              ? "border-green-500/20 bg-green-500/10 text-green-700 cursor-pointer hover:bg-green-500/20"
                               : "border-border bg-muted/30 text-muted-foreground"
                           }`}
+                          onClick={handleEditTheory}
                         >
                           {done ? <Check className="h-3 w-3" /> : <span className="h-3 w-3" />}
                           L{l.nr}
@@ -1101,7 +1262,7 @@ const FahrschuelerDetail = () => {
                         return (
                           <Tooltip key={l.nr}>
                             <TooltipTrigger asChild>{chip}</TooltipTrigger>
-                            <TooltipContent><p>{instrName}</p></TooltipContent>
+                            <TooltipContent><p>{instrName} · Klicken zum Bearbeiten</p></TooltipContent>
                           </Tooltip>
                         );
                       }
@@ -1117,14 +1278,20 @@ const FahrschuelerDetail = () => {
                     {THEORIE_LEKTIONEN.filter((l) => l.nr >= 13).map((l) => {
                       const done = completedLektionen.has(l.nr);
                       const instrName = lektionInstructorMap[l.nr];
+                      const handleEditTheory = () => {
+                        if (!done) return;
+                        const session = theorySessions.find((s: any) => s.lektion === l.nr);
+                        if (session) setEditingTheory({ ...session, datum: new Date(session.datum).toISOString().slice(0, 16), instructor_id: session.instructor_id || "" });
+                      };
                       const chip = (
                         <div
                           key={l.nr}
                           className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
                             done
-                              ? "border-green-500/20 bg-green-500/10 text-green-700"
+                              ? "border-green-500/20 bg-green-500/10 text-green-700 cursor-pointer hover:bg-green-500/20"
                               : "border-border bg-muted/30 text-muted-foreground"
                           }`}
+                          onClick={handleEditTheory}
                         >
                           {done ? <Check className="h-3 w-3" /> : <span className="h-3 w-3" />}
                           L{l.nr}
@@ -1134,7 +1301,7 @@ const FahrschuelerDetail = () => {
                         return (
                           <Tooltip key={l.nr}>
                             <TooltipTrigger asChild>{chip}</TooltipTrigger>
-                            <TooltipContent><p>{instrName}</p></TooltipContent>
+                            <TooltipContent><p>{instrName} · Klicken zum Bearbeiten</p></TooltipContent>
                           </Tooltip>
                         );
                       }
@@ -1257,6 +1424,14 @@ const FahrschuelerDetail = () => {
                           {format(new Date(exam.datum), "dd.MM.yyyy", { locale: de })}
                         </p>
                       </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setEditingExam({
+                        ...exam,
+                        datum: new Date(exam.datum).toISOString().slice(0, 10),
+                        preis: String(exam.preis),
+                        instructor_id: exam.instructor_id || "",
+                      })}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <div className="flex items-center gap-2 shrink-0">
                         {editingExamStatusId === exam.id ? (
                           <Select
@@ -1338,6 +1513,12 @@ const FahrschuelerDetail = () => {
                         })()}
                       </p>
                     </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setEditingLesson({
+                      ...lesson,
+                      datum: new Date(lesson.datum).toISOString().slice(0, 16),
+                    })}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                     <span className="text-sm font-semibold text-foreground shrink-0">
                       {Number(lesson.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
                     </span>
@@ -1394,6 +1575,12 @@ const FahrschuelerDetail = () => {
                           {format(new Date(service.created_at), "dd.MM.yyyy", { locale: de })}
                         </p>
                       </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setEditingService({
+                        ...service,
+                        preis: String(service.preis),
+                      })}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <span
                         className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold shrink-0 ${status.cls}`}
                       >
@@ -1435,6 +1622,13 @@ const FahrschuelerDetail = () => {
                         {format(new Date(payment.datum), "dd.MM.yyyy", { locale: de })}
                       </p>
                     </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setEditingPayment({
+                      ...payment,
+                      betrag: String(Math.abs(Number(payment.betrag))),
+                      datum: new Date(payment.datum).toISOString().slice(0, 10),
+                    })}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                     <span className="text-sm font-semibold text-green-400 shrink-0">
                       {Number(payment.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
                     </span>
@@ -1832,6 +2026,265 @@ const FahrschuelerDetail = () => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          EDIT MODALS
+         ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── Edit: Fahrstunde ── */}
+      <Dialog open={!!editingLesson} onOpenChange={(v) => { if (!v) setEditingLesson(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Fahrstunde bearbeiten</DialogTitle>
+          </DialogHeader>
+          {editingLesson && (
+            <form onSubmit={(e) => { e.preventDefault(); mutEditFahrstunde.mutate(editingLesson); }} className="space-y-4 mt-2">
+              <div className="space-y-1.5">
+                <Label>Typ</Label>
+                <Select value={editingLesson.typ} onValueChange={(v) => setEditingLesson((prev: any) => ({ ...prev, typ: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TYP_LABELS).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fahrlehrer</Label>
+                <Select value={editingLesson.instructor_id || ""} onValueChange={(v) => setEditingLesson((prev: any) => ({ ...prev, instructor_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen…" /></SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fahrzeugtyp</Label>
+                <Select value={editingLesson.fahrzeug_typ} onValueChange={(v) => setEditingLesson((prev: any) => ({ ...prev, fahrzeug_typ: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="automatik">Automatik</SelectItem>
+                    <SelectItem value="schaltwagen">Schaltwagen</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Datum & Uhrzeit</Label>
+                <Input type="datetime-local" value={editingLesson.datum} onChange={(e) => setEditingLesson((prev: any) => ({ ...prev, datum: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Dauer (Minuten)</Label>
+                <div className="flex gap-2">
+                  {DAUER_OPTIONS.map((d) => (
+                    <Button key={d} type="button" variant={editingLesson.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setEditingLesson((prev: any) => ({ ...prev, dauer_minuten: d }))}>
+                      {d} min
+                    </Button>
+                  ))}
+                  <Input type="number" min={0} step={15} className="w-24" value={editingLesson.dauer_minuten} onChange={(e) => setEditingLesson((prev: any) => ({ ...prev, dauer_minuten: parseInt(e.target.value) || 45 }))} />
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Berechneter Preis</span>
+                <span className="font-semibold text-foreground text-lg">{calculatePrice(editingLesson.dauer_minuten).toFixed(2)} €</span>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setEditingLesson(null)}>Abbrechen</Button>
+                <Button type="submit" disabled={mutEditFahrstunde.isPending}>{mutEditFahrstunde.isPending ? "Speichern…" : "Speichern"}</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit: Theorie ── */}
+      <Dialog open={!!editingTheory} onOpenChange={(v) => { if (!v) setEditingTheory(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Theoriestunde bearbeiten</DialogTitle>
+          </DialogHeader>
+          {editingTheory && (
+            <form onSubmit={(e) => { e.preventDefault(); mutEditTheorie.mutate(editingTheory); }} className="space-y-4 mt-2">
+              <div className="space-y-1.5">
+                <Label>Theorielektion</Label>
+                <Select value={String(editingTheory.lektion ?? 1)} onValueChange={(v) => setEditingTheory((prev: any) => ({ ...prev, lektion: parseInt(v) }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {THEORIE_LEKTIONEN.map((l) => (
+                      <SelectItem key={l.nr} value={String(l.nr)}>{l.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fahrlehrer</Label>
+                <Select value={editingTheory.instructor_id || ""} onValueChange={(v) => setEditingTheory((prev: any) => ({ ...prev, instructor_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen" /></SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>{i.vorname} {i.nachname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Datum & Uhrzeit</Label>
+                <Input type="datetime-local" value={editingTheory.datum} onChange={(e) => setEditingTheory((prev: any) => ({ ...prev, datum: e.target.value }))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setEditingTheory(null)}>Abbrechen</Button>
+                <Button type="submit" disabled={mutEditTheorie.isPending}>{mutEditTheorie.isPending ? "Speichern…" : "Speichern"}</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit: Prüfung ── */}
+      <Dialog open={!!editingExam} onOpenChange={(v) => { if (!v) setEditingExam(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Prüfung bearbeiten</DialogTitle>
+          </DialogHeader>
+          {editingExam && (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <Label>Prüfungstyp</Label>
+                <Select value={editingExam.typ} onValueChange={(v) => setEditingExam((prev: any) => ({ ...prev, typ: v, instructor_id: v === "theorie" ? "" : prev.instructor_id }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="theorie">Theorieprüfung</SelectItem>
+                    <SelectItem value="praxis">Fahrprüfung</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editingExam.typ === "praxis" && (
+                <div className="space-y-1.5">
+                  <Label>Fahrlehrer</Label>
+                  <Select value={editingExam.instructor_id || ""} onValueChange={(v) => setEditingExam((prev: any) => ({ ...prev, instructor_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen…" /></SelectTrigger>
+                    <SelectContent>
+                      {instructors.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label>Fahrzeugtyp</Label>
+                <Select value={editingExam.fahrzeug_typ} onValueChange={(v) => setEditingExam((prev: any) => ({ ...prev, fahrzeug_typ: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="automatik">Automatik</SelectItem>
+                    <SelectItem value="schaltwagen">Schaltwagen</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Datum</Label>
+                <Input type="date" value={editingExam.datum} onChange={(e) => setEditingExam((prev: any) => ({ ...prev, datum: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select value={editingExam.status} onValueChange={(v) => setEditingExam((prev: any) => ({ ...prev, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="angemeldet">Angemeldet</SelectItem>
+                    <SelectItem value="bestanden">Bestanden</SelectItem>
+                    <SelectItem value="nicht_bestanden">Nicht bestanden</SelectItem>
+                    <SelectItem value="krank">Krank</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Preis (€)</Label>
+                <Input type="number" step="0.01" min="0" value={editingExam.preis} onChange={(e) => setEditingExam((prev: any) => ({ ...prev, preis: e.target.value }))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditingExam(null)}>Abbrechen</Button>
+                <Button disabled={mutEditPruefung.isPending} onClick={() => mutEditPruefung.mutate(editingExam)}>
+                  {mutEditPruefung.isPending ? "Speichern…" : "Speichern"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit: Leistung ── */}
+      <Dialog open={!!editingService} onOpenChange={(v) => { if (!v) setEditingService(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leistung bearbeiten</DialogTitle>
+          </DialogHeader>
+          {editingService && (
+            <form onSubmit={(e) => { e.preventDefault(); mutEditLeistung.mutate(editingService); }} className="space-y-4 mt-2">
+              <div className="space-y-1.5">
+                <Label>Bezeichnung *</Label>
+                <Input value={editingService.bezeichnung} onChange={(e) => setEditingService((prev: any) => ({ ...prev, bezeichnung: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Preis (€)</Label>
+                <Input type="number" step="0.01" min="0" value={editingService.preis} onChange={(e) => setEditingService((prev: any) => ({ ...prev, preis: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Select value={editingService.status} onValueChange={(v) => setEditingService((prev: any) => ({ ...prev, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offen">Offen</SelectItem>
+                    <SelectItem value="bezahlt">Bezahlt</SelectItem>
+                    <SelectItem value="erledigt">Erledigt</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditingService(null)}>Abbrechen</Button>
+                <Button type="submit" disabled={mutEditLeistung.isPending}>{mutEditLeistung.isPending ? "Speichern…" : "Speichern"}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit: Zahlung ── */}
+      <Dialog open={!!editingPayment} onOpenChange={(v) => { if (!v) setEditingPayment(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Zahlung bearbeiten</DialogTitle>
+          </DialogHeader>
+          {editingPayment && (
+            <form onSubmit={(e) => { e.preventDefault(); mutEditZahlung.mutate(editingPayment); }} className="space-y-4 mt-2">
+              <div className="space-y-1.5">
+                <Label>Datum</Label>
+                <Input type="date" value={editingPayment.datum} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, datum: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Zahlungsart</Label>
+                <Select value={editingPayment.zahlungsart} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, zahlungsart: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bar">Bar</SelectItem>
+                    <SelectItem value="ec">EC-Karte</SelectItem>
+                    <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Betrag (€)</Label>
+                <Input type="number" step="0.01" min="0" value={editingPayment.betrag} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, betrag: e.target.value }))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" onClick={() => setEditingPayment(null)}>Abbrechen</Button>
+                <Button type="submit" disabled={mutEditZahlung.isPending}>{mutEditZahlung.isPending ? "Speichern…" : "Speichern"}</Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
