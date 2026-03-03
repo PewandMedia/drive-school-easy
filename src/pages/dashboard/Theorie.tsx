@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Plus, Trash2, Users, GraduationCap, BookMarked } from "lucide-react";
+import { BookOpen, Plus, Trash2, Users, GraduationCap, BookMarked, Pencil } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { useAuth } from "@/contexts/AuthContext";
@@ -65,6 +65,8 @@ const Theorie = () => {
   const [form, setForm] = useState(defaultForm);
   const [filterStudentId, setFilterStudentId] = useState<string>("all");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
+  const [editingSession, setEditingSession] = useState<TheorySession | null>(null);
+  const [editForm, setEditForm] = useState({ lektion: 1, instructor_id: "", datum: "" });
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students"],
@@ -123,6 +125,22 @@ const Theorie = () => {
     onError: (e: Error) => {
       toast({ title: "Fehler", description: e.message, variant: "destructive" });
     },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (vals: { id: string; lektion: number; instructor_id: string; datum: string }) => {
+      const typ = lektionToTyp(vals.lektion);
+      const { error } = await supabase.from("theory_sessions")
+        .update({ lektion: vals.lektion, typ, instructor_id: vals.instructor_id || null, datum: new Date(vals.datum).toISOString() } as any)
+        .eq("id", vals.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
+      setEditingSession(null);
+      toast({ title: "Theoriestunde aktualisiert" });
+    },
+    onError: (e: Error) => { toast({ title: "Fehler", description: e.message, variant: "destructive" }); },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -202,14 +220,14 @@ const Theorie = () => {
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => {
+              setEditingSession(session);
+              setEditForm({ lektion: session.lektion || 1, instructor_id: session.instructor_id || "", datum: new Date(session.datum).toISOString().slice(0, 16) });
+            }}>
+              <Pencil className="h-4 w-4" />
+            </Button>
             <ActivityInfoButton entityId={session.id} />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => deleteMutation.mutate(session.id)}
-              disabled={deleteMutation.isPending}
-            >
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(session.id)} disabled={deleteMutation.isPending}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -417,6 +435,49 @@ const Theorie = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingSession} onOpenChange={(v) => { if (!v) setEditingSession(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Theoriestunde bearbeiten</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Theorielektion</Label>
+              <Select value={String(editForm.lektion)} onValueChange={(v) => setEditForm((f) => ({ ...f, lektion: parseInt(v) }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {THEORIE_LEKTIONEN.map((l) => (
+                    <SelectItem key={l.nr} value={String(l.nr)}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fahrlehrer</Label>
+              <Select value={editForm.instructor_id} onValueChange={(v) => setEditForm((f) => ({ ...f, instructor_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen" /></SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>{i.vorname} {i.nachname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum & Uhrzeit</Label>
+              <Input type="datetime-local" value={editForm.datum} onChange={(e) => setEditForm((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setEditingSession(null)}>Abbrechen</Button>
+              <Button disabled={updateMutation.isPending} onClick={() => { if (editingSession) updateMutation.mutate({ id: editingSession.id, ...editForm }); }}>
+                {updateMutation.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
