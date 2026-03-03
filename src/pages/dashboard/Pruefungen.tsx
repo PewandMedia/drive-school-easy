@@ -70,6 +70,8 @@ const Pruefungen = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [visibleCount, setVisibleCount] = useState(10);
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [editingExam, setEditingExam] = useState<any | null>(null);
+  const [editExamForm, setEditExamForm] = useState<ExamForm>(defaultForm());
   const { toast } = useToast();
   const qc = useQueryClient();
   const typFilter = searchParams.get("typ") || "all";
@@ -201,6 +203,30 @@ const Pruefungen = () => {
     onError: (e: Error) => {
       toast({ title: "Fehler", description: e.message, variant: "destructive" });
     },
+  });
+
+  const updateExamMutation = useMutation({
+    mutationFn: async (vals: { id: string } & ExamForm) => {
+      const preis = parseFloat(vals.preis) || 0;
+      const { error } = await supabase.from("exams").update({
+        typ: vals.typ, fahrzeug_typ: vals.fahrzeug_typ, instructor_id: vals.typ === "praxis" ? vals.instructor_id || null : null,
+        datum: new Date(vals.datum).toISOString(), status: vals.status, preis,
+      }).eq("id", vals.id);
+      if (error) throw error;
+      await supabase.from("open_items").update({
+        betrag_gesamt: preis,
+        beschreibung: vals.typ === "theorie" ? "Theorieprüfung" : "Fahrprüfung",
+        datum: new Date(vals.datum).toISOString(),
+      }).eq("referenz_id", vals.id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["exams_all"] });
+      qc.invalidateQueries({ queryKey: ["exams"] });
+      qc.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingExam(null);
+      toast({ title: "Prüfung aktualisiert" });
+    },
+    onError: (e: Error) => { toast({ title: "Fehler", description: e.message, variant: "destructive" }); },
   });
 
   const filtered = useMemo(() => {
@@ -341,14 +367,14 @@ const Pruefungen = () => {
                         <Icon className="h-3 w-3" /> {cfg.label}
                       </button>
                     )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => {
+                      setEditingExam(exam);
+                      setEditExamForm({ student_id: exam.student_id, typ: exam.typ, fahrzeug_typ: exam.fahrzeug_typ, vehicle_id: "", instructor_id: exam.instructor_id || "", datum: exam.datum?.slice(0, 10) || "", status: (exam.status || "angemeldet") as ExamStatus, preis: String(exam.preis || 0) });
+                    }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                     <ActivityInfoButton entityId={exam.id} />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(exam.id)}
-                      disabled={deleteMutation.isPending}
-                    >
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(exam.id)} disabled={deleteMutation.isPending}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -537,6 +563,76 @@ const Pruefungen = () => {
                 onClick={() => saveMutation.mutate()}
               >
                 {saveMutation.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Exam Dialog */}
+      <Dialog open={!!editingExam} onOpenChange={(v) => { if (!v) setEditingExam(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Prüfung bearbeiten</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Prüfungstyp</Label>
+              <Select value={editExamForm.typ} onValueChange={(v) => setEditExamForm((f) => ({ ...f, typ: v as "theorie" | "praxis" }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="theorie">Theorieprüfung</SelectItem>
+                  <SelectItem value="praxis">Fahrprüfung</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editExamForm.typ === "praxis" && (
+              <div className="space-y-1.5">
+                <Label>Fahrlehrer</Label>
+                <Select value={editExamForm.instructor_id} onValueChange={(v) => setEditExamForm((f) => ({ ...f, instructor_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen…" /></SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Fahrzeug</Label>
+              <Select value={editExamForm.fahrzeug_typ} onValueChange={(v) => setEditExamForm((f) => ({ ...f, fahrzeug_typ: v as "automatik" | "schaltwagen" }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="automatik">Automatik</SelectItem>
+                  <SelectItem value="schaltwagen">Schaltwagen</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum</Label>
+              <Input type="date" value={editExamForm.datum} onChange={(e) => setEditExamForm((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={editExamForm.status} onValueChange={(v) => setEditExamForm((f) => ({ ...f, status: v as ExamStatus }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="angemeldet">Angemeldet</SelectItem>
+                  <SelectItem value="bestanden">Bestanden</SelectItem>
+                  <SelectItem value="nicht_bestanden">Nicht bestanden</SelectItem>
+                  <SelectItem value="krank">Krank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Preis (€)</Label>
+              <Input type="number" min="0" step="0.01" value={editExamForm.preis} onChange={(e) => setEditExamForm((f) => ({ ...f, preis: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditingExam(null)}>Abbrechen</Button>
+              <Button disabled={updateExamMutation.isPending} onClick={() => { if (editingExam) updateExamMutation.mutate({ id: editingExam.id, ...editExamForm }); }}>
+                {updateExamMutation.isPending ? "Speichern…" : "Speichern"}
               </Button>
             </div>
           </div>

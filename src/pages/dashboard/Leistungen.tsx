@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ListChecks, Plus, ChevronRight, Search, Trash2 } from "lucide-react";
+import { ListChecks, Plus, ChevronRight, Search, Trash2, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { formatStudentName } from "@/lib/formatStudentName";
@@ -70,6 +70,8 @@ const Leistungen = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<ServiceStatus | "alle">("alle");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editServiceForm, setEditServiceForm] = useState({ bezeichnung: "", preis: "", status: "offen" as ServiceStatus });
 
   const { data: services = [], isLoading } = useQuery({
     queryKey: ["services"],
@@ -135,6 +137,21 @@ const Leistungen = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services"] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
+    },
+    onError: (err: Error) => setFormError(err.message),
+  });
+
+  const updateServiceMutation = useMutation({
+    mutationFn: async (vals: { id: string; bezeichnung: string; preis: string; status: ServiceStatus }) => {
+      const preis = parseFloat(vals.preis) || 0;
+      const { error } = await supabase.from("services").update({ bezeichnung: vals.bezeichnung, preis, status: vals.status }).eq("id", vals.id);
+      if (error) throw error;
+      await supabase.from("open_items").update({ betrag_gesamt: preis, beschreibung: vals.bezeichnung }).eq("referenz_id", vals.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingService(null);
     },
     onError: (err: Error) => setFormError(err.message),
   });
@@ -331,14 +348,14 @@ const Leistungen = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => {
+                      setEditingService(service);
+                      setEditServiceForm({ bezeichnung: service.bezeichnung, preis: String(service.preis), status: service.status });
+                    }}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                     <ActivityInfoButton entityId={service.id} />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteMutation.mutate(service.id)}
-                      disabled={deleteMutation.isPending}
-                    >
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(service.id)} disabled={deleteMutation.isPending}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -470,6 +487,42 @@ const Leistungen = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Service Dialog */}
+      <Dialog open={!!editingService} onOpenChange={(v) => { if (!v) setEditingService(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leistung bearbeiten</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label>Bezeichnung</Label>
+              <Input value={editServiceForm.bezeichnung} onChange={(e) => setEditServiceForm((f) => ({ ...f, bezeichnung: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Preis (€)</Label>
+              <Input type="number" step="0.01" min="0" value={editServiceForm.preis} onChange={(e) => setEditServiceForm((f) => ({ ...f, preis: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editServiceForm.status} onValueChange={(v) => setEditServiceForm((f) => ({ ...f, status: v as ServiceStatus }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(statusConfig).map(([val, cfg]) => (
+                    <SelectItem key={val} value={val}>{cfg.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingService(null)}>Abbrechen</Button>
+              <Button disabled={updateServiceMutation.isPending} onClick={() => { if (editingService) updateServiceMutation.mutate({ id: editingService.id, ...editServiceForm }); }}>
+                {updateServiceMutation.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

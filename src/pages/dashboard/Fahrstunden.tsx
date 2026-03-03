@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Car, Plus, Trash2, Euro, Clock, TrendingUp } from "lucide-react";
+import { Car, Plus, Trash2, Euro, Clock, TrendingUp, Pencil } from "lucide-react";
 import { formatStudentName } from "@/lib/formatStudentName";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
@@ -113,6 +113,14 @@ const Fahrstunden = () => {
   const [filterFahrzeug, setFilterFahrzeug] = useState<string>("all");
   const [filterStudent, setFilterStudent] = useState<string>("all");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
+  const [editingLesson, setEditingLesson] = useState<DrivingLesson | null>(null);
+  const [editForm, setEditForm] = useState({
+    typ: "uebungsstunde" as DrivingLessonTyp,
+    fahrzeug_typ: "automatik" as FahrzeugTyp,
+    instructor_id: "",
+    dauer_minuten: 45,
+    datum: "",
+  });
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students"],
@@ -193,6 +201,28 @@ const Fahrstunden = () => {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (vals: { id: string; typ: DrivingLessonTyp; fahrzeug_typ: FahrzeugTyp; instructor_id: string; dauer_minuten: number; datum: string }) => {
+      const { data, error } = await supabase.from("driving_lessons")
+        .update({ typ: vals.typ, fahrzeug_typ: vals.fahrzeug_typ, instructor_id: vals.instructor_id || null, dauer_minuten: vals.dauer_minuten, datum: new Date(vals.datum).toISOString() })
+        .eq("id", vals.id).select("preis, einheiten, dauer_minuten").single();
+      if (error) throw error;
+      await supabase.from("open_items").update({
+        betrag_gesamt: data.preis,
+        beschreibung: `Fahrstunde ${data.dauer_minuten}min (${data.einheiten}E)`,
+        datum: new Date(vals.datum).toISOString(),
+      }).eq("referenz_id", vals.id);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingLesson(null);
+      toast({ title: "Fahrstunde aktualisiert" });
+    },
+    onError: (e: Error) => { toast({ title: "Fehler", description: e.message, variant: "destructive" }); },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.student_id) {
@@ -264,14 +294,14 @@ const Fahrstunden = () => {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => {
+            setEditingLesson(lesson);
+            setEditForm({ typ: lesson.typ, fahrzeug_typ: lesson.fahrzeug_typ, instructor_id: lesson.instructor_id || "", dauer_minuten: lesson.dauer_minuten, datum: new Date(lesson.datum).toISOString().slice(0, 16) });
+          }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
           <ActivityInfoButton entityId={lesson.id} />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={() => deleteMutation.mutate(lesson.id)}
-            disabled={deleteMutation.isPending}
-          >
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(lesson.id)} disabled={deleteMutation.isPending}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -606,6 +636,75 @@ const Fahrstunden = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingLesson} onOpenChange={(v) => { if (!v) setEditingLesson(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Fahrstunde bearbeiten</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Typ</Label>
+              <Select value={editForm.typ} onValueChange={(v) => setEditForm((f) => ({ ...f, typ: v as DrivingLessonTyp }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(TYP_LABELS) as [DrivingLessonTyp, string][]).map(([val, label]) => (
+                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fahrzeug</Label>
+              <Select value={editForm.fahrzeug_typ} onValueChange={(v) => setEditForm((f) => ({ ...f, fahrzeug_typ: v as FahrzeugTyp }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(FAHRZEUG_LABELS) as [FahrzeugTyp, string][]).map(([val, label]) => (
+                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fahrlehrer</Label>
+              <Select value={editForm.instructor_id} onValueChange={(v) => setEditForm((f) => ({ ...f, instructor_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Fahrlehrer wählen…" /></SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum & Uhrzeit</Label>
+              <Input type="datetime-local" value={editForm.datum} onChange={(e) => setEditForm((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dauer (Minuten)</Label>
+              <div className="flex gap-2">
+                {DAUER_OPTIONS.map((d) => (
+                  <Button key={d} type="button" variant={editForm.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setEditForm((f) => ({ ...f, dauer_minuten: d }))}>
+                    {d} min
+                  </Button>
+                ))}
+                <Input type="number" min={0} step={15} className="w-24" value={editForm.dauer_minuten || ""} onChange={(e) => setEditForm((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 0 }))} />
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Berechneter Preis</span>
+              <span className="font-semibold text-foreground text-lg">{editForm.dauer_minuten > 0 ? `${calculatePrice(editForm.dauer_minuten).toFixed(2)} €` : "–"}</span>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setEditingLesson(null)}>Abbrechen</Button>
+              <Button disabled={updateMutation.isPending} onClick={() => { if (editingLesson) updateMutation.mutate({ id: editingLesson.id, ...editForm }); }}>
+                {updateMutation.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

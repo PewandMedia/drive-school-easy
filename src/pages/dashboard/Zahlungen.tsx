@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark, Search } from "lucide-react";
+import { CreditCard, Plus, Trash2, TrendingDown, Banknote, Landmark, Search, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityInfoButton from "@/components/ActivityInfoButton";
 import { formatStudentName } from "@/lib/formatStudentName";
@@ -81,6 +81,8 @@ const Zahlungen = () => {
   const [form, setForm] = useState<PaymentForm>(defaultForm());
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
+  const [editingPayment, setEditingPayment] = useState<any | null>(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, datum: "" });
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const qc = useQueryClient();
@@ -194,6 +196,25 @@ const Zahlungen = () => {
     },
   });
 
+  const updatePaymentMutation = useMutation({
+    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string }) => {
+      const { error } = await supabase.from("payments").update({
+        betrag: parseFloat(vals.betrag) || 0,
+        zahlungsart: vals.zahlungsart,
+        datum: new Date(vals.datum).toISOString(),
+      }).eq("id", vals.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payments"] });
+      qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
+      qc.invalidateQueries({ queryKey: ["open_items"] });
+      setEditingPayment(null);
+      toast({ title: "Zahlung aktualisiert" });
+    },
+    onError: (e: Error) => { toast({ title: "Fehler", description: e.message, variant: "destructive" }); },
+  });
+
   // Stats
   const now = new Date();
   const monthStart = startOfMonth(now);
@@ -270,14 +291,14 @@ const Zahlungen = () => {
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => {
+              setEditingPayment(p);
+              setEditPaymentForm({ betrag: String(Math.abs(Number(p.betrag))), zahlungsart: p.zahlungsart as Zahlungsart, datum: new Date(p.datum).toISOString().slice(0, 10) });
+            }}>
+              <Pencil className="h-4 w-4" />
+            </Button>
             <ActivityInfoButton entityId={p.id} />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => deleteMutation.mutate(p.id)}
-              disabled={deleteMutation.isPending}
-            >
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate(p.id)} disabled={deleteMutation.isPending}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -533,6 +554,52 @@ const Zahlungen = () => {
                 onClick={() => saveMutation.mutate()}
               >
                 {saveMutation.isPending ? "Speichern…" : "Speichern"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={!!editingPayment} onOpenChange={(v) => { if (!v) setEditingPayment(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Zahlung bearbeiten</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>Datum</Label>
+              <Input type="date" value={editPaymentForm.datum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, datum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Zahlungsart</Label>
+              <Select value={editPaymentForm.zahlungsart} onValueChange={(v) => setEditPaymentForm((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(ZAHLUNGSART_LABELS) as [Zahlungsart, string][]).map(([val, label]) => (
+                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Betrag (€)</Label>
+              <Input type="number" step="0.01" min="0.01" value={editPaymentForm.betrag} onChange={(e) => setEditPaymentForm((f) => ({ ...f, betrag: e.target.value }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditingPayment(null)}>Abbrechen</Button>
+              <Button disabled={updatePaymentMutation.isPending} onClick={() => {
+                if (editingPayment) {
+                  const isGutschrift = Number(editingPayment.betrag) < 0;
+                  updatePaymentMutation.mutate({
+                    id: editingPayment.id,
+                    betrag: isGutschrift ? String(-Math.abs(parseFloat(editPaymentForm.betrag))) : editPaymentForm.betrag,
+                    zahlungsart: editPaymentForm.zahlungsart,
+                    datum: editPaymentForm.datum,
+                  });
+                }
+              }}>
+                {updatePaymentMutation.isPending ? "Speichern…" : "Speichern"}
               </Button>
             </div>
           </div>
