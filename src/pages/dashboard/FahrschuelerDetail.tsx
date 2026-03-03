@@ -102,6 +102,7 @@ const FahrschuelerDetail = () => {
   const [dlgLeistung, setDlgLeistung] = useState(false);
   const [dlgZahlung, setDlgZahlung] = useState(false);
   const [editingExamStatusId, setEditingExamStatusId] = useState<string | null>(null);
+  const [visibleLessons, setVisibleLessons] = useState(10);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -1323,7 +1324,7 @@ const FahrschuelerDetail = () => {
               <p className="text-sm text-muted-foreground">Noch keine Fahrstunden eingetragen.</p>
             ) : (
               <div className="space-y-0 divide-y divide-border/50">
-                {lessons.slice(0, 10).map((lesson) => (
+                {lessons.slice(0, visibleLessons).map((lesson) => (
                   <div key={lesson.id} className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">
@@ -1342,10 +1343,17 @@ const FahrschuelerDetail = () => {
                     </span>
                   </div>
                 ))}
-                {lessons.length > 10 && (
-                  <p className="text-xs text-muted-foreground pt-3">
-                    + {lessons.length - 10} weitere Einträge
-                  </p>
+                {lessons.length > visibleLessons && (
+                  <div className="pt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs text-muted-foreground"
+                      onClick={() => setVisibleLessons((c) => c + 10)}
+                    >
+                      Weitere {Math.min(10, lessons.length - visibleLessons)} von {lessons.length - visibleLessons} anzeigen
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
