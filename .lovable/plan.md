@@ -1,81 +1,76 @@
 
 
-## Bearbeitungsfunktion fuer alle Eintraege im Schuelerprofil
+## Bearbeitungsbuttons in allen Einzelbereichen
 
 ### Uebersicht
-In jeder Sektion (Fahrstunden, Theorie, Pruefungen, Leistungen, Zahlungen) wird pro Eintrag ein Bearbeiten-Button (Stift-Icon) ergaenzt. Klick oeffnet einen Dialog mit den vorausgefuellten Daten, die dann geaendert und gespeichert werden koennen.
+In allen 6 Einzelseiten (Fahrstunden, Theorie, Schaltstunden, Pruefungen, Leistungen, Zahlungen) wird pro Zeile ein Stift-Button ergaenzt, der einen Bearbeitungsdialog oeffnet. Die Logik orientiert sich am bestehenden Muster in FahrschuelerDetail.tsx.
 
-### Wichtig: Datenkonsistenz mit offenen Posten
-Die Tabelle `open_items` wird nur bei INSERT/DELETE ueber Trigger aktualisiert -- es gibt keinen UPDATE-Trigger. Daher muss bei jeder Bearbeitung von Fahrstunden, Pruefungen und Leistungen der zugehoerige offene Posten (Beschreibung + Betrag) manuell mitaktualisiert werden.
+### Betroffene Dateien und Aenderungen
 
-### Aenderungen in FahrschuelerDetail.tsx
+**1. Fahrstunden.tsx**
+- Neuer State: `editingLesson` (null oder DrivingLesson-Objekt)
+- Neuer State: `editForm` mit typ, fahrzeug_typ, vehicle_id, instructor_id, dauer_minuten, datum
+- Neue `updateMutation`: UPDATE `driving_lessons`, danach `.select()` fuer neuen Preis, dann `open_items` WHERE `referenz_id` manuell synchronisieren (Betrag + Beschreibung)
+- Pencil-Button in `renderRow` neben dem Loeschen-Button
+- Edit-Dialog mit denselben Feldern wie der Erstellen-Dialog (Typ, Fahrzeug, Fahrlehrer, Dauer, Datum)
+- Query-Invalidierung: `driving_lessons`, `open_items`
 
-**1. Neue States**
-- `editingLesson` / `editingTheory` / `editingExam` / `editingService` / `editingPayment` -- jeweils `null` oder das zu bearbeitende Objekt
-- Separate Edit-Form-States (oder Wiederverwendung der bestehenden Form-States mit einem `isEditing`-Flag)
+**2. Theorie.tsx (src/pages/dashboard/Theorie.tsx)**
+- Neuer State: `editingSession` (null oder TheorySession-Objekt)
+- Neuer State: `editForm` mit lektion, instructor_id, datum
+- Neue `updateMutation`: UPDATE `theory_sessions` (lektion, typ via lektionToTyp(), instructor_id, datum)
+- Pencil-Button in `renderRow`
+- Edit-Dialog mit Lektion-Select, Fahrlehrer-Select, Datum
+- Kein open_items-Sync noetig (Theorie hat keine offenen Posten)
 
-**2. Neue Update-Mutations (5 Stueck)**
+**3. Schaltstunden.tsx**
+- Neuer State: `editingLesson` (null oder SchaltstundeRow)
+- Neuer State: `editForm` mit typ, dauer_minuten, datum
+- Neue `updateMutation`: UPDATE `driving_lessons` (typ, dauer_minuten, datum), danach `open_items` WHERE `referenz_id` synchronisieren
+- Pencil-Button in `renderRow`
+- Edit-Dialog mit Typ-Select, Dauer-Buttons, Datum
 
-a) `mutEditFahrstunde` -- UPDATE `driving_lessons` (typ, fahrzeug_typ, instructor_id, dauer_minuten, datum). Danach: neuen Preis/Einheiten via `.select()` zuruecklesen (Server-Trigger berechnet diese), dann `open_items` WHERE `referenz_id = lesson.id` mit neuem Betrag und neuer Beschreibung updaten.
+**4. Pruefungen.tsx**
+- Neuer State: `editingExam` (null oder Exam-Objekt)
+- Neuer State: `editForm` mit typ, fahrzeug_typ, instructor_id, datum, status, preis
+- Neue `updateMutation`: UPDATE `exams`, danach `open_items` WHERE `referenz_id` synchronisieren (Beschreibung + Betrag)
+- Pencil-Button pro Zeile (neben Status-Badge und Loeschen)
+- Edit-Dialog mit allen Feldern (Typ, Fahrzeug, Fahrlehrer, Datum, Status, Preis)
 
-b) `mutEditTheorie` -- UPDATE `theory_sessions` (lektion, instructor_id, datum). Kein open_item betroffen.
+**5. Leistungen.tsx**
+- Neuer State: `editingService` (null oder Service-Objekt)
+- Neuer State: `editForm` mit bezeichnung, preis, status
+- Neue `updateMutation`: UPDATE `services`, danach `open_items` WHERE `referenz_id` synchronisieren (Beschreibung + Betrag)
+- Pencil-Button pro Leistungszeile
+- Edit-Dialog mit Bezeichnung, Preis, Status
 
-c) `mutEditPruefung` -- UPDATE `exams` (typ, fahrzeug_typ, instructor_id, datum, status, preis). Danach `open_items` WHERE `referenz_id = exam.id` updaten (Beschreibung + Betrag).
+**6. Zahlungen.tsx**
+- Neuer State: `editingPayment` (null oder Payment-Objekt)
+- Neuer State: `editForm` mit betrag, zahlungsart, datum
+- Neue `updateMutation`: UPDATE `payments` (betrag, zahlungsart, datum)
+- Pencil-Button in `renderRow`
+- Edit-Dialog mit Betrag, Zahlungsart, Datum
+- Kein open_items-Sync noetig (Zahlungen haben keine direkte open_items-Referenz)
 
-d) `mutEditLeistung` -- UPDATE `services` (bezeichnung, preis, status). Danach `open_items` WHERE `referenz_id = service.id` updaten (Beschreibung + Betrag).
+### Datenkonsistenz (kritisch)
 
-e) `mutEditZahlung` -- UPDATE `payments` (betrag, zahlungsart, datum). Kein open_item direkt betroffen (Zahlungen haben keine open_items).
+Fuer Fahrstunden, Schaltstunden, Pruefungen und Leistungen muss nach jedem Update die `open_items`-Tabelle manuell synchronisiert werden, da kein UPDATE-Trigger existiert:
 
-**3. UI je Sektion**
-- Jede Zeile bekommt einen kleinen Stift-Button (Pencil-Icon, ghost variant)
-- Klick setzt den jeweiligen `editing*`-State und oeffnet den Bearbeitungs-Dialog
-- Dialog-Titel aendert sich zu "Fahrstunde bearbeiten" etc.
-- Speichern-Button fuehrt die Update-Mutation aus
-- Nach Erfolg: alle relevanten Queries invalidieren (gleiche Keys wie beim Erstellen + `open_items`)
-
-**4. Query-Invalidierung bei Updates**
-Jede Update-Mutation invalidiert:
-- Die eigene Tabelle (`driving_lessons`, `theory_sessions`, etc.)
-- `open_items` (fuer Fahrstunden, Pruefungen, Leistungen)
-- Globale Listen-Queries (z.B. `exams_all`, `services`)
-
-### Technisches Detail: Open-Item-Sync
-
-```typescript
-// Beispiel fuer Fahrstunde-Update
-const mutEditFahrstunde = useMutation({
-  mutationFn: async (lesson: EditLessonData) => {
-    const { data, error } = await supabase
-      .from("driving_lessons")
-      .update({ typ: lesson.typ, fahrzeug_typ: lesson.fahrzeug_typ, 
-                instructor_id: lesson.instructor_id,
-                dauer_minuten: lesson.dauer_minuten, 
-                datum: new Date(lesson.datum).toISOString() })
-      .eq("id", lesson.id)
-      .select("preis, einheiten, dauer_minuten")
-      .single();
-    if (error) throw error;
-    // Open Item synchronisieren
-    await supabase.from("open_items")
-      .update({ 
-        betrag_gesamt: data.preis,
-        beschreibung: `Fahrstunde ${data.dauer_minuten}min (${data.einheiten}E)`,
-        datum: new Date(lesson.datum).toISOString()
-      })
-      .eq("referenz_id", lesson.id);
-    return data;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
-    queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
-    queryClient.invalidateQueries({ queryKey: ["open_items", id] });
-    queryClient.invalidateQueries({ queryKey: ["open_items"] });
-    setEditingLesson(null);
-    toast({ title: "Fahrstunde aktualisiert" });
-  },
-});
+```text
+1. driving_lessons UPDATE -> open_items.betrag_gesamt = neuer Preis, beschreibung aktualisieren
+2. exams UPDATE          -> open_items.betrag_gesamt = neuer Preis, beschreibung aktualisieren
+3. services UPDATE       -> open_items.betrag_gesamt = neuer Preis, beschreibung aktualisieren
 ```
 
+Nach jedem erfolgreichen Update werden alle relevanten Query-Keys invalidiert, damit sowohl die Einzelseite als auch das Schuelerprofil (FahrschuelerDetail) immer aktuelle Daten anzeigt.
+
+### UI-Muster (einheitlich)
+- Jede Zeile bekommt einen `Pencil`-Icon-Button (ghost, size="icon") links neben dem Loeschen-Button
+- Klick oeffnet einen Dialog mit vorausgefuellten Feldern
+- Dialog-Titel: "[Typ] bearbeiten" (z.B. "Fahrstunde bearbeiten")
+- Speichern-Button fuehrt die Update-Mutation aus
+- Nach Erfolg: Dialog schliesst, Toast-Nachricht, Queries werden invalidiert
+
 ### Keine Datenbank-Migrationen noetig
-Alle UPDATE-Rechte (RLS-Policies) sind bereits fuer alle Tabellen vorhanden.
+Alle UPDATE-RLS-Policies sind bereits fuer alle Tabellen vorhanden.
 
