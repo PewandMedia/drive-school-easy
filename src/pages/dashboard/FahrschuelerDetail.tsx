@@ -1343,16 +1343,28 @@ const FahrschuelerDetail = () => {
                     </span>
                   </div>
                 ))}
-                {lessons.length > visibleLessons && (
-                  <div className="pt-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-xs text-muted-foreground"
-                      onClick={() => setVisibleLessons((c) => c + 10)}
-                    >
-                      Weitere {Math.min(10, lessons.length - visibleLessons)} von {lessons.length - visibleLessons} anzeigen
-                    </Button>
+                {(lessons.length > visibleLessons || visibleLessons > 10) && (
+                  <div className="pt-3 flex flex-col gap-1">
+                    {lessons.length > visibleLessons && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs text-muted-foreground"
+                        onClick={() => setVisibleLessons((c) => c + 10)}
+                      >
+                        Weitere {Math.min(10, lessons.length - visibleLessons)} von {lessons.length - visibleLessons} anzeigen
+                      </Button>
+                    )}
+                    {visibleLessons > 10 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs text-muted-foreground"
+                        onClick={() => setVisibleLessons(10)}
+                      >
+                        Weniger anzeigen
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
