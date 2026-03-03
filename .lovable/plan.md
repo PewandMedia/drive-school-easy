@@ -1,25 +1,41 @@
 
 
-## STVA-Gebuehren in die Preisliste einfuegen (korrigiert)
+## Loeschfunktion fuer Pruefungen und Leistungen
 
-### Aenderungen gegenueber dem urspruenglichen Plan
-- **STVA BF17**: Preis korrigiert von 54,80 auf **54,90 EUR**
-- **STVA Begleiter** umbenannt zu **STVA BEGPER**
-- **STVA Service Begleiter** umbenannt zu **STVA Service Beg**
+### Was wird gemacht
+Auf den Seiten "Pruefungen" und "Leistungen" wird jeweils ein Loeschen-Button (Papierkorb-Icon) pro Eintrag ergaenzt -- genau wie es bereits bei Fahrstunden und Theorie existiert.
 
-### Einzufuegende Leistungen
+### Aenderungen
 
-| Bezeichnung | Preis |
-|---|---|
-| STVA Ersterteilung | 45,90 EUR |
-| STVA Service | 24,10 EUR |
-| STVA BF17 | 54,90 EUR |
-| STVA Service BF17 | 20,10 EUR |
-| STVA BEGPER | 12,30 EUR |
-| STVA Service Beg | 12,70 EUR |
-| STVA FSW | 25,60 EUR |
-| STVA FSW Service | 14,40 EUR |
+**1. Pruefungen.tsx**
+- Import `Trash2` von lucide-react hinzufuegen
+- Eine `deleteMutation` ergaenzen, die den Eintrag aus `exams` loescht und danach `exams_all` sowie `open_items` Queries invalidiert
+- In jeder Zeile neben dem Status-Badge und dem ActivityInfoButton einen Loeschen-Button (Trash2-Icon) rendern
 
-### Technische Umsetzung
-Ein einzelnes SQL-INSERT in die `prices`-Tabelle mit Kategorie "STVA Gebuehren" und `aktiv = true`. Kein Frontend-Code noetig -- die Leistungen erscheinen automatisch im "Leistung zuordnen"-Dialog und in der Auswertung.
+**2. Leistungen.tsx**
+- Import `Trash2` von lucide-react hinzufuegen
+- Eine `deleteMutation` ergaenzen, die den Eintrag aus `services` loescht und danach `services` sowie `open_items` Queries invalidiert
+- In jeder Zeile neben dem Status-Dropdown und dem ActivityInfoButton einen Loeschen-Button (Trash2-Icon) rendern
 
+### Technische Details
+
+Beide Mutations folgen dem bestehenden Muster aus `Fahrstunden.tsx`:
+
+```typescript
+const deleteMutation = useMutation({
+  mutationFn: async (id: string) => {
+    const { error } = await supabase.from("exams").delete().eq("id", id);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: ["exams_all"] });
+    qc.invalidateQueries({ queryKey: ["open_items"] });
+    toast({ title: "Prüfung gelöscht" });
+  },
+  onError: (e: Error) => {
+    toast({ title: "Fehler", description: e.message, variant: "destructive" });
+  },
+});
+```
+
+Der Button wird als `variant="ghost" size="icon"` gerendert mit Trash2-Icon, identisch zum bestehenden Design in Fahrstunden/Theorie. Keine Datenbankmigrationen noetig -- die DELETE-Trigger und RLS-Policies existieren bereits.
