@@ -57,6 +57,7 @@ const defaultForm = {
   ist_umschreiber: false,
   status: "",
   geburtsdatum: undefined as Date | undefined,
+  anmeldedatum: new Date() as Date | undefined,
 };
 
 const Fahrschueler = () => {
@@ -68,6 +69,7 @@ const Fahrschueler = () => {
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
+  const [anmeldedatumText, setAnmeldedatumText] = useState(format(new Date(), "dd.MM.yyyy"));
   const [visibleCount, setVisibleCount] = useState(10);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [angebotsNotiz, setAngebotsNotiz] = useState("");
@@ -161,6 +163,7 @@ const Fahrschueler = () => {
           ist_umschreiber: values.ist_umschreiber,
           status: values.status || null,
           geburtsdatum: values.geburtsdatum ? format(values.geburtsdatum, "yyyy-MM-dd") : null,
+          created_at: values.anmeldedatum ? values.anmeldedatum.toISOString() : new Date().toISOString(),
         },
       ]).select("id").single();
       if (error) throw error;
@@ -186,6 +189,7 @@ const Fahrschueler = () => {
       setOpen(false);
       setForm(defaultForm);
       setGeburtsdatumText("");
+      setAnmeldedatumText(format(new Date(), "dd.MM.yyyy"));
       setFormError("");
       const initial: Record<string, number> = {};
       for (const p of autoPrices) initial[p.id] = Number(p.preis);
@@ -485,12 +489,55 @@ const Fahrschueler = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Switch
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Anmeldedatum</Label>
+                <div className="relative">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                        <CalendarIcon className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.anmeldedatum}
+                        onSelect={(date) => {
+                          setForm({ ...form, anmeldedatum: date });
+                          setAnmeldedatumText(date ? format(date, "dd.MM.yyyy") : "");
+                        }}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Input
+                    placeholder="TT.MM.JJJJ"
+                    className="pl-9"
+                    value={anmeldedatumText}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAnmeldedatumText(val);
+                      if (val.length === 10) {
+                        const parsed = parse(val, "dd.MM.yyyy", new Date());
+                        if (isValid(parsed)) {
+                          setForm((f) => ({ ...f, anmeldedatum: parsed }));
+                        }
+                      } else {
+                        setForm((f) => ({ ...f, anmeldedatum: undefined }));
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 pt-6">
+                <Switch
                 checked={form.ist_umschreiber}
                 onCheckedChange={(v) => setForm({ ...form, ist_umschreiber: v })}
               />
-              <Label>Umschreiber</Label>
+                <Label>Umschreiber</Label>
+              </div>
             </div>
 
             {autoPrices.length > 0 && (
