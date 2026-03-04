@@ -1,61 +1,24 @@
 
 
-## PDF-Export fuer Fahrstunden, Leistungen und Zahlungen im Schuelerprofil
-
-### Uebersicht
-
-In den drei Sektionen (Fahrstunden, Leistungen, Zahlungen) im Schuelerprofil wird jeweils ein "Als PDF drucken"-Button hinzugefuegt. Beim Klick wird ein druckoptimiertes Overlay (wie bei Tagesabrechnung) per `window.print()` erzeugt.
-
-### Ansatz
-
-Eine wiederverwendbare Hilfsfunktion/Komponente die:
-1. Ein unsichtbares `print:block`-Element rendert mit den Daten
-2. Beim Klick auf den Button `window.print()` aufruft
-3. Per State steuert welcher Bereich gedruckt wird (fahrstunden/leistungen/zahlungen)
+## Druck-Button bei Prüfungen hinzufuegen
 
 ### Aenderungen in `FahrschuelerDetail.tsx`
 
-**1. Print-State hinzufuegen:**
-- `const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | null>(null)`
-- Bei Klick: `setPrintSection("fahrstunden")` → `useEffect` ruft `window.print()` auf → `afterprint` setzt zurueck
+**1. `printSection` Type erweitern (Zeile 127):**
+- `"pruefungen"` zum Union-Typ hinzufuegen: `"fahrstunden" | "leistungen" | "zahlungen" | "pruefungen" | null`
 
-**2. Drei PDF-Buttons in den Sektionsheadern (neben "+ hinzufuegen"):**
-- Fahrstunden-Header (Zeile ~1703): Printer-Icon-Button
-- Leistungen-Header (Zeile ~1772): Printer-Icon-Button
-- Zahlungen-Header (Zeile ~1823): Printer-Icon-Button
+**2. Drucker-Button im Prüfungen-Header (Zeile 1619-1620):**
+- Zwischen Header und Add-Button einen Printer-Icon-Button einfuegen (gleicher Stil wie bei den anderen Sektionen)
+- `onClick={() => setPrintSection("pruefungen")}`
 
-**3. Print-Area am Ende der Komponente (`hidden print:block`):**
+**3. Print-Area Title erweitern (Zeile 2595):**
+- `printSection === "pruefungen" ? "Prüfungen"` zum Titel-Mapping hinzufuegen
 
-Abhaengig von `printSection` wird gerendert:
-
-- **Fahrstunden-PDF:** Schuelername + Klasse, Tabelle mit Datum/Typ/Dauer/Fahrzeug/Fahrlehrer/Preis, Summenzeile
-- **Leistungen-PDF:** Schuelername, Tabelle mit Datum/Bezeichnung/Status/Preis, Summenzeile
-- **Zahlungen-PDF:** Schuelername, Tabelle mit Datum/Zahlungsart/Betrag, Summenzeile
-
-**4. Screen-Content ausblenden beim Drucken:**
-- Bestehende Inhalte mit `print:hidden` versehen (der aeussere Container)
-
-### Datenstruktur der PDFs
-
-```text
-┌──────────────────────────────────────────┐
-│ Fahrschulverwaltung – Fahrstunden        │
-│ Schueler: Nachname, Vorname (Klasse B)   │
-│ Datum: 04.03.2026                        │
-├──────────────────────────────────────────┤
-│ Datum    │ Typ      │ Dauer │ Preis      │
-│ 01.11.25 │ Uebung   │ 45min │ 65,00 €    │
-│ ...      │ ...      │ ...   │ ...        │
-├──────────────────────────────────────────┤
-│                     Gesamt: 1.300,00 €   │
-└──────────────────────────────────────────┘
-```
-
-### Dateien
+**4. Prüfungen-Druckbereich hinzufuegen (nach Zeile 2692, vor `</div>`):**
+- Tabelle mit Spalten: Datum, Typ (Theorie/Praxis), Ergebnis (Bestanden/Nicht bestanden), ggf. Preis
+- Summenzeile mit Gesamtkosten der Prüfungen
 
 | Datei | Aenderung |
 |---|---|
-| `FahrschuelerDetail.tsx` | Print-State, 3 Drucker-Buttons, Print-Area mit 3 PDF-Layouts |
-
-Keine DB-Aenderungen noetig. Alle Daten sind bereits geladen (lessons, services, payments).
+| `FahrschuelerDetail.tsx` | printSection-Typ erweitern, Drucker-Button bei Prüfungen, Print-Layout fuer Prüfungen |
 
