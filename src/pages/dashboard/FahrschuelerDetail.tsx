@@ -132,6 +132,7 @@ const FahrschuelerDetail = () => {
     instructor_id: "",
     dauer_minuten: 45,
     datum: new Date().toISOString().slice(0, 16),
+    fehlstundePreis: "40",
   });
   // fsSchaltstunde removed – Fahrstunden-Dialog handles schaltwagen
   const [fsTheorie, setFsTheorie] = useState({
@@ -294,21 +295,25 @@ const FahrschuelerDetail = () => {
   const mutFahrstunde = useMutation({
     mutationFn: async () => {
       if (!fsFahrstunde.instructor_id) throw new Error("Bitte einen Fahrlehrer auswählen");
-      const { error } = await supabase.from("driving_lessons").insert({
+      const insertData: any = {
         student_id: id!,
         instructor_id: fsFahrstunde.instructor_id,
         typ: fsFahrstunde.typ,
         fahrzeug_typ: fsFahrstunde.fahrzeug_typ,
         dauer_minuten: fsFahrstunde.dauer_minuten,
         datum: new Date(fsFahrstunde.datum).toISOString(),
-      } as any);
+      };
+      if (fsFahrstunde.typ === "fehlstunde") {
+        insertData.preis = parseFloat(fsFahrstunde.fehlstundePreis) || 40;
+      }
+      const { error } = await supabase.from("driving_lessons").insert(insertData);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["driving_lessons", id] });
       queryClient.invalidateQueries({ queryKey: ["driving_lessons"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
-      setFsFahrstunde(prev => ({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: prev.instructor_id, dauer_minuten: 45, datum: new Date().toISOString().slice(0, 16) }));
+      setFsFahrstunde(prev => ({ typ: "uebungsstunde", fahrzeug_typ: "automatik", instructor_id: prev.instructor_id, dauer_minuten: 45, datum: prev.datum, fehlstundePreis: "40" }));
       toast({ title: "Fahrstunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -332,7 +337,7 @@ const FahrschuelerDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
-      setFsTheorie(prev => ({ lektion: 1, instructor_id: prev.instructor_id, datum: new Date().toISOString().slice(0, 16) }));
+      setFsTheorie(prev => ({ lektion: 1, instructor_id: prev.instructor_id, datum: prev.datum }));
       toast({ title: "Theoriestunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -450,7 +455,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" });
+      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -1867,7 +1872,7 @@ const FahrschuelerDetail = () => {
               <Label>Typ</Label>
               <Select value={fsFahrstunde.typ} onValueChange={(v) => {
                 const newTyp = v as DrivingLessonTyp;
-                setFsFahrstunde((f) => ({ ...f, typ: newTyp, dauer_minuten: newTyp === "fehlstunde" ? 0 : (f.dauer_minuten === 0 ? 45 : f.dauer_minuten) }));
+                setFsFahrstunde((f) => ({ ...f, typ: newTyp, dauer_minuten: newTyp === "fehlstunde" ? 0 : (f.dauer_minuten === 0 ? 45 : f.dauer_minuten), fehlstundePreis: newTyp === "fehlstunde" ? f.fehlstundePreis : "40" }));
               }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1915,9 +1920,15 @@ const FahrschuelerDetail = () => {
               </div>
             </div>
             )}
+            {fsFahrstunde.typ === "fehlstunde" && (
+            <div className="space-y-1.5">
+              <Label>Preis (EUR)</Label>
+              <Input type="number" min={0} step={1} value={fsFahrstunde.fehlstundePreis} onChange={(e) => setFsFahrstunde((f) => ({ ...f, fehlstundePreis: e.target.value }))} className="w-32" />
+            </div>
+            )}
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Berechneter Preis</span>
-              <span className="font-semibold text-foreground text-lg">{fsFahrstunde.typ === "fehlstunde" ? "40,00 €" : `${previewPrice.toFixed(2)} €`}</span>
+              <span className="font-semibold text-foreground text-lg">{fsFahrstunde.typ === "fehlstunde" ? `${(parseFloat(fsFahrstunde.fehlstundePreis) || 40).toFixed(2)} €` : `${previewPrice.toFixed(2)} €`}</span>
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={() => setDlgFahrstunde(false)}>Abbrechen</Button>

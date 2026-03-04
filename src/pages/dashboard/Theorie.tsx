@@ -103,7 +103,7 @@ const Theorie = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
-      setForm(defaultForm);
+      setForm(prev => ({ ...defaultForm, datum: prev.datum }));
       setOpen(false);
       toast({ title: "Theoriestunde gespeichert" });
     },
