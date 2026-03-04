@@ -124,7 +124,7 @@ const FahrschuelerDetail = () => {
   const [editingContact, setEditingContact] = useState(false);
   const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
   const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
-  const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | null>(null);
+  const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | "pruefungen" | null>(null);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -1617,7 +1617,12 @@ const FahrschuelerDetail = () => {
                   <span className="ml-2 text-sm font-normal text-muted-foreground">({exams.length})</span>
                 </h2>
               </div>
-              <SectionAddBtn label="+ Prüfung eintragen" onClick={() => setDlgPruefung(true)} />
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPrintSection("pruefungen")} title="Prüfungen drucken">
+                  <Printer className="h-4 w-4" />
+                </Button>
+                <SectionAddBtn label="+ Prüfung eintragen" onClick={() => setDlgPruefung(true)} />
+              </div>
             </div>
             {exams.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Prüfungen eingetragen.</p>
@@ -2592,7 +2597,7 @@ const FahrschuelerDetail = () => {
         <div className="print-area hidden print:block">
           <div className="mb-6 border-b pb-4">
             <h1 className="text-2xl font-bold">
-              Fahrschulverwaltung – {printSection === "fahrstunden" ? "Fahrstunden" : printSection === "leistungen" ? "Leistungen" : "Zahlungen"}
+              Fahrschulverwaltung – {printSection === "fahrstunden" ? "Fahrstunden" : printSection === "leistungen" ? "Leistungen" : printSection === "pruefungen" ? "Prüfungen" : "Zahlungen"}
             </h1>
             <p className="text-lg mt-1">
               Schüler: {student.nachname}, {student.vorname} (Klasse {student.fuehrerscheinklasse})
@@ -2687,6 +2692,34 @@ const FahrschuelerDetail = () => {
               </table>
               <p className="text-base font-bold">
                 Gesamt: {payments.reduce((s, p) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+              </p>
+            </>
+          )}
+
+          {printSection === "pruefungen" && (
+            <>
+              <table className="w-full text-sm border-collapse mb-6">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-1">Datum</th>
+                    <th className="text-left py-1">Typ</th>
+                    <th className="text-left py-1">Ergebnis</th>
+                    <th className="text-right py-1">Preis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exams.map((e: any) => (
+                    <tr key={e.id} className="border-b">
+                      <td className="py-1">{format(new Date(e.datum), "dd.MM.yyyy")}</td>
+                      <td className="py-1">{e.typ === "theorie" ? "Theorie" : "Praxis"}</td>
+                      <td className="py-1">{e.status === "bestanden" ? "Bestanden" : "Nicht bestanden"}</td>
+                      <td className="py-1 text-right">{Number(e.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-base font-bold">
+                Gesamt: {exams.reduce((s: number, e: any) => s + Number(e.preis), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
               </p>
             </>
           )}
