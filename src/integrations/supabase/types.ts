@@ -406,6 +406,7 @@ export type Database = {
         Row: {
           bezeichnung: string
           created_at: string
+          datum: string
           id: string
           notiz: string | null
           preis: number
@@ -416,6 +417,7 @@ export type Database = {
         Insert: {
           bezeichnung: string
           created_at?: string
+          datum?: string
           id?: string
           notiz?: string | null
           preis?: number
@@ -426,6 +428,7 @@ export type Database = {
         Update: {
           bezeichnung?: string
           created_at?: string
+          datum?: string
           id?: string
           notiz?: string | null
           preis?: number

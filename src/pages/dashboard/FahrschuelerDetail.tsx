@@ -151,6 +151,7 @@ const FahrschuelerDetail = () => {
     preis_id: "",
     bezeichnung: "",
     preis: "",
+    datum: new Date().toISOString().slice(0, 16),
     status: "offen" as ServiceStatus,
   });
   const [fsZahlung, setFsZahlung] = useState({
@@ -331,8 +332,7 @@ const FahrschuelerDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["theory_sessions", id] });
       queryClient.invalidateQueries({ queryKey: ["theory_sessions"] });
-      setDlgTheorie(false);
-      setFsTheorie({ lektion: 1, instructor_id: "", datum: new Date().toISOString().slice(0, 16) });
+      setFsTheorie(prev => ({ lektion: 1, instructor_id: prev.instructor_id, datum: new Date().toISOString().slice(0, 16) }));
       toast({ title: "Theoriestunde gespeichert" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -355,8 +355,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["exams", id] });
       queryClient.invalidateQueries({ queryKey: ["exams_all"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
-      setDlgPruefung(false);
-      setFsPruefung({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), status: "angemeldet", preis: "0" });
+      setFsPruefung(prev => ({ typ: "theorie", fahrzeug_typ: "automatik", instructor_id: "", datum: new Date().toISOString().slice(0, 10), status: "angemeldet", preis: "0" }));
       toast({ title: "Prüfung eingetragen" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -385,15 +384,15 @@ const FahrschuelerDetail = () => {
         bezeichnung: fsLeistung.bezeichnung,
         preis: parseFloat(fsLeistung.preis) || 0,
         status: fsLeistung.status,
-      });
+        datum: new Date(fsLeistung.datum).toISOString(),
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["services", id] });
       queryClient.invalidateQueries({ queryKey: ["services"] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
-      setDlgLeistung(false);
-      setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", status: "offen" });
+      setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", datum: new Date().toISOString().slice(0, 16), status: "offen" });
       toast({ title: "Leistung hinzugefügt" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -451,7 +450,6 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setDlgZahlung(false);
       setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" });
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
     },
@@ -589,7 +587,8 @@ const FahrschuelerDetail = () => {
           bezeichnung: service.bezeichnung,
           preis: parseFloat(service.preis) || 0,
           status: service.status,
-        })
+          datum: service.datum ? new Date(service.datum).toISOString() : undefined,
+        } as any)
         .eq("id", service.id);
       if (error) throw error;
       // Sync open_items
@@ -1778,12 +1777,13 @@ const FahrschuelerDetail = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{service.bezeichnung}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(service.created_at), "dd.MM.yyyy", { locale: de })}
+                          {format(new Date((service as any).datum || service.created_at), "dd.MM.yyyy HH:mm", { locale: de })}
                         </p>
                       </div>
                       <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setEditingService({
                         ...service,
                         preis: String(service.preis),
+                        datum: new Date((service as any).datum || service.created_at).toISOString().slice(0, 16),
                       })}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -1865,7 +1865,10 @@ const FahrschuelerDetail = () => {
           <form onSubmit={(e) => { e.preventDefault(); mutFahrstunde.mutate(); }} className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label>Typ</Label>
-              <Select value={fsFahrstunde.typ} onValueChange={(v) => setFsFahrstunde((f) => ({ ...f, typ: v as DrivingLessonTyp }))}>
+              <Select value={fsFahrstunde.typ} onValueChange={(v) => {
+                const newTyp = v as DrivingLessonTyp;
+                setFsFahrstunde((f) => ({ ...f, typ: newTyp, dauer_minuten: newTyp === "fehlstunde" ? 0 : (f.dauer_minuten === 0 ? 45 : f.dauer_minuten) }));
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(TYP_LABELS).map(([val, label]) => (
@@ -1899,6 +1902,7 @@ const FahrschuelerDetail = () => {
               <Label>Datum & Uhrzeit</Label>
               <Input type="datetime-local" value={fsFahrstunde.datum} onChange={(e) => setFsFahrstunde((f) => ({ ...f, datum: e.target.value }))} />
             </div>
+            {fsFahrstunde.typ !== "fehlstunde" && (
             <div className="space-y-1.5">
               <Label>Dauer (Minuten)</Label>
               <div className="flex gap-2">
@@ -1910,9 +1914,10 @@ const FahrschuelerDetail = () => {
                 <Input type="number" min={0} step={15} className="w-24" value={fsFahrstunde.dauer_minuten} onChange={(e) => setFsFahrstunde((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 45 }))} />
               </div>
             </div>
+            )}
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Berechneter Preis</span>
-              <span className="font-semibold text-foreground text-lg">{previewPrice.toFixed(2)} €</span>
+              <span className="font-semibold text-foreground text-lg">{fsFahrstunde.typ === "fehlstunde" ? "40,00 €" : `${previewPrice.toFixed(2)} €`}</span>
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={() => setDlgFahrstunde(false)}>Abbrechen</Button>
@@ -2047,7 +2052,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Leistung ── */}
-      <Dialog open={dlgLeistung} onOpenChange={(v) => { setDlgLeistung(v); if (!v) setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", status: "offen" }); }}>
+      <Dialog open={dlgLeistung} onOpenChange={(v) => { setDlgLeistung(v); if (!v) setFsLeistung({ preis_id: "", bezeichnung: "", preis: "", datum: new Date().toISOString().slice(0, 16), status: "offen" }); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Leistung hinzufügen</DialogTitle>
@@ -2082,6 +2087,10 @@ const FahrschuelerDetail = () => {
             <div className="space-y-1.5">
               <Label>Preis (€)</Label>
               <Input type="number" step="0.01" min="0" placeholder="0,00" value={fsLeistung.preis} onChange={(e) => setFsLeistung((f) => ({ ...f, preis: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Datum & Uhrzeit</Label>
+              <Input type="datetime-local" value={fsLeistung.datum} onChange={(e) => setFsLeistung((f) => ({ ...f, datum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
@@ -2452,6 +2461,10 @@ const FahrschuelerDetail = () => {
               <div className="space-y-1.5">
                 <Label>Preis (€)</Label>
                 <Input type="number" step="0.01" min="0" value={editingService.preis} onChange={(e) => setEditingService((prev: any) => ({ ...prev, preis: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Datum & Uhrzeit</Label>
+                <Input type="datetime-local" value={editingService.datum || ""} onChange={(e) => setEditingService((prev: any) => ({ ...prev, datum: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
                 <Label>Status</Label>
