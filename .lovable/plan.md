@@ -1,53 +1,42 @@
 
 
-## Namensbearbeitung und Loeschbuttons im Schuelerprofil
+## Drei Aenderungen im Schuelerprofil
 
-### Uebersicht
-Zwei Erweiterungen in `FahrschuelerDetail.tsx`:
-1. **Kontaktdaten-Dialog erweitern**: Vorname, Nachname und Fuehrerscheinklasse als bearbeitbare Felder hinzufuegen.
-2. **Loeschbuttons**: Neben jedem Bearbeitungs-Stift (Fahrstunden, Pruefungen, Leistungen, Zahlungen, Theorie) einen Papierkorb-Button ergaenzen, der nach Bestaetigungsabfrage den Eintrag loescht.
+### 1. Dialoge offen lassen nach Speichern
 
-### Technische Details
+In `FahrschuelerDetail.tsx` bei den `onSuccess`-Handlern von `mutTheorie`, `mutPruefung`, `mutLeistung` und `mutZahlung` das `setDlg...(false)` entfernen. Nur das Formular zuruecksetzen (wie bereits bei Fahrstunden implementiert).
 
-#### 1. Kontaktdaten-Dialog: Name bearbeitbar machen
+- Zeile 334: `setDlgTheorie(false)` entfernen
+- Zeile 358: `setDlgPruefung(false)` entfernen  
+- Zeile 395: `setDlgLeistung(false)` entfernen
+- Zeile 454: `setDlgZahlung(false)` entfernen
 
-- `contactForm` State erweitern um `vorname`, `nachname`, `fuehrerscheinklasse`
-- Beim Oeffnen des Dialogs diese Felder vorausfuellen
-- Im Dialog zwei neue Felder (Vorname, Nachname) als erstes einfuegen, darunter Fuehrerscheinklasse als Select
-- `mutEditContact` erweitern: zusaetzlich `vorname`, `nachname`, `fuehrerscheinklasse` an den UPDATE uebergeben
+### 2. Fehlstunde = 40 EUR, keine Dauer
 
-#### 2. Loeschbuttons + Bestaetigungsdialog
+**Frontend** (`FahrschuelerDetail.tsx`):
+- Wenn `typ === "fehlstunde"`: Dauer-Buttons ausblenden, `dauer_minuten` auf 0 setzen, Preisvorschau "40,00 €" anzeigen
+- Beim Wechsel zu fehlstunde: `dauer_minuten = 0`, weg von fehlstunde: `dauer_minuten = 45`
 
-**Neuer State:**
-- `deletingItem`: `{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung", id: string, label: string } | null`
+**DB-Migration** (neue Datei):
+- `calculate_driving_lesson_price` Trigger erweitern: wenn `typ = 'fehlstunde'` dann `preis := 40`, `einheiten := 0`, sonst bisherige Berechnung
 
-**Neue Delete-Mutations (5 Stueck):**
+### 3. Datum und Uhrzeit bei Leistungen hinzufuegen
 
-| Typ | Tabelle | Besonderheit |
-|---|---|---|
-| Fahrstunde | `driving_lessons` | DB-Trigger loescht `open_items` automatisch |
-| Theorie | `theory_sessions` | Keine open_items betroffen |
-| Pruefung | `exams` | DB-Trigger loescht `open_items` automatisch |
-| Leistung | `services` | DB-Trigger loescht `open_items` automatisch |
-| Zahlung | `payments` | Muss zuerst `payment_allocations` loeschen, dann Payment. Danach open_items-Status recalcen via Query-Invalidierung (der DB-Trigger `update_open_item_after_allocation` greift nicht bei DELETE, daher muessen `open_items` manuell zurueckgesetzt werden) |
+Die `services`-Tabelle hat aktuell kein `datum`-Feld. `created_at` existiert aber.
 
-**Zahlung loeschen – kritischer Ablauf:**
-1. Alle `payment_allocations` fuer diese `payment_id` laden
-2. Merken welche `open_item_id`s betroffen sind
-3. `payment_allocations` WHERE `payment_id` = id loeschen
-4. Fuer jede betroffene `open_item_id`: Summe der verbleibenden Allocations neu berechnen, `betrag_bezahlt` und `status` updaten
-5. `payments` WHERE `id` = id loeschen
-6. Falls Gutschrift: zugehoeriger `open_items`-Eintrag (typ=gutschrift, referenz_id=payment_id) loeschen
+**Option A**: `created_at` als Datumsfeld nutzen (kein Schema-Aenderung noetig)
+**Option B**: Neues `datum`-Feld per Migration hinzufuegen
 
-**UI pro Zeile:**
-- Trash2-Icon-Button (ghost, destructive hover) neben dem Pencil-Button
-- Klick setzt `deletingItem` State
-- AlertDialog zeigt: "Eintrag loeschen? [Beschreibung] wird unwiderruflich geloescht."
-- Bestaetigung fuehrt die passende Delete-Mutation aus
+Da Leistungen ein explizites Datum haben sollten (unabhaengig vom Erstellzeitpunkt), wird eine **Migration** benoetigt:
+- `ALTER TABLE services ADD COLUMN datum timestamptz NOT NULL DEFAULT now();`
+- Frontend: `fsLeistung` um `datum` erweitern (datetime-local Input)
+- Insert/Update: `datum` mitsenden
+- Anzeige in der Leistungen-Tabelle: Datum anzeigen
 
-**Query-Invalidierungen nach Delete:**
-Alle relevanten Keys: entity-spezifisch + `open_items` + `payment_allocations` + `payments` (student-spezifisch und global)
+### Zusammenfassung
 
-### Keine Datenbank-Migrationen noetig
-Die DELETE-Trigger (`delete_open_item_for_entity`) existieren bereits fuer `driving_lessons`, `exams` und `services`. Payment-Allocations werden manuell bereinigt.
+| Datei | Aenderung |
+|---|---|
+| `FahrschuelerDetail.tsx` | Dialoge offen lassen, Fehlstunde-UI, Leistung-Datum-Feld |
+| DB-Migration (neu) | Trigger fuer Fehlstunde=40€ + `services.datum` Spalte |
 
