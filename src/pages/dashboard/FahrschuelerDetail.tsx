@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { parse, isValid } from "date-fns";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2, Printer } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
@@ -124,6 +124,7 @@ const FahrschuelerDetail = () => {
   const [editingContact, setEditingContact] = useState(false);
   const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
   const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
+  const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | null>(null);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -290,6 +291,18 @@ const FahrschuelerDetail = () => {
       if (match) setFsPruefung((f) => ({ ...f, preis: String(match.preis) }));
     }
   }, [fsPruefung.typ, dlgPruefung, prices]);
+
+  // Print trigger
+  useEffect(() => {
+    if (!printSection) return;
+    const timer = setTimeout(() => window.print(), 100);
+    const onAfterPrint = () => setPrintSection(null);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [printSection]);
 
   // ── Mutations ──
   const mutFahrstunde = useMutation({
@@ -910,7 +923,8 @@ const FahrschuelerDetail = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+    <div className="space-y-6 print:hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -1700,7 +1714,12 @@ const FahrschuelerDetail = () => {
                 Fahrstunden
                 <span className="ml-2 text-sm font-normal text-muted-foreground">({lessons.reduce((s, l) => s + (Number((l as any).einheiten) || Math.floor(l.dauer_minuten / 45)), 0)} Einheiten)</span>
               </h2>
-              <SectionAddBtn label="+ Fahrstunde hinzufügen" onClick={() => setDlgFahrstunde(true)} />
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => setPrintSection("fahrstunden")} title="Als PDF drucken">
+                  <Printer className="h-3.5 w-3.5" />
+                </Button>
+                <SectionAddBtn label="+ Fahrstunde hinzufügen" onClick={() => setDlgFahrstunde(true)} />
+              </div>
             </div>
             {lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Fahrstunden eingetragen.</p>
@@ -1769,7 +1788,12 @@ const FahrschuelerDetail = () => {
                 Leistungen
                 <span className="ml-2 text-sm font-normal text-muted-foreground">({services.length})</span>
               </h2>
-              <SectionAddBtn label="+ Leistung hinzufügen" onClick={() => setDlgLeistung(true)} />
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => setPrintSection("leistungen")} title="Als PDF drucken">
+                  <Printer className="h-3.5 w-3.5" />
+                </Button>
+                <SectionAddBtn label="+ Leistung hinzufügen" onClick={() => setDlgLeistung(true)} />
+              </div>
             </div>
             {services.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Leistungen erfasst.</p>
@@ -1820,7 +1844,12 @@ const FahrschuelerDetail = () => {
                   <span className="ml-2 text-sm font-normal text-muted-foreground">({payments.length})</span>
                 </h2>
               </div>
-              <SectionAddBtn label="+ Zahlung hinzufügen" onClick={() => setDlgZahlung(true)} />
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => setPrintSection("zahlungen")} title="Als PDF drucken">
+                  <Printer className="h-3.5 w-3.5" />
+                </Button>
+                <SectionAddBtn label="+ Zahlung hinzufügen" onClick={() => setDlgZahlung(true)} />
+              </div>
             </div>
             {payments.length === 0 ? (
               <p className="text-sm text-muted-foreground">Noch keine Zahlungen erfasst.</p>
@@ -2557,6 +2586,113 @@ const FahrschuelerDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+
+      {/* ===== PRINT AREA ===== */}
+      {printSection && (
+        <div className="print-area hidden print:block">
+          <div className="mb-6 border-b pb-4">
+            <h1 className="text-2xl font-bold">
+              Fahrschulverwaltung – {printSection === "fahrstunden" ? "Fahrstunden" : printSection === "leistungen" ? "Leistungen" : "Zahlungen"}
+            </h1>
+            <p className="text-lg mt-1">
+              Schüler: {student.nachname}, {student.vorname} (Klasse {student.fuehrerscheinklasse})
+            </p>
+            <p className="text-sm mt-1">
+              Datum: {format(new Date(), "dd.MM.yyyy", { locale: de })}
+            </p>
+          </div>
+
+          {printSection === "fahrstunden" && (
+            <>
+              <table className="w-full text-sm border-collapse mb-6">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-1">Datum</th>
+                    <th className="text-left py-1">Typ</th>
+                    <th className="text-left py-1">Dauer</th>
+                    <th className="text-left py-1">Fahrzeug</th>
+                    <th className="text-left py-1">Fahrlehrer</th>
+                    <th className="text-right py-1">Preis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lessons.map((l) => {
+                    const instr = instructors.find((i) => i.id === (l as any).instructor_id);
+                    return (
+                      <tr key={l.id} className="border-b">
+                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy HH:mm")}</td>
+                        <td className="py-1">{TYP_LABELS[l.typ] ?? l.typ}</td>
+                        <td className="py-1">{l.dauer_minuten} min</td>
+                        <td className="py-1">{FAHRZEUG_LABELS[l.fahrzeug_typ] ?? l.fahrzeug_typ}</td>
+                        <td className="py-1">{instr ? `${instr.vorname} ${instr.nachname}` : "–"}</td>
+                        <td className="py-1 text-right">{Number(l.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="text-base font-bold">
+                Gesamt: {lessons.reduce((s, l) => s + Number(l.preis), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+              </p>
+            </>
+          )}
+
+          {printSection === "leistungen" && (
+            <>
+              <table className="w-full text-sm border-collapse mb-6">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-1">Datum</th>
+                    <th className="text-left py-1">Bezeichnung</th>
+                    <th className="text-left py-1">Status</th>
+                    <th className="text-right py-1">Preis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {services.map((s) => (
+                    <tr key={s.id} className="border-b">
+                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy HH:mm")}</td>
+                      <td className="py-1">{s.bezeichnung}</td>
+                      <td className="py-1">{(SERVICE_STATUS_LABELS[s.status] ?? { label: s.status }).label}</td>
+                      <td className="py-1 text-right">{Number(s.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-base font-bold">
+                Gesamt: {services.reduce((s, sv) => s + Number(sv.preis), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+              </p>
+            </>
+          )}
+
+          {printSection === "zahlungen" && (
+            <>
+              <table className="w-full text-sm border-collapse mb-6">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-1">Datum</th>
+                    <th className="text-left py-1">Zahlungsart</th>
+                    <th className="text-right py-1">Betrag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id} className="border-b">
+                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                      <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
+                      <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-base font-bold">
+                Gesamt: {payments.reduce((s, p) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </>
   );
 };
 
