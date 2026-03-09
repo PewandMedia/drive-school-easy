@@ -1,23 +1,39 @@
 
 
-## Test-Account "test tes" komplett loeschen
+## Kombi-Druck-Button unter Kontaktdaten
 
-Der Schueler (ID: `e225cc6d-fdd1-4f65-bb89-d53afd9d47da`) hat:
-- 2 Services (Grundbetrag, Lernmaterial)
-- 2 Offene Posten
-- Keine Fahrstunden, Theorie, Pruefungen, Zahlungen
+### Uebersicht
 
-### SQL-Migration
+Ein neuer "Drucken"-Button unter den Kontaktdaten oeffnet einen Dialog mit Checkboxen fuer Fahrstunden, Leistungen, Pruefungen und Zahlungen. Der Nutzer waehlt die gewuenschten Bereiche aus und klickt "Drucken" – alle ausgewaehlten Sektionen erscheinen in einem einzigen PDF-Dokument.
 
-Reihenfolge (wegen Foreign Keys / Trigger):
-1. `payment_allocations` loeschen (fuer open_items des Schuelers)
-2. `open_items` loeschen
-3. `services` loeschen
-4. `students` Datensatz loeschen
+### Aenderungen in `FahrschuelerDetail.tsx`
 
-Eine einzige Migration mit DELETE-Statements in der richtigen Reihenfolge.
+**1. Neuer State (neben `printSection`):**
+- `printSections` als `Set<string>` oder Array: `useState<string[]>([])` fuer Multi-Auswahl
+- `dlgPrint` als `boolean` fuer den Auswahl-Dialog
 
-| Aenderung | Details |
+**2. Druck-Button unter Kontaktdaten (nach Zeile 1073):**
+- Button mit Printer-Icon und Text "Übersicht drucken"
+- `onClick={() => setDlgPrint(true)}`
+
+**3. Auswahl-Dialog:**
+- 4 Checkboxen: Fahrstunden, Pruefungen, Leistungen, Zahlungen
+- "Alle auswaehlen" Toggle
+- "Drucken"-Button setzt `printSections` und schliesst Dialog, loest `window.print()` aus
+
+**4. Print-Area erweitern:**
+- Bestehenden `printSection`-Block beibehalten (fuer Einzel-Druck-Buttons)
+- Neuen Block fuer `printSections.length > 0`: rendert alle ausgewaehlten Sektionen hintereinander mit Seitenumbruch-Hints (`page-break-before`) zwischen Sektionen
+- Jede Sektion: eigene Ueberschrift, Tabelle, Summenzeile
+- Gemeinsamer Header mit Schuelername, Klasse, Datum
+
+**5. Print-Trigger:**
+- Bestehenden `useEffect` erweitern: auch bei `printSections.length > 0` drucken
+- `afterprint` setzt `printSections` zurueck auf `[]`
+
+### Dateien
+
+| Datei | Aenderung |
 |---|---|
-| DB-Migration | Alle Daten des Schuelers `e225cc6d-...` loeschen |
+| `FahrschuelerDetail.tsx` | Neuer State, Druck-Button, Auswahl-Dialog, erweiterter Print-Bereich |
 
