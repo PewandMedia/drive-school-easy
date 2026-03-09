@@ -177,6 +177,9 @@ const Fahrschueler = () => {
           preis: customPrices[p.id] ?? p.preis,
           status: "offen" as const,
           notiz: angebotsNotiz.trim() || null,
+          datum: values.anmeldedatum
+            ? values.anmeldedatum.toISOString()
+            : new Date().toISOString(),
         }));
         await supabase.from("services").insert(servicesToInsert);
       }
