@@ -18,9 +18,6 @@ const DashboardLayout = () => {
           {/* Top Header */}
           <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 shrink-0">
             <SidebarTrigger />
-            <span className="ml-2 rounded bg-green-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white select-none">
-              Produktiv
-            </span>
             <div className="flex items-center gap-3 ml-auto">
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                 {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
