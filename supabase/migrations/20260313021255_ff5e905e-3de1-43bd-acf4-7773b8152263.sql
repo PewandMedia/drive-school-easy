@@ -1,0 +1,10 @@
+DELETE FROM payment_allocations WHERE open_item_id IN (SELECT id FROM open_items WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63');
+DELETE FROM open_items WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM payments WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM driving_lessons WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM exams WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM theory_sessions WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM gear_lessons WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM services WHERE student_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM activity_log WHERE entity_id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
+DELETE FROM students WHERE id = 'eddb0f9e-fdb2-4152-ba6a-0544ad541c63';
