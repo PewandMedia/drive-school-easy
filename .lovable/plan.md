@@ -1,39 +1,18 @@
 
 
-## Kombi-Druck-Button unter Kontaktdaten
+## Test-Account "test test" loeschen
 
-### Uebersicht
+### Ursache
 
-Ein neuer "Drucken"-Button unter den Kontaktdaten oeffnet einen Dialog mit Checkboxen fuer Fahrstunden, Leistungen, Pruefungen und Zahlungen. Der Nutzer waehlt die gewuenschten Bereiche aus und klickt "Drucken" – alle ausgewaehlten Sektionen erscheinen in einem einzigen PDF-Dokument.
+Beide Projekte teilen dieselbe Supabase-Datenbank. Das Remix-Projekt muss mit einer eigenen Supabase-Instanz verbunden werden, damit Daten getrennt bleiben.
 
-### Aenderungen in `FahrschuelerDetail.tsx`
+### Loesung
 
-**1. Neuer State (neben `printSection`):**
-- `printSections` als `Set<string>` oder Array: `useState<string[]>([])` fuer Multi-Auswahl
-- `dlgPrint` als `boolean` fuer den Auswahl-Dialog
+1. **SQL-Migration**: Alle Daten des Schuelers `eddb0f9e-fdb2-4152-ba6a-0544ad541c63` loeschen (gleiche Reihenfolge wie beim letzten Mal: payment_allocations → open_items → services → activity_log → students)
 
-**2. Druck-Button unter Kontaktdaten (nach Zeile 1073):**
-- Button mit Printer-Icon und Text "Übersicht drucken"
-- `onClick={() => setDlgPrint(true)}`
-
-**3. Auswahl-Dialog:**
-- 4 Checkboxen: Fahrstunden, Pruefungen, Leistungen, Zahlungen
-- "Alle auswaehlen" Toggle
-- "Drucken"-Button setzt `printSections` und schliesst Dialog, loest `window.print()` aus
-
-**4. Print-Area erweitern:**
-- Bestehenden `printSection`-Block beibehalten (fuer Einzel-Druck-Buttons)
-- Neuen Block fuer `printSections.length > 0`: rendert alle ausgewaehlten Sektionen hintereinander mit Seitenumbruch-Hints (`page-break-before`) zwischen Sektionen
-- Jede Sektion: eigene Ueberschrift, Tabelle, Summenzeile
-- Gemeinsamer Header mit Schuelername, Klasse, Datum
-
-**5. Print-Trigger:**
-- Bestehenden `useEffect` erweitern: auch bei `printSections.length > 0` drucken
-- `afterprint` setzt `printSections` zurueck auf `[]`
-
-### Dateien
+2. **Empfehlung**: Im Remix-Projekt eine neue Supabase-Verbindung einrichten, damit die Datenbanken getrennt sind.
 
 | Datei | Aenderung |
 |---|---|
-| `FahrschuelerDetail.tsx` | Neuer State, Druck-Button, Auswahl-Dialog, erweiterter Print-Bereich |
+| SQL-Migration | DELETE-Statements fuer Student `eddb0f9e-fdb2-4152-ba6a-0544ad541c63` |
 
