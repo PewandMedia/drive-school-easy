@@ -105,7 +105,7 @@ const FahrschuelerDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [dlgArchive, setDlgArchive] = useState(false);
+  
 
   // ── Dialog states ──
   const [dlgFahrstunde, setDlgFahrstunde] = useState(false);
@@ -321,7 +321,7 @@ const FahrschuelerDetail = () => {
     onSuccess: (_, archive) => {
       queryClient.invalidateQueries({ queryKey: ["student", id] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
-      setDlgArchive(false);
+      
       toast({ title: archive ? "Schüler archiviert" : "Schüler wiederhergestellt" });
       if (archive) navigate("/dashboard/fahrschueler");
     },
@@ -973,7 +973,7 @@ const FahrschuelerDetail = () => {
               Wiederherstellen
             </Button>
           ) : (
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setDlgArchive(true)}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => mutArchive.mutate(true)}>
               <Archive className="h-4 w-4" />
               Archivieren
             </Button>
@@ -2967,22 +2967,6 @@ const FahrschuelerDetail = () => {
           )}
         </div>
       )}
-
-      {/* Archive confirmation dialog */}
-      <AlertDialog open={dlgArchive} onOpenChange={setDlgArchive}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Schüler archivieren?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Möchtest du {student?.vorname} {student?.nachname} wirklich archivieren? Der Schüler wird in das Archiv verschoben und kann jederzeit wiederhergestellt werden.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={() => mutArchive.mutate(true)}>Archivieren</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };
