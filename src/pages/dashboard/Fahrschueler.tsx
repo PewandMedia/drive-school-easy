@@ -64,8 +64,10 @@ const defaultForm = {
 const Fahrschueler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
+  const [showArchive, setShowArchive] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
