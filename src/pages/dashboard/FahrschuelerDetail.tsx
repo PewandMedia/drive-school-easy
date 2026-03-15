@@ -965,39 +965,54 @@ const FahrschuelerDetail = () => {
           </div>
         </div>
 
-        {/* ── Central Action Dropdown ── */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Aktion hinzufügen
-              <ChevronDown className="h-3 w-3 opacity-60" />
+        {/* ── Action buttons ── */}
+        <div className="flex items-center gap-2">
+          {isArchived ? (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => mutArchive.mutate(false)}>
+              <RotateCcw className="h-4 w-4" />
+              Wiederherstellen
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => setDlgFahrstunde(true)}>
-              <Car className="h-4 w-4 mr-2" />Fahrstunde eintragen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              setFsFahrstunde((f) => ({ ...f, fahrzeug_typ: "schaltwagen" }));
-              setDlgFahrstunde(true);
-            }}>
-              <Settings className="h-4 w-4 mr-2" />Schaltstunde planen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgTheorie(true)}>
-              <BookOpen className="h-4 w-4 mr-2" />Theorieeinheit eintragen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgPruefung(true)}>
-              <GraduationCap className="h-4 w-4 mr-2" />Prüfung eintragen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgLeistung(true)}>
-              <CreditCard className="h-4 w-4 mr-2" />Leistung hinzufügen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgZahlung(true)}>
-              <CreditCard className="h-4 w-4 mr-2" />Zahlung erfassen
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setDlgArchive(true)}>
+              <Archive className="h-4 w-4" />
+              Archivieren
+            </Button>
+          )}
+
+          {/* ── Central Action Dropdown ── */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Aktion hinzufügen
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => setDlgFahrstunde(true)}>
+                <Car className="h-4 w-4 mr-2" />Fahrstunde eintragen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setFsFahrstunde((f) => ({ ...f, fahrzeug_typ: "schaltwagen" }));
+                setDlgFahrstunde(true);
+              }}>
+                <Settings className="h-4 w-4 mr-2" />Schaltstunde planen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgTheorie(true)}>
+                <BookOpen className="h-4 w-4 mr-2" />Theorieeinheit eintragen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgPruefung(true)}>
+                <GraduationCap className="h-4 w-4 mr-2" />Prüfung eintragen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgLeistung(true)}>
+                <CreditCard className="h-4 w-4 mr-2" />Leistung hinzufügen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgZahlung(true)}>
+                <CreditCard className="h-4 w-4 mr-2" />Zahlung erfassen
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
