@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { parse, isValid } from "date-fns";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2, Printer } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2, Printer, Archive, RotateCcw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
