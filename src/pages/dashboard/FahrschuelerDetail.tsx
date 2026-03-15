@@ -105,7 +105,7 @@ const FahrschuelerDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [dlgArchive, setDlgArchive] = useState(false);
+  
 
   // ── Dialog states ──
   const [dlgFahrstunde, setDlgFahrstunde] = useState(false);
