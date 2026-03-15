@@ -312,6 +312,24 @@ const FahrschuelerDetail = () => {
     };
   }, [printSection, printSections]);
 
+  // ── Archive mutation ──
+  const mutArchive = useMutation({
+    mutationFn: async (archive: boolean) => {
+      const { error } = await supabase.from("students").update({ status: archive ? "archiviert" : null }).eq("id", id!);
+      if (error) throw error;
+    },
+    onSuccess: (_, archive) => {
+      queryClient.invalidateQueries({ queryKey: ["student", id] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setDlgArchive(false);
+      toast({ title: archive ? "Schüler archiviert" : "Schüler wiederhergestellt" });
+      if (archive) navigate("/dashboard/fahrschueler");
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const isArchived = student?.status === "archiviert";
+
   // ── Mutations ──
   const mutFahrstunde = useMutation({
     mutationFn: async () => {
