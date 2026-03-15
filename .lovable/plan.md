@@ -1,39 +1,34 @@
 
 
-## Kombi-Druck-Button unter Kontaktdaten
+## Fahrschüler-Archivierung
 
-### Uebersicht
+Schüler, die mit dem Führerschein fertig sind, sollen archiviert werden können. Die Archivierung nutzt das bestehende `status`-Feld der `students`-Tabelle (Text, nullable) mit dem Wert `"archiviert"`.
 
-Ein neuer "Drucken"-Button unter den Kontaktdaten oeffnet einen Dialog mit Checkboxen fuer Fahrstunden, Leistungen, Pruefungen und Zahlungen. Der Nutzer waehlt die gewuenschten Bereiche aus und klickt "Drucken" – alle ausgewaehlten Sektionen erscheinen in einem einzigen PDF-Dokument.
+### Änderungen
 
-### Aenderungen in `FahrschuelerDetail.tsx`
+**1. `src/pages/dashboard/Fahrschueler.tsx` — Archiv-Ansicht und Filter**
+- Neuer Toggle-Button (z.B. Tabs oder Segmented Control) oben: **"Aktive Schüler"** / **"Archiv"**
+- Standard: Aktive Schüler (alle mit `status != 'archiviert'` oder `status IS NULL`)
+- Archiv-Ansicht: nur Schüler mit `status = 'archiviert'`
+- In der Archiv-Ansicht: Button pro Schüler zum **Wiederherstellen** (setzt `status` zurück auf `null`)
 
-**1. Neuer State (neben `printSection`):**
-- `printSections` als `Set<string>` oder Array: `useState<string[]>([])` fuer Multi-Auswahl
-- `dlgPrint` als `boolean` fuer den Auswahl-Dialog
+**2. `src/pages/dashboard/FahrschuelerDetail.tsx` — Archivieren-Button**
+- Neuer Button im Header-Bereich (neben den bestehenden Aktions-Buttons): **"Archivieren"** mit Archive-Icon
+- Klick öffnet AlertDialog zur Bestätigung: "Schüler XY wirklich archivieren?"
+- Bei Bestätigung: `UPDATE students SET status = 'archiviert' WHERE id = ...`
+- Nach Archivierung: Weiterleitung zurück zur Schülerliste
+- Wenn Schüler bereits archiviert ist: stattdessen **"Wiederherstellen"**-Button anzeigen
 
-**2. Druck-Button unter Kontaktdaten (nach Zeile 1073):**
-- Button mit Printer-Icon und Text "Übersicht drucken"
-- `onClick={() => setDlgPrint(true)}`
-
-**3. Auswahl-Dialog:**
-- 4 Checkboxen: Fahrstunden, Pruefungen, Leistungen, Zahlungen
-- "Alle auswaehlen" Toggle
-- "Drucken"-Button setzt `printSections` und schliesst Dialog, loest `window.print()` aus
-
-**4. Print-Area erweitern:**
-- Bestehenden `printSection`-Block beibehalten (fuer Einzel-Druck-Buttons)
-- Neuen Block fuer `printSections.length > 0`: rendert alle ausgewaehlten Sektionen hintereinander mit Seitenumbruch-Hints (`page-break-before`) zwischen Sektionen
-- Jede Sektion: eigene Ueberschrift, Tabelle, Summenzeile
-- Gemeinsamer Header mit Schuelername, Klasse, Datum
-
-**5. Print-Trigger:**
-- Bestehenden `useEffect` erweitern: auch bei `printSections.length > 0` drucken
-- `afterprint` setzt `printSections` zurueck auf `[]`
+**3. Visuelle Kennzeichnung**
+- Archivierte Schüler in der Liste erhalten ein graues "Archiviert"-Badge
+- In der Detailansicht: Banner/Hinweis wenn Schüler archiviert ist
 
 ### Dateien
 
-| Datei | Aenderung |
+| Datei | Änderung |
 |---|---|
-| `FahrschuelerDetail.tsx` | Neuer State, Druck-Button, Auswahl-Dialog, erweiterter Print-Bereich |
+| `Fahrschueler.tsx` | Archiv-Tab/Filter, Wiederherstellen-Button in Archiv-Liste |
+| `FahrschuelerDetail.tsx` | Archivieren/Wiederherstellen-Button, Bestätigungsdialog, Archiv-Banner |
+
+Keine Datenbankänderung nötig — das bestehende `status`-Feld (text, nullable) wird genutzt.
 
