@@ -267,6 +267,23 @@ const Fahrschueler = () => {
         }
       />
 
+      {/* Archive Toggle */}
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
+        <button
+          onClick={() => { setShowArchive(false); setVisibleCount(10); }}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${!showArchive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+        >
+          Aktive Schüler
+        </button>
+        <button
+          onClick={() => { setShowArchive(true); setVisibleCount(10); }}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${showArchive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          Archiv
+        </button>
+      </div>
+
       {/* Search + Filter */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
