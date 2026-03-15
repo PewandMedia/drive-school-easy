@@ -1015,6 +1015,20 @@ const FahrschuelerDetail = () => {
         </div>
       </div>
 
+      {/* Archive banner */}
+      {isArchived && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
+          <Archive className="h-5 w-5 text-muted-foreground" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-muted-foreground">Dieser Schüler ist archiviert.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => mutArchive.mutate(false)}>
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            Wiederherstellen
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* ── Left Column: Profil-Karte ── */}
         <div className="rounded-xl border border-border bg-card p-5 lg:col-span-1 space-y-5">
