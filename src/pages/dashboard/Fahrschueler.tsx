@@ -207,7 +207,24 @@ const Fahrschueler = () => {
     },
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: async (studentId: string) => {
+      const { error } = await supabase.from("students").update({ status: null }).eq("id", studentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      toast({ title: "Schüler wiederhergestellt" });
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
   const filtered = students.filter((s) => {
+    // Archive filter
+    const isArchived = s.status === "archiviert";
+    if (showArchive && !isArchived) return false;
+    if (!showArchive && isArchived) return false;
+
     if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
     const q = search.toLowerCase();
     return (
