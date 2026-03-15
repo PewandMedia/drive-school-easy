@@ -973,7 +973,7 @@ const FahrschuelerDetail = () => {
               Wiederherstellen
             </Button>
           ) : (
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setDlgArchive(true)}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => mutArchive.mutate(true)}>
               <Archive className="h-4 w-4" />
               Archivieren
             </Button>
