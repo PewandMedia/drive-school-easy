@@ -321,7 +321,7 @@ const FahrschuelerDetail = () => {
     onSuccess: (_, archive) => {
       queryClient.invalidateQueries({ queryKey: ["student", id] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
-      setDlgArchive(false);
+      
       toast({ title: archive ? "Schüler archiviert" : "Schüler wiederhergestellt" });
       if (archive) navigate("/dashboard/fahrschueler");
     },
