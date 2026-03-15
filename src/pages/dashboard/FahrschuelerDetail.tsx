@@ -2967,22 +2967,6 @@ const FahrschuelerDetail = () => {
           )}
         </div>
       )}
-
-      {/* Archive confirmation dialog */}
-      <AlertDialog open={dlgArchive} onOpenChange={setDlgArchive}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Schüler archivieren?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Möchtest du {student?.vorname} {student?.nachname} wirklich archivieren? Der Schüler wird in das Archiv verschoben und kann jederzeit wiederhergestellt werden.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={() => mutArchive.mutate(true)}>Archivieren</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };
