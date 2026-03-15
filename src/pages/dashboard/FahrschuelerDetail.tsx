@@ -103,7 +103,9 @@ type Zahlungsart = "bar" | "ec" | "ueberweisung";
 const FahrschuelerDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [dlgArchive, setDlgArchive] = useState(false);
 
   // ── Dialog states ──
   const [dlgFahrstunde, setDlgFahrstunde] = useState(false);
