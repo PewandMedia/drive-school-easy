@@ -408,7 +408,22 @@ const Fahrschueler = () => {
                   })()}
                 </div>
 
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                {showArchive ? (
+                  <div className="flex items-center gap-1">
+                    <Badge className="bg-muted text-muted-foreground border-border text-xs">Archiviert</Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => { e.stopPropagation(); restoreMutation.mutate(student.id); }}
+                      title="Wiederherstellen"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                )}
               </button>
             ))}
           </div>
