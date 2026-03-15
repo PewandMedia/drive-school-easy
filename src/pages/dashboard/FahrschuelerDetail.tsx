@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { parse, isValid } from "date-fns";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2, Printer } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2, Printer, Archive, RotateCcw } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { THEORIE_LEKTIONEN, lektionToTyp } from "@/lib/theorieLektionen";
 import { Button } from "@/components/ui/button";
@@ -103,7 +103,9 @@ type Zahlungsart = "bar" | "ec" | "ueberweisung";
 const FahrschuelerDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [dlgArchive, setDlgArchive] = useState(false);
 
   // ── Dialog states ──
   const [dlgFahrstunde, setDlgFahrstunde] = useState(false);
@@ -309,6 +311,24 @@ const FahrschuelerDetail = () => {
       window.removeEventListener("afterprint", onAfterPrint);
     };
   }, [printSection, printSections]);
+
+  // ── Archive mutation ──
+  const mutArchive = useMutation({
+    mutationFn: async (archive: boolean) => {
+      const { error } = await supabase.from("students").update({ status: archive ? "archiviert" : null }).eq("id", id!);
+      if (error) throw error;
+    },
+    onSuccess: (_, archive) => {
+      queryClient.invalidateQueries({ queryKey: ["student", id] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setDlgArchive(false);
+      toast({ title: archive ? "Schüler archiviert" : "Schüler wiederhergestellt" });
+      if (archive) navigate("/dashboard/fahrschueler");
+    },
+    onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const isArchived = student?.status === "archiviert";
 
   // ── Mutations ──
   const mutFahrstunde = useMutation({
@@ -945,40 +965,69 @@ const FahrschuelerDetail = () => {
           </div>
         </div>
 
-        {/* ── Central Action Dropdown ── */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Aktion hinzufügen
-              <ChevronDown className="h-3 w-3 opacity-60" />
+        {/* ── Action buttons ── */}
+        <div className="flex items-center gap-2">
+          {isArchived ? (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => mutArchive.mutate(false)}>
+              <RotateCcw className="h-4 w-4" />
+              Wiederherstellen
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => setDlgFahrstunde(true)}>
-              <Car className="h-4 w-4 mr-2" />Fahrstunde eintragen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => {
-              setFsFahrstunde((f) => ({ ...f, fahrzeug_typ: "schaltwagen" }));
-              setDlgFahrstunde(true);
-            }}>
-              <Settings className="h-4 w-4 mr-2" />Schaltstunde planen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgTheorie(true)}>
-              <BookOpen className="h-4 w-4 mr-2" />Theorieeinheit eintragen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgPruefung(true)}>
-              <GraduationCap className="h-4 w-4 mr-2" />Prüfung eintragen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgLeistung(true)}>
-              <CreditCard className="h-4 w-4 mr-2" />Leistung hinzufügen
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setDlgZahlung(true)}>
-              <CreditCard className="h-4 w-4 mr-2" />Zahlung erfassen
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setDlgArchive(true)}>
+              <Archive className="h-4 w-4" />
+              Archivieren
+            </Button>
+          )}
+
+          {/* ── Central Action Dropdown ── */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Aktion hinzufügen
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => setDlgFahrstunde(true)}>
+                <Car className="h-4 w-4 mr-2" />Fahrstunde eintragen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setFsFahrstunde((f) => ({ ...f, fahrzeug_typ: "schaltwagen" }));
+                setDlgFahrstunde(true);
+              }}>
+                <Settings className="h-4 w-4 mr-2" />Schaltstunde planen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgTheorie(true)}>
+                <BookOpen className="h-4 w-4 mr-2" />Theorieeinheit eintragen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgPruefung(true)}>
+                <GraduationCap className="h-4 w-4 mr-2" />Prüfung eintragen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgLeistung(true)}>
+                <CreditCard className="h-4 w-4 mr-2" />Leistung hinzufügen
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDlgZahlung(true)}>
+                <CreditCard className="h-4 w-4 mr-2" />Zahlung erfassen
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      {/* Archive banner */}
+      {isArchived && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
+          <Archive className="h-5 w-5 text-muted-foreground" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-muted-foreground">Dieser Schüler ist archiviert.</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => mutArchive.mutate(false)}>
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            Wiederherstellen
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* ── Left Column: Profil-Karte ── */}
@@ -2918,6 +2967,22 @@ const FahrschuelerDetail = () => {
           )}
         </div>
       )}
+
+      {/* Archive confirmation dialog */}
+      <AlertDialog open={dlgArchive} onOpenChange={setDlgArchive}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Schüler archivieren?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchtest du {student?.vorname} {student?.nachname} wirklich archivieren? Der Schüler wird in das Archiv verschoben und kann jederzeit wiederhergestellt werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => mutArchive.mutate(true)}>Archivieren</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
