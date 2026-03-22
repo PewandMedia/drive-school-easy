@@ -150,7 +150,7 @@ const Tagesabrechnung = () => {
             const Icon = zahlungsartIcon[z];
             return (
               <TableRow key={z}>
-                <TableCell colSpan={3} />
+                <TableCell colSpan={4} />
                 <TableCell>
                   <span className="flex items-center gap-1.5">
                     <Icon className="h-4 w-4" />
