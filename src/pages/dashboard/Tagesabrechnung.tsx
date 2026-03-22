@@ -69,10 +69,10 @@ const Tagesabrechnung = () => {
 
     const { data, error } = await supabase
       .from("payments")
-      .select("id, betrag, zahlungsart, datum, students(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .gte("datum", dayStart.toISOString())
-      .lt("datum", dayEnd.toISOString())
-      .order("datum", { ascending: true });
+      .select("id, betrag, zahlungsart, datum, einreichungsdatum, students(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+      .gte("einreichungsdatum", dayStart.toISOString())
+      .lt("einreichungsdatum", dayEnd.toISOString())
+      .order("einreichungsdatum", { ascending: true });
 
     if (error) {
       toast.error("Fehler beim Laden der Zahlungen");
