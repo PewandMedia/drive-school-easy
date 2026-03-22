@@ -516,6 +516,8 @@ const FahrschuelerDetail = () => {
         telefon: contactForm.telefon || null,
         adresse: contactForm.adresse || null,
         geburtsdatum: parsedGeb && isValid(parsedGeb) ? format(parsedGeb, "yyyy-MM-dd") : null,
+        ist_umschreiber: contactForm.ist_umschreiber,
+        fahrschule: contactForm.fahrschule,
       };
       if (parsedAnm && isValid(parsedAnm)) {
         updateData.created_at = parsedAnm.toISOString();
