@@ -26,6 +26,7 @@ type PaymentRow = {
   betrag: number;
   zahlungsart: "bar" | "ec" | "ueberweisung";
   datum: string;
+  einreichungsdatum: string;
   students: { vorname: string; nachname: string } | null;
   payment_allocations: Allocation[];
 };
