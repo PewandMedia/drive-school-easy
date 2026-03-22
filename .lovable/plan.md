@@ -1,33 +1,28 @@
 
 
-## Schülerprofil: Umschreiber-Status bearbeiten + Schüler löschen
+## Druckübersicht bereinigen: Fahrzeug-Spalte und Uhrzeiten entfernen
 
-### Aktuelle Situation
-Das Bearbeitungs-Dialog enthält bereits Führerscheinklasse, Name, Kontaktdaten etc. Es fehlen:
-1. **Umschreiber-Status** (ist_umschreiber) — kann aktuell nicht nachträglich geändert werden
-2. **Schüler komplett löschen** — keine Möglichkeit vorhanden
+### Problem
+In der Druckansicht des Schülerprofils werden aktuell:
+1. **Fahrzeug-Spalte** (Automatik/Schalter) bei Fahrstunden angezeigt — soll entfernt werden
+2. **Uhrzeiten** bei Datumsangaben angezeigt (`dd.MM.yyyy HH:mm`) — soll nur `dd.MM.yyyy` sein
 
-### Änderungen
+### Änderungen in `src/pages/dashboard/FahrschuelerDetail.tsx`
 
-**`src/pages/dashboard/FahrschuelerDetail.tsx`**
+Betrifft beide Print-Bereiche: **PRINT AREA** (Einzeldruck) und **MULTI-PRINT AREA** (Übersichtsdruck).
 
-1. **contactForm-State erweitern** um `ist_umschreiber: boolean` und `fahrschule: string`
-2. **Im Bearbeitungs-Dialog** zwei neue Felder hinzufügen:
-   - Checkbox "Umschreiber" (ein/aus)
-   - Select "Fahrschule" (Riemke Markt / Rathaus)
-3. **mutEditContact** erweitern: `ist_umschreiber` und `fahrschule` ins Update-Objekt aufnehmen
-4. **Schüler-Löschfunktion**: 
-   - Neuer State `deletingStudent` für AlertDialog-Bestätigung
-   - Mutation die den Schüler aus `students` löscht (CASCADE löscht abhängige Daten)
-   - Nach Löschen: Redirect zur Schülerliste
-   - Button "Schüler löschen" (rot, destruktiv) im Bearbeitungs-Dialog oder als separater Button im Profil
+**Fahrstunden-Tabelle (2× im Code):**
+- `<th>Fahrzeug</th>` Spalte entfernen
+- `<td>{FAHRZEUG_LABELS[...]}</td>` Zelle entfernen
+- Datum von `"dd.MM.yyyy HH:mm"` → `"dd.MM.yyyy"` ändern
 
-| Bereich | Änderung |
+**Leistungen-Tabelle (2× im Code):**
+- Datum von `"dd.MM.yyyy HH:mm"` → `"dd.MM.yyyy"` ändern
+
+| Zeile | Änderung |
 |---|---|
-| contactForm State | `ist_umschreiber` und `fahrschule` hinzufügen |
-| Bearbeitungs-Dialog | Umschreiber-Checkbox + Fahrschule-Select einfügen |
-| mutEditContact | `ist_umschreiber` und `fahrschule` mitspeichern |
-| Neuer AlertDialog | Sicherheitsabfrage vor Schüler-Löschung |
-| Neue Mutation | `supabase.from("students").delete().eq("id", id)` + Redirect |
-| Profil-UI | Roter "Schüler löschen"-Button unterhalb des Drucken-Buttons |
+| 2771, 2950 | `<th>Fahrzeug</th>` entfernen |
+| 2781, 2960 | Datum-Format: `HH:mm` entfernen |
+| 2784, 2963 | Fahrzeug-Zelle `<td>` entfernen |
+| 2812, 3021 | Leistungen-Datum: `HH:mm` entfernen |
 
