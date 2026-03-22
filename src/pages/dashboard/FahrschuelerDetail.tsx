@@ -2768,7 +2768,6 @@ const FahrschuelerDetail = () => {
                     <th className="text-left py-1">Datum</th>
                     <th className="text-left py-1">Typ</th>
                     <th className="text-left py-1">Dauer</th>
-                    <th className="text-left py-1">Fahrzeug</th>
                     <th className="text-left py-1">Fahrlehrer</th>
                     <th className="text-right py-1">Preis</th>
                   </tr>
@@ -2778,10 +2777,9 @@ const FahrschuelerDetail = () => {
                     const instr = instructors.find((i) => i.id === (l as any).instructor_id);
                     return (
                       <tr key={l.id} className="border-b">
-                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy HH:mm")}</td>
+                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy")}</td>
                         <td className="py-1">{TYP_LABELS[l.typ] ?? l.typ}</td>
                         <td className="py-1">{l.dauer_minuten} min</td>
-                        <td className="py-1">{FAHRZEUG_LABELS[l.fahrzeug_typ] ?? l.fahrzeug_typ}</td>
                         <td className="py-1">{instr ? `${instr.vorname} ${instr.nachname}` : "–"}</td>
                         <td className="py-1 text-right">{Number(l.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
                       </tr>
@@ -2809,7 +2807,7 @@ const FahrschuelerDetail = () => {
                 <tbody>
                   {services.map((s) => (
                     <tr key={s.id} className="border-b">
-                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy HH:mm")}</td>
+                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy")}</td>
                       <td className="py-1">{s.bezeichnung}</td>
                       <td className="py-1">{(SERVICE_STATUS_LABELS[s.status] ?? { label: s.status }).label}</td>
                       <td className="py-1 text-right">{Number(s.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
@@ -2947,7 +2945,6 @@ const FahrschuelerDetail = () => {
                     <th className="text-left py-1">Datum</th>
                     <th className="text-left py-1">Typ</th>
                     <th className="text-left py-1">Dauer</th>
-                    <th className="text-left py-1">Fahrzeug</th>
                     <th className="text-left py-1">Fahrlehrer</th>
                     <th className="text-right py-1">Preis</th>
                   </tr>
@@ -2957,10 +2954,9 @@ const FahrschuelerDetail = () => {
                     const instr = instructors.find((i) => i.id === (l as any).instructor_id);
                     return (
                       <tr key={l.id} className="border-b">
-                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy HH:mm")}</td>
+                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy")}</td>
                         <td className="py-1">{TYP_LABELS[l.typ] ?? l.typ}</td>
                         <td className="py-1">{l.dauer_minuten} min</td>
-                        <td className="py-1">{FAHRZEUG_LABELS[l.fahrzeug_typ] ?? l.fahrzeug_typ}</td>
                         <td className="py-1">{instr ? `${instr.vorname} ${instr.nachname}` : "–"}</td>
                         <td className="py-1 text-right">{Number(l.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
                       </tr>
@@ -3018,7 +3014,7 @@ const FahrschuelerDetail = () => {
                 <tbody>
                   {services.map((s) => (
                     <tr key={s.id} className="border-b">
-                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy HH:mm")}</td>
+                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy")}</td>
                       <td className="py-1">{s.bezeichnung}</td>
                       <td className="py-1">{(SERVICE_STATUS_LABELS[s.status] ?? { label: s.status }).label}</td>
                       <td className="py-1 text-right">{Number(s.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
