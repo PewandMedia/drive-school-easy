@@ -124,7 +124,8 @@ const FahrschuelerDetail = () => {
   const [editingService, setEditingService] = useState<any | null>(null);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
   const [editingContact, setEditingContact] = useState(false);
-  const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
+  const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "", ist_umschreiber: false, fahrschule: "riemke" });
+  const [deletingStudent, setDeletingStudent] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
   const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | "pruefungen" | null>(null);
   const [printSections, setPrintSections] = useState<string[]>([]);
@@ -515,6 +516,8 @@ const FahrschuelerDetail = () => {
         telefon: contactForm.telefon || null,
         adresse: contactForm.adresse || null,
         geburtsdatum: parsedGeb && isValid(parsedGeb) ? format(parsedGeb, "yyyy-MM-dd") : null,
+        ist_umschreiber: contactForm.ist_umschreiber,
+        fahrschule: contactForm.fahrschule,
       };
       if (parsedAnm && isValid(parsedAnm)) {
         updateData.created_at = parsedAnm.toISOString();
@@ -1084,6 +1087,8 @@ const FahrschuelerDetail = () => {
                     adresse: student.adresse || "",
                     geburtsdatum: (student as any).geburtsdatum ? format(new Date((student as any).geburtsdatum), "dd.MM.yyyy") : "",
                     anmeldedatum: format(new Date(student.created_at), "dd.MM.yyyy"),
+                    ist_umschreiber: student.ist_umschreiber,
+                    fahrschule: (student as any).fahrschule || "riemke",
                   });
                   setEditingContact(true);
                 }}
@@ -1184,8 +1189,37 @@ const FahrschuelerDetail = () => {
                     <Input value={contactForm.anmeldedatum} onChange={(e) => setContactForm(f => ({ ...f, anmeldedatum: e.target.value }))} placeholder="TT.MM.JJJJ" />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Fahrschule</Label>
+                    <Select value={contactForm.fahrschule} onValueChange={(v) => setContactForm(f => ({ ...f, fahrschule: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="riemke">Miro-Drive (Riemke Markt)</SelectItem>
+                        <SelectItem value="rathaus">Miro-Drive (Rathaus)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end pb-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={contactForm.ist_umschreiber}
+                        onCheckedChange={(checked) => setContactForm(f => ({ ...f, ist_umschreiber: !!checked }))}
+                      />
+                      <span className="text-sm font-medium">Umschreiber</span>
+                    </label>
+                  </div>
+                </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button
+                  variant="destructive"
+                  className="sm:mr-auto"
+                  onClick={() => { setEditingContact(false); setDeletingStudent(true); }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Schüler löschen
+                </Button>
                 <Button variant="outline" onClick={() => setEditingContact(false)}>Abbrechen</Button>
                 <Button onClick={() => mutEditContact.mutate()} disabled={mutEditContact.isPending}>
                   {mutEditContact.isPending ? "Speichern…" : "Speichern"}
@@ -1193,6 +1227,59 @@ const FahrschuelerDetail = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Delete Student AlertDialog */}
+          <AlertDialog open={deletingStudent} onOpenChange={setDeletingStudent}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Schüler endgültig löschen?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  <strong>{student.vorname} {student.nachname}</strong> und alle zugehörigen Daten (Fahrstunden, Prüfungen, Zahlungen, Leistungen, Theoriestunden) werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    try {
+                      // Delete dependent data first
+                      const studentId = id!;
+                      // Delete payment allocations for this student's payments
+                      const { data: studentPayments } = await supabase.from("payments").select("id").eq("student_id", studentId);
+                      if (studentPayments && studentPayments.length > 0) {
+                        const paymentIds = studentPayments.map(p => p.id);
+                        await supabase.from("payment_allocations").delete().in("payment_id", paymentIds);
+                      }
+                      // Delete open items
+                      await supabase.from("open_items").delete().eq("student_id", studentId);
+                      // Delete payments
+                      await supabase.from("payments").delete().eq("student_id", studentId);
+                      // Delete services
+                      await supabase.from("services").delete().eq("student_id", studentId);
+                      // Delete driving lessons
+                      await supabase.from("driving_lessons").delete().eq("student_id", studentId);
+                      // Delete theory sessions
+                      await supabase.from("theory_sessions").delete().eq("student_id", studentId);
+                      // Delete exams
+                      await supabase.from("exams").delete().eq("student_id", studentId);
+                      // Delete gear lessons
+                      await supabase.from("gear_lessons").delete().eq("student_id", studentId);
+                      // Finally delete the student
+                      const { error } = await supabase.from("students").delete().eq("id", studentId);
+                      if (error) throw error;
+                      toast({ title: "Schüler gelöscht", description: `${student.vorname} ${student.nachname} wurde gelöscht.` });
+                      navigate("/dashboard/fahrschueler");
+                    } catch (e: any) {
+                      toast({ title: "Fehler beim Löschen", description: e.message, variant: "destructive" });
+                    }
+                  }}
+                >
+                  Endgültig löschen
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <div className="border-t border-border" />
 
