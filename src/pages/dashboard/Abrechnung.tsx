@@ -88,17 +88,19 @@ const Abrechnung = () => {
       />
 
       {/* ── Statistik-Karten ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {stats.map(({ label, value, icon: Icon, cls, bg }) => (
-          <div key={label} className={`rounded-xl border p-5 ${bg}`}>
-            <div className="flex items-center gap-3 mb-2">
-              <Icon className={`h-5 w-5 ${cls}`} />
-              <span className="text-sm text-muted-foreground">{label}</span>
+      {isAdmin && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {stats.map(({ label, value, icon: Icon, cls, bg }) => (
+            <div key={label} className={`rounded-xl border p-5 ${bg}`}>
+              <div className="flex items-center gap-3 mb-2">
+                <Icon className={`h-5 w-5 ${cls}`} />
+                <span className="text-sm text-muted-foreground">{label}</span>
+              </div>
+              <p className={`text-2xl font-bold ${cls}`}>{value}</p>
             </div>
-            <p className={`text-2xl font-bold ${cls}`}>{value}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Schüler-Tabelle ── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
