@@ -2954,10 +2954,9 @@ const FahrschuelerDetail = () => {
                     const instr = instructors.find((i) => i.id === (l as any).instructor_id);
                     return (
                       <tr key={l.id} className="border-b">
-                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy HH:mm")}</td>
+                        <td className="py-1">{format(new Date(l.datum), "dd.MM.yyyy")}</td>
                         <td className="py-1">{TYP_LABELS[l.typ] ?? l.typ}</td>
                         <td className="py-1">{l.dauer_minuten} min</td>
-                        <td className="py-1">{FAHRZEUG_LABELS[l.fahrzeug_typ] ?? l.fahrzeug_typ}</td>
                         <td className="py-1">{instr ? `${instr.vorname} ${instr.nachname}` : "–"}</td>
                         <td className="py-1 text-right">{Number(l.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
                       </tr>
