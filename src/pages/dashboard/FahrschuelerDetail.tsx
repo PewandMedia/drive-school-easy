@@ -2768,7 +2768,6 @@ const FahrschuelerDetail = () => {
                     <th className="text-left py-1">Datum</th>
                     <th className="text-left py-1">Typ</th>
                     <th className="text-left py-1">Dauer</th>
-                    <th className="text-left py-1">Fahrzeug</th>
                     <th className="text-left py-1">Fahrlehrer</th>
                     <th className="text-right py-1">Preis</th>
                   </tr>
