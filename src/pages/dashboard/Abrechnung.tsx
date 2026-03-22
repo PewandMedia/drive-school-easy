@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Receipt, TrendingUp, Wallet, AlertCircle, Search, ArrowDownWideNarrow } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatStudentName } from "@/lib/formatStudentName";
