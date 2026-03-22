@@ -1,22 +1,33 @@
 
 
-## Einreichungsdatum für bestehende Zahlungen korrigieren
+## Schülerprofil: Umschreiber-Status bearbeiten + Schüler löschen
 
-### Problem
-Die Migration hat `einreichungsdatum` mit `DEFAULT now()` angelegt, wodurch alle bestehenden Zahlungen den Migrationszeitpunkt (22.03.2026 10:42) als Einreichungsdatum bekommen haben statt ihr ursprüngliches Einnahmedatum.
+### Aktuelle Situation
+Das Bearbeitungs-Dialog enthält bereits Führerscheinklasse, Name, Kontaktdaten etc. Es fehlen:
+1. **Umschreiber-Status** (ist_umschreiber) — kann aktuell nicht nachträglich geändert werden
+2. **Schüler komplett löschen** — keine Möglichkeit vorhanden
 
-### Lösung
-Ein einziges SQL-Update: Alle Zahlungen, deren `einreichungsdatum` auf den Migrationszeitpunkt gesetzt ist (`2026-03-22 10:42:28.736478+00`), werden auf ihr jeweiliges `datum` (Einnahmedatum) korrigiert.
+### Änderungen
 
-```sql
-UPDATE payments 
-SET einreichungsdatum = datum 
-WHERE einreichungsdatum = '2026-03-22 10:42:28.736478+00'
-```
+**`src/pages/dashboard/FahrschuelerDetail.tsx`**
 
-Keine Code-Änderungen nötig. Ab jetzt wird das Einreichungsdatum bei neuen Zahlungen vom Benutzer manuell eingetragen.
+1. **contactForm-State erweitern** um `ist_umschreiber: boolean` und `fahrschule: string`
+2. **Im Bearbeitungs-Dialog** zwei neue Felder hinzufügen:
+   - Checkbox "Umschreiber" (ein/aus)
+   - Select "Fahrschule" (Riemke Markt / Rathaus)
+3. **mutEditContact** erweitern: `ist_umschreiber` und `fahrschule` ins Update-Objekt aufnehmen
+4. **Schüler-Löschfunktion**: 
+   - Neuer State `deletingStudent` für AlertDialog-Bestätigung
+   - Mutation die den Schüler aus `students` löscht (CASCADE löscht abhängige Daten)
+   - Nach Löschen: Redirect zur Schülerliste
+   - Button "Schüler löschen" (rot, destruktiv) im Bearbeitungs-Dialog oder als separater Button im Profil
 
-| Aktion | Detail |
+| Bereich | Änderung |
 |---|---|
-| Daten-Update (SQL) | `einreichungsdatum = datum` für alle Altdaten mit Migrationszeitpunkt |
+| contactForm State | `ist_umschreiber` und `fahrschule` hinzufügen |
+| Bearbeitungs-Dialog | Umschreiber-Checkbox + Fahrschule-Select einfügen |
+| mutEditContact | `ist_umschreiber` und `fahrschule` mitspeichern |
+| Neuer AlertDialog | Sicherheitsabfrage vor Schüler-Löschung |
+| Neue Mutation | `supabase.from("students").delete().eq("id", id)` + Redirect |
+| Profil-UI | Roter "Schüler löschen"-Button unterhalb des Drucken-Buttons |
 
