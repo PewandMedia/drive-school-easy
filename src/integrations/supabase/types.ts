@@ -305,6 +305,7 @@ export type Database = {
           betrag: number
           created_at: string
           datum: string
+          einreichungsdatum: string | null
           id: string
           service_id: string | null
           student_id: string
@@ -314,6 +315,7 @@ export type Database = {
           betrag?: number
           created_at?: string
           datum?: string
+          einreichungsdatum?: string | null
           id?: string
           service_id?: string | null
           student_id: string
@@ -323,6 +325,7 @@ export type Database = {
           betrag?: number
           created_at?: string
           datum?: string
+          einreichungsdatum?: string | null
           id?: string
           service_id?: string | null
           student_id?: string
