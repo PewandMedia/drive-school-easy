@@ -2237,6 +2237,10 @@ const FahrschuelerDetail = () => {
               <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
+              <Label>Einreichungsdatum (Büro)</Label>
+              <Input type="date" value={fsZahlung.einreichungsdatum} onChange={(e) => setFsZahlung((f) => ({ ...f, einreichungsdatum: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
               <Select value={fsZahlung.zahlungsart} onValueChange={(v) => setFsZahlung((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

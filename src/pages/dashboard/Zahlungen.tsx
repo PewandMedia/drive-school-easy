@@ -452,6 +452,15 @@ const Zahlungen = () => {
             </div>
 
             <div className="space-y-1.5">
+              <Label>Einreichungsdatum (Büro)</Label>
+              <Input
+                type="date"
+                value={form.einreichungsdatum}
+                onChange={(e) => setForm((f) => ({ ...f, einreichungsdatum: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
               <Select
                 value={form.zahlungsart}

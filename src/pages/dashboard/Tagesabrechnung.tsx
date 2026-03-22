@@ -288,6 +288,7 @@ const Tagesabrechnung = () => {
                 {filteredPayments.map((p) => (
                   <tr key={p.id} className="border-b">
                     <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                    <td className="py-1">{format(new Date(p.einreichungsdatum), "dd.MM.yyyy")}</td>
                     <td className="py-1">
                       {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
                     </td>
