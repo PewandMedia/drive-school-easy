@@ -126,6 +126,7 @@ const Tagesabrechnung = () => {
           return (
             <TableRow key={p.id}>
               <TableCell>{format(new Date(p.datum), "dd.MM.yyyy")}</TableCell>
+              <TableCell>{format(new Date(p.einreichungsdatum), "dd.MM.yyyy")}</TableCell>
               <TableCell>
                 {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
               </TableCell>
