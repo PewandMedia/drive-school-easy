@@ -1085,6 +1085,8 @@ const FahrschuelerDetail = () => {
                     adresse: student.adresse || "",
                     geburtsdatum: (student as any).geburtsdatum ? format(new Date((student as any).geburtsdatum), "dd.MM.yyyy") : "",
                     anmeldedatum: format(new Date(student.created_at), "dd.MM.yyyy"),
+                    ist_umschreiber: student.ist_umschreiber,
+                    fahrschule: (student as any).fahrschule || "riemke",
                   });
                   setEditingContact(true);
                 }}
