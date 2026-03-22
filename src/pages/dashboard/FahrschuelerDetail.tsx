@@ -3014,7 +3014,7 @@ const FahrschuelerDetail = () => {
                 <tbody>
                   {services.map((s) => (
                     <tr key={s.id} className="border-b">
-                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy HH:mm")}</td>
+                      <td className="py-1">{format(new Date((s as any).datum || s.created_at), "dd.MM.yyyy")}</td>
                       <td className="py-1">{s.bezeichnung}</td>
                       <td className="py-1">{(SERVICE_STATUS_LABELS[s.status] ?? { label: s.status }).label}</td>
                       <td className="py-1 text-right">{Number(s.preis).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
