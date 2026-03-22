@@ -1,0 +1,1 @@
+UPDATE payments SET einreichungsdatum = datum WHERE einreichungsdatum::date = '2026-03-22';
