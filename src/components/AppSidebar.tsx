@@ -49,7 +49,7 @@ const verwaltungItems = [
 const finanzItems = [
   { title: "Zahlungen", url: "/dashboard/zahlungen", icon: CreditCard },
   { title: "Abrechnung", url: "/dashboard/abrechnung", icon: Receipt },
-  { title: "Tagesabrechnung", url: "/dashboard/tagesabrechnung", icon: FileText, adminOnly: true },
+  { title: "Tagesabrechnung", url: "/dashboard/tagesabrechnung", icon: FileText },
   { title: "Auswertung", url: "/dashboard/auswertung", icon: BarChart3, adminOnly: true },
 ];
 
