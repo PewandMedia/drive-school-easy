@@ -2219,7 +2219,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
