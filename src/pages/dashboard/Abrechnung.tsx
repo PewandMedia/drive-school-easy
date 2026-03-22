@@ -19,6 +19,7 @@ const fmt = (v: number) =>
 
 const Abrechnung = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
   const [sortBySaldo, setSortBySaldo] = useState(true);
