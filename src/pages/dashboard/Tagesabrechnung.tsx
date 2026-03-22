@@ -112,7 +112,8 @@ const Tagesabrechnung = () => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Datum</TableHead>
+          <TableHead>Einnahmedatum</TableHead>
+          <TableHead>Eingereicht am</TableHead>
           <TableHead>Schüler</TableHead>
           <TableHead>Verwendungszweck</TableHead>
           <TableHead>Zahlungsart</TableHead>
