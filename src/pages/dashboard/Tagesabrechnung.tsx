@@ -276,7 +276,8 @@ const Tagesabrechnung = () => {
             <table className="w-full text-sm border-collapse mb-6">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-1">Datum</th>
+                  <th className="text-left py-1">Einnahmedatum</th>
+                  <th className="text-left py-1">Eingereicht am</th>
                   <th className="text-left py-1">Schüler</th>
                   <th className="text-left py-1">Verwendungszweck</th>
                   <th className="text-left py-1">Zahlungsart</th>
