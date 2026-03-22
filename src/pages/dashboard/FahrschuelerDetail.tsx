@@ -124,7 +124,8 @@ const FahrschuelerDetail = () => {
   const [editingService, setEditingService] = useState<any | null>(null);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
   const [editingContact, setEditingContact] = useState(false);
-  const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "" });
+  const [contactForm, setContactForm] = useState({ vorname: "", nachname: "", fuehrerscheinklasse: "" as "B" | "B78" | "B197", email: "", telefon: "", adresse: "", geburtsdatum: "", anmeldedatum: "", ist_umschreiber: false, fahrschule: "riemke" });
+  const [deletingStudent, setDeletingStudent] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
   const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | "pruefungen" | null>(null);
   const [printSections, setPrintSections] = useState<string[]>([]);
