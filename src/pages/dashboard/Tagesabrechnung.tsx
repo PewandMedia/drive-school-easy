@@ -162,7 +162,7 @@ const Tagesabrechnung = () => {
             );
           })}
           <TableRow>
-            <TableCell colSpan={3} />
+            <TableCell colSpan={4} />
             <TableCell className="font-bold">Gesamt ({totals.counts.gesamt})</TableCell>
             <TableCell className="text-right font-bold">{formatEUR(totals.amounts.gesamt)}</TableCell>
           </TableRow>
