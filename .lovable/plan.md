@@ -1,33 +1,19 @@
 
 
-## Einreichungsdatum entfernen — zurück zum einfachen Datum
+## Automatische Guthaben-Verrechnung nach Zahlungserfassung
 
-Das Einreichungsdatum-Feld wird aus allen Formularen und der Tagesabrechnung entfernt. Alles basiert wieder nur auf dem normalen `datum`-Feld.
+### Problem
+Nach dem Hinzufügen einer Zahlung muss man manuell hochscrollen und auf "Guthaben verrechnen" klicken. Das soll automatisch passieren.
 
-### Änderungen
+### Lösung
 
-**1. `src/pages/dashboard/Zahlungen.tsx`**
-- `einreichungsdatum` aus dem `PaymentForm`-Type und Default-State entfernen
-- `einreichungsdatum` aus dem Insert-Objekt entfernen
-- Das "Einreichungsdatum (Büro)"-Eingabefeld im Dialog entfernen
+**`src/pages/dashboard/FahrschuelerDetail.tsx`**
 
-**2. `src/pages/dashboard/FahrschuelerDetail.tsx`**
-- `einreichungsdatum` aus dem `fsZahlung`-State und allen Resets entfernen
-- `einreichungsdatum` aus dem Insert-Objekt entfernen
-- Das "Einreichungsdatum (Büro)"-Eingabefeld im Zahlungsdialog entfernen
+In der `mutZahlung`-Mutation (Zeile ~492, `onSuccess`-Callback): Nach erfolgreichem Speichern einer Zahlung automatisch `mutGuthabenVerrechnen.mutate()` aufrufen — aber nur wenn es keine Gutschrift ist und keine offenen Posten bereits ausgewählt wurden (da diese schon direkt zugeordnet werden).
 
-**3. `src/pages/dashboard/Tagesabrechnung.tsx`**
-- Query: Filter und Select von `einreichungsdatum` → `datum` umstellen
-- `einreichungsdatum` aus dem `PaymentRow`-Type entfernen
-- Tabelle: "Eingereicht am"-Spalte entfernen, nur noch "Datum" anzeigen
-- Print-Bereich: "Eingereicht am"-Spalte ebenfalls entfernen
-- Spaltenüberschrift "Einnahmedatum" → "Datum" umbenennen
+Konkret: Im `onSuccess` von `mutZahlung` nach den `invalidateQueries`-Aufrufen eine Bedingung einfügen, die prüft ob die Zahlung keine Gutschrift war und keine spezifischen Posten ausgewählt waren. Falls ja, wird nach kurzem Delay (damit die Queries refetched sind) automatisch `mutGuthabenVerrechnen.mutate()` aufgerufen.
 
 | Datei | Änderung |
 |---|---|
-| `Zahlungen.tsx` | Einreichungsdatum-Feld und State entfernen |
-| `FahrschuelerDetail.tsx` | Einreichungsdatum-Feld und State entfernen |
-| `Tagesabrechnung.tsx` | Filter auf `datum`, "Eingereicht am"-Spalte entfernen |
-
-Keine Datenbank-Änderung nötig — die Spalte `einreichungsdatum` bleibt in der DB bestehen, wird nur nicht mehr genutzt.
+| `FahrschuelerDetail.tsx` | `mutZahlung.onSuccess`: automatisch `mutGuthabenVerrechnen.mutate()` aufrufen für freie Zahlungen |
 
