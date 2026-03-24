@@ -46,7 +46,6 @@ type PaymentForm = {
   betrag: string;
   zahlungsart: Zahlungsart;
   datum: string;
-  einreichungsdatum: string;
   selectedOpenItems: string[];
   istGutschrift: boolean;
   gutschriftNotiz: string;
