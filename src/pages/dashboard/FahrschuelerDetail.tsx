@@ -495,7 +495,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, einreichungsdatum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
+      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
