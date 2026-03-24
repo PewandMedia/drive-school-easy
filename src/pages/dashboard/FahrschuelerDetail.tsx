@@ -166,7 +166,6 @@ const FahrschuelerDetail = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     datum: new Date().toISOString().slice(0, 10),
-    einreichungsdatum: new Date().toISOString().slice(0, 10),
     selectedOpenItems: [] as string[],
     istGutschrift: false,
     gutschriftNotiz: "",
@@ -454,7 +453,6 @@ const FahrschuelerDetail = () => {
         betrag,
         zahlungsart: fsZahlung.zahlungsart,
         datum: new Date(fsZahlung.datum).toISOString(),
-        einreichungsdatum: new Date(fsZahlung.einreichungsdatum).toISOString(),
       }).select("id").single();
       if (paymentError) throw paymentError;
 
@@ -497,7 +495,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, einreichungsdatum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
+      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
       toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -2306,7 +2304,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
@@ -2322,10 +2320,6 @@ const FahrschuelerDetail = () => {
             <div className="space-y-1.5">
               <Label>Datum</Label>
               <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Einreichungsdatum (Büro)</Label>
-              <Input type="date" value={fsZahlung.einreichungsdatum} onChange={(e) => setFsZahlung((f) => ({ ...f, einreichungsdatum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>

@@ -26,7 +26,6 @@ type PaymentRow = {
   betrag: number;
   zahlungsart: "bar" | "ec" | "ueberweisung";
   datum: string;
-  einreichungsdatum: string;
   students: { vorname: string; nachname: string } | null;
   payment_allocations: Allocation[];
 };
@@ -69,10 +68,10 @@ const Tagesabrechnung = () => {
 
     const { data, error } = await supabase
       .from("payments")
-      .select("id, betrag, zahlungsart, datum, einreichungsdatum, students(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .gte("einreichungsdatum", dayStart.toISOString())
-      .lt("einreichungsdatum", dayEnd.toISOString())
-      .order("einreichungsdatum", { ascending: true });
+      .select("id, betrag, zahlungsart, datum, students(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+      .gte("datum", dayStart.toISOString())
+      .lt("datum", dayEnd.toISOString())
+      .order("datum", { ascending: true });
 
     if (error) {
       toast.error("Fehler beim Laden der Zahlungen");
@@ -112,8 +111,7 @@ const Tagesabrechnung = () => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Einnahmedatum</TableHead>
-          <TableHead>Eingereicht am</TableHead>
+          <TableHead>Datum</TableHead>
           <TableHead>Schüler</TableHead>
           <TableHead>Verwendungszweck</TableHead>
           <TableHead>Zahlungsart</TableHead>
@@ -126,7 +124,6 @@ const Tagesabrechnung = () => {
           return (
             <TableRow key={p.id}>
               <TableCell>{format(new Date(p.datum), "dd.MM.yyyy")}</TableCell>
-              <TableCell>{format(new Date(p.einreichungsdatum), "dd.MM.yyyy")}</TableCell>
               <TableCell>
                 {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
               </TableCell>
@@ -150,7 +147,7 @@ const Tagesabrechnung = () => {
             const Icon = zahlungsartIcon[z];
             return (
               <TableRow key={z}>
-                <TableCell colSpan={4} />
+                <TableCell colSpan={3} />
                 <TableCell>
                   <span className="flex items-center gap-1.5">
                     <Icon className="h-4 w-4" />
@@ -162,7 +159,7 @@ const Tagesabrechnung = () => {
             );
           })}
           <TableRow>
-            <TableCell colSpan={4} />
+            <TableCell colSpan={3} />
             <TableCell className="font-bold">Gesamt ({totals.counts.gesamt})</TableCell>
             <TableCell className="text-right font-bold">{formatEUR(totals.amounts.gesamt)}</TableCell>
           </TableRow>
@@ -276,8 +273,7 @@ const Tagesabrechnung = () => {
             <table className="w-full text-sm border-collapse mb-6">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-1">Einnahmedatum</th>
-                  <th className="text-left py-1">Eingereicht am</th>
+                  <th className="text-left py-1">Datum</th>
                   <th className="text-left py-1">Schüler</th>
                   <th className="text-left py-1">Verwendungszweck</th>
                   <th className="text-left py-1">Zahlungsart</th>
@@ -288,7 +284,6 @@ const Tagesabrechnung = () => {
                 {filteredPayments.map((p) => (
                   <tr key={p.id} className="border-b">
                     <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                    <td className="py-1">{format(new Date(p.einreichungsdatum), "dd.MM.yyyy")}</td>
                     <td className="py-1">
                       {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
                     </td>

@@ -46,7 +46,6 @@ type PaymentForm = {
   betrag: string;
   zahlungsart: Zahlungsart;
   datum: string;
-  einreichungsdatum: string;
   selectedOpenItems: string[];
   istGutschrift: boolean;
   gutschriftNotiz: string;
@@ -57,7 +56,6 @@ const defaultForm = (): PaymentForm => ({
   betrag: "",
   zahlungsart: "bar",
   datum: new Date().toISOString().slice(0, 10),
-  einreichungsdatum: new Date().toISOString().slice(0, 10),
   selectedOpenItems: [],
   istGutschrift: false,
   gutschriftNotiz: "",
@@ -131,7 +129,6 @@ const Zahlungen = () => {
           betrag,
           zahlungsart: form.zahlungsart,
           datum: new Date(form.datum).toISOString(),
-          einreichungsdatum: new Date(form.einreichungsdatum).toISOString(),
         })
         .select("id")
         .single();
@@ -451,14 +448,6 @@ const Zahlungen = () => {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Einreichungsdatum (Büro)</Label>
-              <Input
-                type="date"
-                value={form.einreichungsdatum}
-                onChange={(e) => setForm((f) => ({ ...f, einreichungsdatum: e.target.value }))}
-              />
-            </div>
 
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
