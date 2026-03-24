@@ -453,7 +453,6 @@ const FahrschuelerDetail = () => {
         betrag,
         zahlungsart: fsZahlung.zahlungsart,
         datum: new Date(fsZahlung.datum).toISOString(),
-        einreichungsdatum: new Date(fsZahlung.einreichungsdatum).toISOString(),
       }).select("id").single();
       if (paymentError) throw paymentError;
 
