@@ -490,13 +490,21 @@ const FahrschuelerDetail = () => {
       }
     },
     onSuccess: () => {
+      const wasGutschrift = fsZahlung.istGutschrift;
+      const hadSelectedItems = fsZahlung.selectedOpenItems.length > 0;
       queryClient.invalidateQueries({ queryKey: ["payments", id] });
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
       setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
-      toast({ title: fsZahlung.istGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
+      toast({ title: wasGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
+      // Auto-allocate credit for free payments (no Gutschrift, no specific items selected)
+      if (!wasGutschrift && !hadSelectedItems) {
+        setTimeout(() => {
+          mutGuthabenVerrechnen.mutate();
+        }, 500);
+      }
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
   });
