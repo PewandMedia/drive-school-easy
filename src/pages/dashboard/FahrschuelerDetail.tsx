@@ -166,7 +166,6 @@ const FahrschuelerDetail = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     datum: new Date().toISOString().slice(0, 10),
-    einreichungsdatum: new Date().toISOString().slice(0, 10),
     selectedOpenItems: [] as string[],
     istGutschrift: false,
     gutschriftNotiz: "",
