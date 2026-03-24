@@ -129,7 +129,6 @@ const Zahlungen = () => {
           betrag,
           zahlungsart: form.zahlungsart,
           datum: new Date(form.datum).toISOString(),
-          einreichungsdatum: new Date(form.einreichungsdatum).toISOString(),
         })
         .select("id")
         .single();
