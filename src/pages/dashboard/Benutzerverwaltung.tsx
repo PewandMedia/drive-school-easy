@@ -83,6 +83,15 @@ const Benutzerverwaltung = () => {
     },
   });
 
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["instructors_manage"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname, aktiv").order("nachname") as any;
+      if (error) throw error;
+      return data as { id: string; vorname: string; nachname: string; aktiv: boolean }[];
+    },
+  });
+
   const { data: roles = [] } = useQuery({
     queryKey: ["admin_user_roles"],
     queryFn: async () => {
