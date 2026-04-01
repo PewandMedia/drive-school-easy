@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Shield, Plus, RotateCcw, History, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -82,6 +83,15 @@ const Benutzerverwaltung = () => {
     },
   });
 
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["instructors_manage"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname, aktiv").order("nachname") as any;
+      if (error) throw error;
+      return data as { id: string; vorname: string; nachname: string; aktiv: boolean }[];
+    },
+  });
+
   const { data: roles = [] } = useQuery({
     queryKey: ["admin_user_roles"],
     queryFn: async () => {
@@ -161,14 +171,9 @@ const Benutzerverwaltung = () => {
         description="Accounts und Rollen verwalten"
         icon={Shield}
         action={
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
-              <Users className="h-4 w-4" />Fahrlehrer verwalten
-            </Button>
-            <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />Account erstellen
-            </Button>
-          </div>
+          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />Account erstellen
+          </Button>
         }
       />
 
@@ -245,6 +250,51 @@ const Benutzerverwaltung = () => {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Fahrlehrer Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Fahrlehrer</h2>
+          </div>
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
+            <Plus className="h-4 w-4" />Fahrlehrer verwalten
+          </Button>
+        </div>
+        <div className="rounded-xl border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-32">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {instructors.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                    Keine Fahrlehrer vorhanden
+                  </TableCell>
+                </TableRow>
+              ) : (
+                instructors.map((inst) => (
+                  <TableRow key={inst.id}>
+                    <TableCell className="font-medium">{inst.nachname}, {inst.vorname}</TableCell>
+                    <TableCell>
+                      <Badge variant={inst.aktiv ? "default" : "secondary"}>
+                        {inst.aktiv ? "Aktiv" : "Inaktiv"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Create Dialog */}
