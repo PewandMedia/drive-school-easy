@@ -171,14 +171,9 @@ const Benutzerverwaltung = () => {
         description="Accounts und Rollen verwalten"
         icon={Shield}
         action={
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
-              <Users className="h-4 w-4" />Fahrlehrer verwalten
-            </Button>
-            <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4" />Account erstellen
-            </Button>
-          </div>
+          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />Account erstellen
+          </Button>
         }
       />
 
