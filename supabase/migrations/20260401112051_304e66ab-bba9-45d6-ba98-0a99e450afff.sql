@@ -1,0 +1,1 @@
+DELETE FROM instructors WHERE id = '872171a9-9256-4bc9-a254-2692dbec18d5';
