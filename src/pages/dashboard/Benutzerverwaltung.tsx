@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, Plus, RotateCcw, History } from "lucide-react";
+import { Shield, Plus, RotateCcw, History, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
