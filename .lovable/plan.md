@@ -1,23 +1,15 @@
 
 
-## Fahrlehrer-Verwaltung in Benutzerverwaltung einbinden
+## Test-Fahrlehrer "Test, Test" löschen
 
-### Aktuelle Situation
-- Es gibt bereits ein fertiges `InstructorManageDialog`-Komponente mit Hinzufügen, Bearbeiten, Deaktivieren und Reaktivieren
-- Die `instructors`-Tabelle ist bereits systemweit integriert (Fahrstunden, Theorie, Prüfungen, Fahrlehrer-Statistik) — alle Stellen nutzen Query-Keys wie `instructors_active` die automatisch invalidiert werden
-- Es fehlt nur der Aufruf-Button in der Benutzerverwaltung
+Der Fahrlehrer "Test, Test" (ID: `872171a9-9256-4bc9-a254-2692dbec18d5`) ist bereits inaktiv und hat keine verknüpften Fahrstunden, Prüfungen oder Theoriestunden. Er kann sicher gelöscht werden.
 
 ### Änderung
 
-**`src/pages/dashboard/Benutzerverwaltung.tsx`**
-- `InstructorManageDialog` importieren
-- State `fahrlehrerOpen` hinzufügen
-- Neben dem "Account erstellen"-Button einen zweiten Button "Fahrlehrer verwalten" einfügen
-- Das `InstructorManageDialog` am Ende der Seite rendern
+**Datenbank-Migration:**
+```sql
+DELETE FROM instructors WHERE id = '872171a9-9256-4bc9-a254-2692dbec18d5';
+```
 
-Ein neuer Fahrlehrer ist sofort überall verfügbar, da alle Komponenten im System die `instructors`-Tabelle direkt abfragen.
-
-| Datei | Änderung |
-|---|---|
-| `Benutzerverwaltung.tsx` | Button + InstructorManageDialog einbinden |
+Keine Code-Änderungen nötig.
 
