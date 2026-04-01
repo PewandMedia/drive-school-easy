@@ -252,6 +252,51 @@ const Benutzerverwaltung = () => {
         </Table>
       </div>
 
+      {/* Fahrlehrer Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">Fahrlehrer</h2>
+          </div>
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
+            <Plus className="h-4 w-4" />Fahrlehrer verwalten
+          </Button>
+        </div>
+        <div className="rounded-xl border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead className="w-32">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {instructors.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                    Keine Fahrlehrer vorhanden
+                  </TableCell>
+                </TableRow>
+              ) : (
+                instructors.map((inst) => (
+                  <TableRow key={inst.id}>
+                    <TableCell className="font-medium">{inst.nachname}, {inst.vorname}</TableCell>
+                    <TableCell>
+                      <Badge variant={inst.aktiv ? "default" : "secondary"}>
+                        {inst.aktiv ? "Aktiv" : "Inaktiv"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
       {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
