@@ -71,6 +71,7 @@ const Benutzerverwaltung = () => {
   const [historieOpen, setHistorieOpen] = useState(false);
   const [historieUserId, setHistorieUserId] = useState("");
   const [historieUserName, setHistorieUserName] = useState("");
+  const [fahrlehrerOpen, setFahrlehrerOpen] = useState(false);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin_profiles"],
