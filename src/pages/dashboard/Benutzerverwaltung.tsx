@@ -349,6 +349,7 @@ const Benutzerverwaltung = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <InstructorManageDialog open={fahrlehrerOpen} onOpenChange={setFahrlehrerOpen} />
     </div>
   );
 };
