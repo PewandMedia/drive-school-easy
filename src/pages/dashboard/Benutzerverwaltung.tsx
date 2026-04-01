@@ -74,7 +74,7 @@ const Benutzerverwaltung = () => {
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin_profiles"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").order("created_at") as any;
+      const { data, error } = await supabase.from("profiles").select("*").neq("email", "media@gmail.com").order("created_at") as any;
       if (error) throw error;
       return data as Profile[];
     },
