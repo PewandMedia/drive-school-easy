@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, Plus, RotateCcw, History } from "lucide-react";
+import { Shield, Plus, RotateCcw, History, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import PageHeader from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import InstructorManageDialog from "@/components/InstructorManageDialog";
 
 type Profile = {
   id: string;
@@ -70,6 +71,7 @@ const Benutzerverwaltung = () => {
   const [historieOpen, setHistorieOpen] = useState(false);
   const [historieUserId, setHistorieUserId] = useState("");
   const [historieUserName, setHistorieUserName] = useState("");
+  const [fahrlehrerOpen, setFahrlehrerOpen] = useState(false);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin_profiles"],
@@ -159,9 +161,14 @@ const Benutzerverwaltung = () => {
         description="Accounts und Rollen verwalten"
         icon={Shield}
         action={
-          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" />Account erstellen
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
+              <Users className="h-4 w-4" />Fahrlehrer verwalten
+            </Button>
+            <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" />Account erstellen
+            </Button>
+          </div>
         }
       />
 
@@ -342,6 +349,7 @@ const Benutzerverwaltung = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <InstructorManageDialog open={fahrlehrerOpen} onOpenChange={setFahrlehrerOpen} />
     </div>
   );
 };
