@@ -261,7 +261,7 @@ const Benutzerverwaltung = () => {
             </div>
             <h2 className="text-lg font-semibold text-foreground">Fahrlehrer</h2>
           </div>
-          <Button size="sm" variant="outline" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
+          <Button size="sm" variant="destructive" className="gap-2" onClick={() => setFahrlehrerOpen(true)}>
             <Plus className="h-4 w-4" />Fahrlehrer verwalten
           </Button>
         </div>
