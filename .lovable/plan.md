@@ -1,17 +1,23 @@
 
 
-## media@gmail.com Admin-Rolle + aus UI ausblenden
+## Fahrlehrer-Verwaltung in Benutzerverwaltung einbinden
 
-### Schritte
+### Aktuelle Situation
+- Es gibt bereits ein fertiges `InstructorManageDialog`-Komponente mit Hinzufügen, Bearbeiten, Deaktivieren und Reaktivieren
+- Die `instructors`-Tabelle ist bereits systemweit integriert (Fahrstunden, Theorie, Prüfungen, Fahrlehrer-Statistik) — alle Stellen nutzen Query-Keys wie `instructors_active` die automatisch invalidiert werden
+- Es fehlt nur der Aufruf-Button in der Benutzerverwaltung
 
-**1. Admin-Rolle zuweisen (Daten-Insert)**
-- `INSERT INTO user_roles (user_id, role) VALUES ('80e68fb7-06f0-4c85-950f-4df81aa63c7c', 'admin')`
+### Änderung
 
-**2. `src/pages/dashboard/Benutzerverwaltung.tsx`**
-- In der `admin_profiles`-Query den Account `media@gmail.com` per `.neq("email", "media@gmail.com")` herausfiltern, sodass er in der Benutzerverwaltung nicht sichtbar ist
+**`src/pages/dashboard/Benutzerverwaltung.tsx`**
+- `InstructorManageDialog` importieren
+- State `fahrlehrerOpen` hinzufügen
+- Neben dem "Account erstellen"-Button einen zweiten Button "Fahrlehrer verwalten" einfügen
+- Das `InstructorManageDialog` am Ende der Seite rendern
 
-| Aktion | Detail |
+Ein neuer Fahrlehrer ist sofort überall verfügbar, da alle Komponenten im System die `instructors`-Tabelle direkt abfragen.
+
+| Datei | Änderung |
 |---|---|
-| Daten-Insert | Admin-Rolle für media@gmail.com in `user_roles` |
-| `Benutzerverwaltung.tsx` | Account aus der Profil-Liste ausblenden |
+| `Benutzerverwaltung.tsx` | Button + InstructorManageDialog einbinden |
 
