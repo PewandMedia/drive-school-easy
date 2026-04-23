@@ -291,53 +291,77 @@ const Tagesabrechnung = () => {
 
       {/* ===== PRINT AREA ===== */}
       <div className="print-area hidden print:block">
-        <div className="mb-6 border-b pb-4">
-          <h1 className="text-2xl font-bold">Fahrschulverwaltung – Tagesabrechnung</h1>
-          <p className="text-lg mt-1">
-            Einreichungsdatum (Büro):{" "}
-            {activeDate ? format(new Date(activeDate), "dd.MM.yyyy", { locale: de }) : "–"}
+        <div className="mb-4 border-b pb-3">
+          <h1 className="text-xl font-bold">Tagesabrechnung – Fahrschulverwaltung</h1>
+          <p className="text-xs mt-1">
+            Im Büro eingereicht am:{" "}
+            <strong>
+              {activeDate ? format(new Date(activeDate), "dd.MM.yyyy", { locale: de }) : "–"}
+            </strong>
           </p>
           {filterZahlungsart !== "alle" && (
-            <p className="text-sm mt-1 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
+            <p className="text-xs mt-0.5 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
           )}
         </div>
 
         {filteredPayments.length > 0 && (
           <>
-            <table className="w-full text-sm border-collapse mb-6">
+            <table className="mb-4">
+              <colgroup>
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "32%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-1">Schüler</th>
-                  <th className="text-left py-1">Verwendungszweck</th>
-                  <th className="text-left py-1">Fahrlehrer</th>
-                  <th className="text-left py-1">Zahlungsart</th>
-                  <th className="text-left py-1">Einnahme am</th>
-                  <th className="text-left py-1">Einreichung am</th>
+                  <th className="text-left py-1 pr-2">Schüler</th>
+                  <th className="text-left py-1 pr-2">Verwendungszweck</th>
+                  <th className="text-left py-1 pr-2">Fahrlehrer</th>
+                  <th className="text-left py-1 pr-2">Art</th>
+                  <th className="text-left py-1 pr-2">Kassiert am</th>
+                  <th className="text-left py-1 pr-2">Im Büro am</th>
                   <th className="text-right py-1">Betrag</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPayments.map((p) => (
                   <tr key={p.id} className="border-b">
-                    <td className="py-1">
+                    <td className="py-1 pr-2">
                       {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
                     </td>
-                    <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
-                    <td className="py-1">{getInstructorName(p)}</td>
-                    <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
-                    <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                    <td className="py-1">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
+                    <td className="py-1 pr-2">{getVerwendungszweck(p.payment_allocations)}</td>
+                    <td className="py-1 pr-2">{getInstructorName(p)}</td>
+                    <td className="py-1 pr-2">{zahlungsartLabel[p.zahlungsart]}</td>
+                    <td className="py-1 pr-2">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                    <td className="py-1 pr-2">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
                     <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <div className="mb-6 text-sm space-y-1">
-              {(["bar", "ec", "ueberweisung"] as const).filter(z => filterZahlungsart === "alle" || filterZahlungsart === z).filter(z => totals.counts[z] > 0).map((z) => (
-                <p key={z}><strong>{zahlungsartLabel[z]} gesamt ({totals.counts[z]}):</strong> {formatEUR(totals.amounts[z])}</p>
-              ))}
-              <p className="text-base font-bold mt-2">Gesamtbetrag ({totals.counts.gesamt}): {formatEUR(totals.amounts.gesamt)}</p>
+            <div className="flex justify-end mb-6">
+              <table className="text-sm border" style={{ width: "auto", minWidth: "260px" }}>
+                <tbody>
+                  {(["bar", "ec", "ueberweisung"] as const)
+                    .filter(z => filterZahlungsart === "alle" || filterZahlungsart === z)
+                    .filter(z => totals.counts[z] > 0)
+                    .map((z) => (
+                      <tr key={z} className="border-b">
+                        <td className="py-1 px-2">{zahlungsartLabel[z]} ({totals.counts[z]})</td>
+                        <td className="py-1 px-2 text-right">{formatEUR(totals.amounts[z])}</td>
+                      </tr>
+                    ))}
+                  <tr className="border-t-2 border-black">
+                    <td className="py-1.5 px-2 font-bold">Gesamt ({totals.counts.gesamt})</td>
+                    <td className="py-1.5 px-2 text-right font-bold">{formatEUR(totals.amounts.gesamt)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </>
         )}
