@@ -166,6 +166,8 @@ const FahrschuelerDetail = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     datum: new Date().toISOString().slice(0, 10),
+    einreichungsdatum: new Date().toISOString().slice(0, 10),
+    instructor_id: "",
     selectedOpenItems: [] as string[],
     istGutschrift: false,
     gutschriftNotiz: "",
@@ -453,7 +455,9 @@ const FahrschuelerDetail = () => {
         betrag,
         zahlungsart: fsZahlung.zahlungsart,
         datum: new Date(fsZahlung.datum).toISOString(),
-      }).select("id").single();
+        einreichungsdatum: new Date(fsZahlung.einreichungsdatum).toISOString(),
+        instructor_id: fsZahlung.instructor_id || null,
+      } as any).select("id").single();
       if (paymentError) throw paymentError;
 
       if (fsZahlung.istGutschrift) {
@@ -497,7 +501,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
+      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: prev.instructor_id, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
       toast({ title: wasGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
       // Auto-allocate credit for free payments (no Gutschrift, no specific items selected)
       if (!wasGutschrift && !hadSelectedItems) {
@@ -673,7 +677,9 @@ const FahrschuelerDetail = () => {
           betrag: parseFloat(payment.betrag) || 0,
           zahlungsart: payment.zahlungsart,
           datum: new Date(payment.datum).toISOString(),
-        })
+          einreichungsdatum: new Date(payment.einreichungsdatum ?? payment.datum).toISOString(),
+          instructor_id: payment.instructor_id || null,
+        } as any)
         .eq("id", payment.id);
       if (error) throw error;
     },
