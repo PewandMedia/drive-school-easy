@@ -462,16 +462,42 @@ const Zahlungen = () => {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Datum</Label>
-              <Input
-                type="date"
-                value={form.datum}
-                onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Einnahmedatum (Fahrlehrer)</Label>
+                <Input
+                  type="date"
+                  value={form.datum}
+                  onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Einreichungsdatum (Büro)</Label>
+                <Input
+                  type="date"
+                  value={form.einreichungsdatum}
+                  onChange={(e) => setForm((f) => ({ ...f, einreichungsdatum: e.target.value }))}
+                />
+              </div>
             </div>
 
-
+            <div className="space-y-1.5">
+              <Label>Fahrlehrer (optional)</Label>
+              <Select
+                value={form.instructor_id || "none"}
+                onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Kein Fahrlehrer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                  {instructors.map((i: any) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
               <Select
@@ -591,9 +617,27 @@ const Zahlungen = () => {
             <DialogTitle>Zahlung bearbeiten</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Einnahmedatum</Label>
+                <Input type="date" value={editPaymentForm.datum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, datum: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Einreichungsdatum</Label>
+                <Input type="date" value={editPaymentForm.einreichungsdatum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, einreichungsdatum: e.target.value }))} />
+              </div>
+            </div>
             <div className="space-y-1.5">
-              <Label>Datum</Label>
-              <Input type="date" value={editPaymentForm.datum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, datum: e.target.value }))} />
+              <Label>Fahrlehrer (optional)</Label>
+              <Select value={editPaymentForm.instructor_id || "none"} onValueChange={(v) => setEditPaymentForm((f) => ({ ...f, instructor_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Kein Fahrlehrer" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                  {instructors.map((i: any) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
@@ -620,6 +664,8 @@ const Zahlungen = () => {
                     betrag: isGutschrift ? String(-Math.abs(parseFloat(editPaymentForm.betrag))) : editPaymentForm.betrag,
                     zahlungsart: editPaymentForm.zahlungsart,
                     datum: editPaymentForm.datum,
+                    einreichungsdatum: editPaymentForm.einreichungsdatum,
+                    instructor_id: editPaymentForm.instructor_id,
                   });
                 }
               }}>
