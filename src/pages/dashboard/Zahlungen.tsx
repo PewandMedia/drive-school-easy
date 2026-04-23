@@ -106,6 +106,15 @@ const Zahlungen = () => {
     queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
   });
 
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["instructors_active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const { data: openItemsForStudent = [] } = useQuery({
     queryKey: ["open_items_student", form.student_id],
     queryFn: async () => {
@@ -133,7 +142,9 @@ const Zahlungen = () => {
           betrag,
           zahlungsart: form.zahlungsart,
           datum: new Date(form.datum).toISOString(),
-        })
+          einreichungsdatum: new Date(form.einreichungsdatum).toISOString(),
+          instructor_id: form.instructor_id || null,
+        } as any)
         .select("id")
         .single();
       if (paymentError) throw paymentError;
@@ -201,12 +212,14 @@ const Zahlungen = () => {
   });
 
   const updatePaymentMutation = useMutation({
-    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string }) => {
+    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string; einreichungsdatum: string; instructor_id: string }) => {
       const { error } = await supabase.from("payments").update({
         betrag: parseFloat(vals.betrag) || 0,
         zahlungsart: vals.zahlungsart,
         datum: new Date(vals.datum).toISOString(),
-      }).eq("id", vals.id);
+        einreichungsdatum: new Date(vals.einreichungsdatum).toISOString(),
+        instructor_id: vals.instructor_id || null,
+      } as any).eq("id", vals.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -297,7 +310,13 @@ const Zahlungen = () => {
           <div className="flex items-center gap-0.5">
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => {
               setEditingPayment(p);
-              setEditPaymentForm({ betrag: String(Math.abs(Number(p.betrag))), zahlungsart: p.zahlungsart as Zahlungsart, datum: new Date(p.datum).toISOString().slice(0, 10) });
+              setEditPaymentForm({
+                betrag: String(Math.abs(Number(p.betrag))),
+                zahlungsart: p.zahlungsart as Zahlungsart,
+                datum: new Date(p.datum).toISOString().slice(0, 10),
+                einreichungsdatum: new Date(p.einreichungsdatum ?? p.datum).toISOString().slice(0, 10),
+                instructor_id: p.instructor_id ?? "",
+              });
             }}>
               <Pencil className="h-4 w-4" />
             </Button>
