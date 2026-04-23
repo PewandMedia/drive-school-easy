@@ -86,7 +86,7 @@ const Zahlungen = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
-  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, datum: "" });
+  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, datum: "", einreichungsdatum: "", instructor_id: "" });
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const qc = useQueryClient();
