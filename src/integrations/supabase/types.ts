@@ -307,6 +307,7 @@ export type Database = {
           datum: string
           einreichungsdatum: string | null
           id: string
+          instructor_id: string | null
           service_id: string | null
           student_id: string
           zahlungsart: Database["public"]["Enums"]["zahlungsart_enum"]
@@ -317,6 +318,7 @@ export type Database = {
           datum?: string
           einreichungsdatum?: string | null
           id?: string
+          instructor_id?: string | null
           service_id?: string | null
           student_id: string
           zahlungsart?: Database["public"]["Enums"]["zahlungsart_enum"]
@@ -327,6 +329,7 @@ export type Database = {
           datum?: string
           einreichungsdatum?: string | null
           id?: string
+          instructor_id?: string | null
           service_id?: string | null
           student_id?: string
           zahlungsart?: Database["public"]["Enums"]["zahlungsart_enum"]
