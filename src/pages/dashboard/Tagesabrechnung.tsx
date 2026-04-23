@@ -140,7 +140,6 @@ const Tagesabrechnung = () => {
       <TableBody>
         {rows.map((p) => {
           const Icon = zahlungsartIcon[p.zahlungsart];
-          const einreichung = p.einreichungsdatum ?? p.datum;
           return (
             <TableRow key={p.id}>
               <TableCell>
@@ -161,8 +160,8 @@ const Tagesabrechnung = () => {
               <TableCell className="text-muted-foreground">
                 {format(new Date(p.datum), "dd.MM.yyyy")}
               </TableCell>
-              <TableCell>
-                {format(new Date(einreichung), "dd.MM.yyyy")}
+              <TableCell className={p.einreichungsdatum ? "" : "text-muted-foreground"}>
+                {p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}
               </TableCell>
               <TableCell className="text-right font-medium">{formatEUR(p.betrag)}</TableCell>
             </TableRow>
