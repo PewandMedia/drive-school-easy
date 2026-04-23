@@ -65,23 +65,28 @@ const getInstructorName = (p: PaymentRow) =>
 
 const Tagesabrechnung = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [filterModus, setFilterModus] = useState<FilterModus>("einreichung");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
+  const [activeModus, setActiveModus] = useState<FilterModus>("einreichung");
+  const [activeDate, setActiveDate] = useState<string>(selectedDate);
 
   const fetchPayments = async () => {
     setLoading(true);
     const dayStart = startOfDay(new Date(selectedDate));
     const dayEnd = addDays(dayStart, 1);
 
-    // Filter nach Einreichungsdatum (mit Fallback auf datum für Altdaten ohne einreichungsdatum)
+    const dateField = filterModus === "einreichung" ? "einreichungsdatum" : "datum";
+
     const { data, error } = await supabase
       .from("payments")
       .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .or(`and(einreichungsdatum.gte.${dayStart.toISOString()},einreichungsdatum.lt.${dayEnd.toISOString()}),and(einreichungsdatum.is.null,datum.gte.${dayStart.toISOString()},datum.lt.${dayEnd.toISOString()})`)
-      .order("einreichungsdatum", { ascending: true });
+      .gte(dateField, dayStart.toISOString())
+      .lt(dateField, dayEnd.toISOString())
+      .order(dateField, { ascending: true });
 
     if (error) {
       toast.error("Fehler beim Laden der Zahlungen");
@@ -89,6 +94,8 @@ const Tagesabrechnung = () => {
     } else {
       setPayments((data as unknown as PaymentRow[]) || []);
     }
+    setActiveModus(filterModus);
+    setActiveDate(selectedDate);
     setSubmitted(true);
     setLoading(false);
   };
