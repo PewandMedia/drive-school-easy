@@ -26,7 +26,10 @@ type PaymentRow = {
   betrag: number;
   zahlungsart: "bar" | "ec" | "ueberweisung";
   datum: string;
+  einreichungsdatum: string | null;
+  instructor_id: string | null;
   students: { vorname: string; nachname: string } | null;
+  instructors: { vorname: string; nachname: string } | null;
   payment_allocations: Allocation[];
 };
 
@@ -53,6 +56,9 @@ const getVerwendungszweck = (allocations: Allocation[]) => {
   return descriptions.length > 0 ? descriptions.join(", ") : "Freie Zahlung";
 };
 
+const getInstructorName = (p: PaymentRow) =>
+  p.instructors ? `${p.instructors.vorname} ${p.instructors.nachname}` : "–";
+
 const Tagesabrechnung = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [submitted, setSubmitted] = useState(false);
@@ -66,12 +72,12 @@ const Tagesabrechnung = () => {
     const dayStart = startOfDay(new Date(selectedDate));
     const dayEnd = addDays(dayStart, 1);
 
+    // Filter nach Einreichungsdatum (mit Fallback auf datum für Altdaten ohne einreichungsdatum)
     const { data, error } = await supabase
       .from("payments")
-      .select("id, betrag, zahlungsart, datum, students(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .gte("datum", dayStart.toISOString())
-      .lt("datum", dayEnd.toISOString())
-      .order("datum", { ascending: true });
+      .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+      .or(`and(einreichungsdatum.gte.${dayStart.toISOString()},einreichungsdatum.lt.${dayEnd.toISOString()}),and(einreichungsdatum.is.null,datum.gte.${dayStart.toISOString()},datum.lt.${dayEnd.toISOString()})`)
+      .order("einreichungsdatum", { ascending: true });
 
     if (error) {
       toast.error("Fehler beim Laden der Zahlungen");
@@ -111,30 +117,41 @@ const Tagesabrechnung = () => {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Datum</TableHead>
           <TableHead>Schüler</TableHead>
           <TableHead>Verwendungszweck</TableHead>
+          <TableHead>Fahrlehrer</TableHead>
           <TableHead>Zahlungsart</TableHead>
+          <TableHead>Einnahme am</TableHead>
+          <TableHead>Einreichung am</TableHead>
           <TableHead className="text-right">Betrag</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((p) => {
           const Icon = zahlungsartIcon[p.zahlungsart];
+          const einreichung = p.einreichungsdatum ?? p.datum;
           return (
             <TableRow key={p.id}>
-              <TableCell>{format(new Date(p.datum), "dd.MM.yyyy")}</TableCell>
               <TableCell>
                 {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {getVerwendungszweck(p.payment_allocations)}
               </TableCell>
+              <TableCell className="text-muted-foreground">
+                {getInstructorName(p)}
+              </TableCell>
               <TableCell>
                 <span className="flex items-center gap-1.5">
                   <Icon className="h-4 w-4 text-muted-foreground" />
                   {zahlungsartLabel[p.zahlungsart]}
                 </span>
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {format(new Date(p.datum), "dd.MM.yyyy")}
+              </TableCell>
+              <TableCell>
+                {format(new Date(einreichung), "dd.MM.yyyy")}
               </TableCell>
               <TableCell className="text-right font-medium">{formatEUR(p.betrag)}</TableCell>
             </TableRow>
@@ -147,7 +164,7 @@ const Tagesabrechnung = () => {
             const Icon = zahlungsartIcon[z];
             return (
               <TableRow key={z}>
-                <TableCell colSpan={3} />
+                <TableCell colSpan={5} />
                 <TableCell>
                   <span className="flex items-center gap-1.5">
                     <Icon className="h-4 w-4" />
@@ -159,7 +176,7 @@ const Tagesabrechnung = () => {
             );
           })}
           <TableRow>
-            <TableCell colSpan={3} />
+            <TableCell colSpan={5} />
             <TableCell className="font-bold">Gesamt ({totals.counts.gesamt})</TableCell>
             <TableCell className="text-right font-bold">{formatEUR(totals.amounts.gesamt)}</TableCell>
           </TableRow>
@@ -172,12 +189,12 @@ const Tagesabrechnung = () => {
     <>
       {/* ===== SCREEN VIEW ===== */}
       <div className="space-y-6 print:hidden">
-        <PageHeader icon={FileText} title="Tagesabrechnung" description="Täglicher Kassenbericht" />
+        <PageHeader icon={FileText} title="Tagesabrechnung" description="Täglicher Kassenbericht (nach Einreichungsdatum im Büro)" />
 
         <Card>
           <CardContent className="flex flex-wrap items-end gap-4 p-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Datum</label>
+              <label className="text-sm font-medium text-muted-foreground">Einreichungsdatum</label>
               <Input
                 type="date"
                 value={selectedDate}
@@ -213,7 +230,7 @@ const Tagesabrechnung = () => {
           payments.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                Für dieses Datum wurden keine Zahlungen erfasst.
+                Für dieses Datum wurden keine Zahlungen im Büro eingereicht.
               </CardContent>
             </Card>
           ) : (
@@ -261,7 +278,7 @@ const Tagesabrechnung = () => {
         <div className="mb-6 border-b pb-4">
           <h1 className="text-2xl font-bold">Fahrschulverwaltung – Tagesabrechnung</h1>
           <p className="text-lg mt-1">
-            Datum: {selectedDate ? format(new Date(selectedDate), "dd.MM.yyyy", { locale: de }) : "–"}
+            Einreichungsdatum: {selectedDate ? format(new Date(selectedDate), "dd.MM.yyyy", { locale: de }) : "–"}
           </p>
           {filterZahlungsart !== "alle" && (
             <p className="text-sm mt-1 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
@@ -273,25 +290,32 @@ const Tagesabrechnung = () => {
             <table className="w-full text-sm border-collapse mb-6">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-1">Datum</th>
                   <th className="text-left py-1">Schüler</th>
                   <th className="text-left py-1">Verwendungszweck</th>
+                  <th className="text-left py-1">Fahrlehrer</th>
                   <th className="text-left py-1">Zahlungsart</th>
+                  <th className="text-left py-1">Einnahme am</th>
+                  <th className="text-left py-1">Einreichung am</th>
                   <th className="text-right py-1">Betrag</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPayments.map((p) => (
-                  <tr key={p.id} className="border-b">
-                    <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                    <td className="py-1">
-                      {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
-                    </td>
-                    <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
-                    <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
-                    <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
-                  </tr>
-                ))}
+                {filteredPayments.map((p) => {
+                  const einreichung = p.einreichungsdatum ?? p.datum;
+                  return (
+                    <tr key={p.id} className="border-b">
+                      <td className="py-1">
+                        {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
+                      </td>
+                      <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
+                      <td className="py-1">{getInstructorName(p)}</td>
+                      <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
+                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                      <td className="py-1">{format(new Date(einreichung), "dd.MM.yyyy")}</td>
+                      <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 

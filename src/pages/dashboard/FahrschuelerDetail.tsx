@@ -166,6 +166,8 @@ const FahrschuelerDetail = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     datum: new Date().toISOString().slice(0, 10),
+    einreichungsdatum: new Date().toISOString().slice(0, 10),
+    instructor_id: "",
     selectedOpenItems: [] as string[],
     istGutschrift: false,
     gutschriftNotiz: "",
@@ -453,7 +455,9 @@ const FahrschuelerDetail = () => {
         betrag,
         zahlungsart: fsZahlung.zahlungsart,
         datum: new Date(fsZahlung.datum).toISOString(),
-      }).select("id").single();
+        einreichungsdatum: new Date(fsZahlung.einreichungsdatum).toISOString(),
+        instructor_id: fsZahlung.instructor_id || null,
+      } as any).select("id").single();
       if (paymentError) throw paymentError;
 
       if (fsZahlung.istGutschrift) {
@@ -497,7 +501,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
+      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: prev.instructor_id, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
       toast({ title: wasGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
       // Auto-allocate credit for free payments (no Gutschrift, no specific items selected)
       if (!wasGutschrift && !hadSelectedItems) {
@@ -673,7 +677,9 @@ const FahrschuelerDetail = () => {
           betrag: parseFloat(payment.betrag) || 0,
           zahlungsart: payment.zahlungsart,
           datum: new Date(payment.datum).toISOString(),
-        })
+          einreichungsdatum: new Date(payment.einreichungsdatum ?? payment.datum).toISOString(),
+          instructor_id: payment.instructor_id || null,
+        } as any)
         .eq("id", payment.id);
       if (error) throw error;
     },
@@ -2029,6 +2035,8 @@ const FahrschuelerDetail = () => {
                       ...payment,
                       betrag: String(Math.abs(Number(payment.betrag))),
                       datum: new Date(payment.datum).toISOString().slice(0, 10),
+                      einreichungsdatum: new Date(payment.einreichungsdatum ?? payment.datum).toISOString().slice(0, 10),
+                      instructor_id: payment.instructor_id ?? "",
                     })}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -2312,7 +2320,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: "", selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
@@ -2325,9 +2333,27 @@ const FahrschuelerDetail = () => {
               />
               <span className="text-sm font-medium text-foreground">Gutschrift</span>
             </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Einnahmedatum (Fahrlehrer)</Label>
+                <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Einreichungsdatum (Büro)</Label>
+                <Input type="date" value={fsZahlung.einreichungsdatum} onChange={(e) => setFsZahlung((f) => ({ ...f, einreichungsdatum: e.target.value }))} />
+              </div>
+            </div>
             <div className="space-y-1.5">
-              <Label>Datum</Label>
-              <Input type="date" value={fsZahlung.datum} onChange={(e) => setFsZahlung((f) => ({ ...f, datum: e.target.value }))} />
+              <Label>Fahrlehrer (optional)</Label>
+              <Select value={fsZahlung.instructor_id || "none"} onValueChange={(v) => setFsZahlung((f) => ({ ...f, instructor_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Kein Fahrlehrer" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                  {instructors.map((i: any) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
@@ -2694,9 +2720,27 @@ const FahrschuelerDetail = () => {
           </DialogHeader>
           {editingPayment && (
             <form onSubmit={(e) => { e.preventDefault(); mutEditZahlung.mutate(editingPayment); }} className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Einnahmedatum</Label>
+                  <Input type="date" value={editingPayment.datum} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, datum: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Einreichungsdatum</Label>
+                  <Input type="date" value={editingPayment.einreichungsdatum ?? ""} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, einreichungsdatum: e.target.value }))} />
+                </div>
+              </div>
               <div className="space-y-1.5">
-                <Label>Datum</Label>
-                <Input type="date" value={editingPayment.datum} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, datum: e.target.value }))} />
+                <Label>Fahrlehrer (optional)</Label>
+                <Select value={editingPayment.instructor_id || "none"} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, instructor_id: v === "none" ? "" : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Kein Fahrlehrer" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                    {instructors.map((i: any) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Zahlungsart</Label>

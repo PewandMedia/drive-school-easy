@@ -46,6 +46,8 @@ type PaymentForm = {
   betrag: string;
   zahlungsart: Zahlungsart;
   datum: string;
+  einreichungsdatum: string;
+  instructor_id: string;
   selectedOpenItems: string[];
   istGutschrift: boolean;
   gutschriftNotiz: string;
@@ -56,6 +58,8 @@ const defaultForm = (): PaymentForm => ({
   betrag: "",
   zahlungsart: "bar",
   datum: new Date().toISOString().slice(0, 10),
+  einreichungsdatum: new Date().toISOString().slice(0, 10),
+  instructor_id: "",
   selectedOpenItems: [],
   istGutschrift: false,
   gutschriftNotiz: "",
@@ -82,7 +86,7 @@ const Zahlungen = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
-  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, datum: "" });
+  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, datum: "", einreichungsdatum: "", instructor_id: "" });
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const qc = useQueryClient();
@@ -100,6 +104,15 @@ const Zahlungen = () => {
   const { data: students = [] } = useQuery({
     queryKey: ["students_list"],
     queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
+  });
+
+  const { data: instructors = [] } = useQuery({
+    queryKey: ["instructors_active"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
   const { data: openItemsForStudent = [] } = useQuery({
@@ -129,7 +142,9 @@ const Zahlungen = () => {
           betrag,
           zahlungsart: form.zahlungsart,
           datum: new Date(form.datum).toISOString(),
-        })
+          einreichungsdatum: new Date(form.einreichungsdatum).toISOString(),
+          instructor_id: form.instructor_id || null,
+        } as any)
         .select("id")
         .single();
       if (paymentError) throw paymentError;
@@ -197,12 +212,14 @@ const Zahlungen = () => {
   });
 
   const updatePaymentMutation = useMutation({
-    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string }) => {
+    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string; einreichungsdatum: string; instructor_id: string }) => {
       const { error } = await supabase.from("payments").update({
         betrag: parseFloat(vals.betrag) || 0,
         zahlungsart: vals.zahlungsart,
         datum: new Date(vals.datum).toISOString(),
-      }).eq("id", vals.id);
+        einreichungsdatum: new Date(vals.einreichungsdatum).toISOString(),
+        instructor_id: vals.instructor_id || null,
+      } as any).eq("id", vals.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -293,7 +310,13 @@ const Zahlungen = () => {
           <div className="flex items-center gap-0.5">
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => {
               setEditingPayment(p);
-              setEditPaymentForm({ betrag: String(Math.abs(Number(p.betrag))), zahlungsart: p.zahlungsart as Zahlungsart, datum: new Date(p.datum).toISOString().slice(0, 10) });
+              setEditPaymentForm({
+                betrag: String(Math.abs(Number(p.betrag))),
+                zahlungsart: p.zahlungsart as Zahlungsart,
+                datum: new Date(p.datum).toISOString().slice(0, 10),
+                einreichungsdatum: new Date(p.einreichungsdatum ?? p.datum).toISOString().slice(0, 10),
+                instructor_id: p.instructor_id ?? "",
+              });
             }}>
               <Pencil className="h-4 w-4" />
             </Button>
@@ -439,16 +462,42 @@ const Zahlungen = () => {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Datum</Label>
-              <Input
-                type="date"
-                value={form.datum}
-                onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Einnahmedatum (Fahrlehrer)</Label>
+                <Input
+                  type="date"
+                  value={form.datum}
+                  onChange={(e) => setForm((f) => ({ ...f, datum: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Einreichungsdatum (Büro)</Label>
+                <Input
+                  type="date"
+                  value={form.einreichungsdatum}
+                  onChange={(e) => setForm((f) => ({ ...f, einreichungsdatum: e.target.value }))}
+                />
+              </div>
             </div>
 
-
+            <div className="space-y-1.5">
+              <Label>Fahrlehrer (optional)</Label>
+              <Select
+                value={form.instructor_id || "none"}
+                onValueChange={(v) => setForm((f) => ({ ...f, instructor_id: v === "none" ? "" : v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Kein Fahrlehrer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                  {instructors.map((i: any) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
               <Select
@@ -568,9 +617,27 @@ const Zahlungen = () => {
             <DialogTitle>Zahlung bearbeiten</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Einnahmedatum</Label>
+                <Input type="date" value={editPaymentForm.datum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, datum: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Einreichungsdatum</Label>
+                <Input type="date" value={editPaymentForm.einreichungsdatum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, einreichungsdatum: e.target.value }))} />
+              </div>
+            </div>
             <div className="space-y-1.5">
-              <Label>Datum</Label>
-              <Input type="date" value={editPaymentForm.datum} onChange={(e) => setEditPaymentForm((f) => ({ ...f, datum: e.target.value }))} />
+              <Label>Fahrlehrer (optional)</Label>
+              <Select value={editPaymentForm.instructor_id || "none"} onValueChange={(v) => setEditPaymentForm((f) => ({ ...f, instructor_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Kein Fahrlehrer" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                  {instructors.map((i: any) => (
+                    <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Zahlungsart</Label>
@@ -597,6 +664,8 @@ const Zahlungen = () => {
                     betrag: isGutschrift ? String(-Math.abs(parseFloat(editPaymentForm.betrag))) : editPaymentForm.betrag,
                     zahlungsart: editPaymentForm.zahlungsart,
                     datum: editPaymentForm.datum,
+                    einreichungsdatum: editPaymentForm.einreichungsdatum,
+                    instructor_id: editPaymentForm.instructor_id,
                   });
                 }
               }}>
