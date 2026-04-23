@@ -53,8 +53,14 @@ const getVerwendungszweck = (allocations: Allocation[]) => {
   if (!allocations || allocations.length === 0) return "Freie Zahlung";
   const descriptions = allocations
     .map((a) => a.open_items?.beschreibung)
-    .filter(Boolean);
-  return descriptions.length > 0 ? descriptions.join(", ") : "Freie Zahlung";
+    .filter(Boolean) as string[];
+  if (descriptions.length === 0) return "Freie Zahlung";
+  // Gruppiere gleiche Beschreibungen
+  const counts = new Map<string, number>();
+  descriptions.forEach((d) => counts.set(d, (counts.get(d) ?? 0) + 1));
+  return Array.from(counts.entries())
+    .map(([desc, n]) => (n > 1 ? `${desc} ×${n}` : desc))
+    .join(", ");
 };
 
 const getInstructorName = (p: PaymentRow) =>
