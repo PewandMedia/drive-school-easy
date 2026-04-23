@@ -129,9 +129,9 @@ const Tagesabrechnung = () => {
           <TableHead>Schüler</TableHead>
           <TableHead>Verwendungszweck</TableHead>
           <TableHead>Fahrlehrer</TableHead>
-          <TableHead>Zahlungsart</TableHead>
-          <TableHead>Einnahme am</TableHead>
-          <TableHead>Einreichung am</TableHead>
+          <TableHead>Art</TableHead>
+          <TableHead>Kassiert am</TableHead>
+          <TableHead>Im Büro am</TableHead>
           <TableHead className="text-right">Betrag</TableHead>
         </TableRow>
       </TableHeader>
