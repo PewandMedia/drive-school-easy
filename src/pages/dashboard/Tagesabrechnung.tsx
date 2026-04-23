@@ -274,7 +274,9 @@ const Tagesabrechnung = () => {
           payments.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                Für dieses Datum wurden keine Zahlungen im Büro eingereicht.
+                {activeModus === "einreichung"
+                  ? "Für dieses Datum wurden keine Zahlungen im Büro eingereicht."
+                  : "Für dieses Datum wurden keine Zahlungen vom Fahrlehrer eingenommen."}
               </CardContent>
             </Card>
           ) : (
