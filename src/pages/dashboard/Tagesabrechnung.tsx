@@ -199,40 +199,74 @@ const Tagesabrechnung = () => {
     <>
       {/* ===== SCREEN VIEW ===== */}
       <div className="space-y-6 print:hidden">
-        <PageHeader icon={FileText} title="Tagesabrechnung" description="Täglicher Kassenbericht (nach Einreichungsdatum im Büro)" />
+        <PageHeader
+          icon={FileText}
+          title="Tagesabrechnung"
+          description={
+            activeModus === "einreichung"
+              ? "Täglicher Kassenbericht (nach Einreichungsdatum im Büro)"
+              : "Täglicher Kassenbericht (nach Einnahmedatum beim Fahrlehrer)"
+          }
+        />
 
         <Card>
-          <CardContent className="flex flex-wrap items-end gap-4 p-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Einreichungsdatum</label>
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => { setSelectedDate(e.target.value); setSubmitted(false); }}
-                className="w-48"
-              />
+          <CardContent className="space-y-4 p-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground">Filtern nach</Label>
+              <RadioGroup
+                value={filterModus}
+                onValueChange={(v) => { setFilterModus(v as FilterModus); setSubmitted(false); }}
+                className="flex flex-wrap gap-6"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="einreichung" id="modus-einreichung" />
+                  <Label htmlFor="modus-einreichung" className="cursor-pointer font-normal">
+                    Einreichung im Büro
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="einnahme" id="modus-einnahme" />
+                  <Label htmlFor="modus-einnahme" className="cursor-pointer font-normal">
+                    Einnahme beim Fahrlehrer
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
-            <Button onClick={fetchPayments} disabled={loading}>
-              {loading ? "Laden…" : "Tagesabrechnung erstellen"}
-            </Button>
-            {submitted && payments.length > 0 && (
-              <>
-                <Select value={filterZahlungsart} onValueChange={setFilterZahlungsart}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder="Zahlungsart" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="alle">Alle Zahlungsarten</SelectItem>
-                    <SelectItem value="bar">Bar</SelectItem>
-                    <SelectItem value="ec">EC-Karte</SelectItem>
-                    <SelectItem value="ueberweisung">Überweisung</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
-                </Button>
-              </>
-            )}
+
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  {filterModus === "einreichung" ? "Einreichungsdatum" : "Einnahmedatum"}
+                </Label>
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => { setSelectedDate(e.target.value); setSubmitted(false); }}
+                  className="w-48"
+                />
+              </div>
+              <Button onClick={fetchPayments} disabled={loading}>
+                {loading ? "Laden…" : "Tagesabrechnung erstellen"}
+              </Button>
+              {submitted && payments.length > 0 && (
+                <>
+                  <Select value={filterZahlungsart} onValueChange={setFilterZahlungsart}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Zahlungsart" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle Zahlungsarten</SelectItem>
+                      <SelectItem value="bar">Bar</SelectItem>
+                      <SelectItem value="ec">EC-Karte</SelectItem>
+                      <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={() => window.print()}>
+                    <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
+                  </Button>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
 
