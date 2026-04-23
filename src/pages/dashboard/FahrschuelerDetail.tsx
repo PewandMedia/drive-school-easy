@@ -2035,6 +2035,8 @@ const FahrschuelerDetail = () => {
                       ...payment,
                       betrag: String(Math.abs(Number(payment.betrag))),
                       datum: new Date(payment.datum).toISOString().slice(0, 10),
+                      einreichungsdatum: new Date(payment.einreichungsdatum ?? payment.datum).toISOString().slice(0, 10),
+                      instructor_id: payment.instructor_id ?? "",
                     })}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -2718,9 +2720,27 @@ const FahrschuelerDetail = () => {
           </DialogHeader>
           {editingPayment && (
             <form onSubmit={(e) => { e.preventDefault(); mutEditZahlung.mutate(editingPayment); }} className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Einnahmedatum</Label>
+                  <Input type="date" value={editingPayment.datum} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, datum: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Einreichungsdatum</Label>
+                  <Input type="date" value={editingPayment.einreichungsdatum ?? ""} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, einreichungsdatum: e.target.value }))} />
+                </div>
+              </div>
               <div className="space-y-1.5">
-                <Label>Datum</Label>
-                <Input type="date" value={editingPayment.datum} onChange={(e) => setEditingPayment((prev: any) => ({ ...prev, datum: e.target.value }))} />
+                <Label>Fahrlehrer (optional)</Label>
+                <Select value={editingPayment.instructor_id || "none"} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, instructor_id: v === "none" ? "" : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Kein Fahrlehrer" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— kein Fahrlehrer —</SelectItem>
+                    {instructors.map((i: any) => (
+                      <SelectItem key={i.id} value={i.id}>{i.nachname}, {i.vorname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Zahlungsart</Label>
