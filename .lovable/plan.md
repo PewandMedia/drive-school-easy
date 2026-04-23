@@ -1,27 +1,53 @@
 
 
-## Fahrlehrer-Verwaltung unterhalb der Benutzerliste anzeigen
+## Tagesabrechnung nach Einreichungsdatum + Fahrlehrer-Zuordnung
 
-### Änderung
+Aktuell wird die Tagesabrechnung nach dem Zahlungsdatum (`datum`) gefiltert. Das Feld `einreichungsdatum` existiert bereits in der `payments`-Tabelle, wird aber nirgendwo genutzt. Es fehlt außerdem eine Fahrlehrer-Zuordnung pro Zahlung.
 
-**`src/pages/dashboard/Benutzerverwaltung.tsx`**
+### Änderungen
 
-Den "Fahrlehrer verwalten"-Button aus dem PageHeader entfernen und stattdessen unterhalb der Benutzer-Tabelle einen eigenen Abschnitt einfügen:
+**1. Datenbank-Migration**
+- Spalte `instructor_id uuid` (nullable) zur Tabelle `payments` hinzufügen
+- Bestehende Zahlungen erhalten `einreichungsdatum = datum` als Fallback (Backfill-Update)
 
-- Überschrift "Fahrlehrer" mit dem Users-Icon
-- Button "Fahrlehrer verwalten" daneben
-- Darunter eine Tabelle mit allen Fahrlehrern (Name, Status aktiv/inaktiv) — direkt inline, nicht im Dialog
-- Der Dialog (`InstructorManageDialog`) bleibt für Hinzufügen/Bearbeiten/Deaktivieren erhalten und wird über den Button geöffnet
+**2. Zahlung erfassen (`Zahlungen.tsx` und `FahrschuelerDetail.tsx`)**
 
-Alternativ: Die Fahrlehrer-Liste direkt inline anzeigen (aus der `instructors`-Tabelle laden) mit einer eigenen Query, sodass man auf einen Blick sieht welche Fahrlehrer es gibt, ohne den Dialog öffnen zu müssen.
+Im "Zahlung erfassen"-Dialog zwei neue Felder:
+- **Einnahmedatum beim Fahrlehrer** (= bisheriges `datum`-Feld, Beschriftung anpassen)
+- **Einreichungsdatum im Büro** (default: heute, separates Datums-Feld)
+- **Fahrlehrer** (Dropdown aus `instructors_active`, optional — nur relevant für Bar-/EC-Übergaben durch Fahrlehrer)
+
+Bearbeiten-Dialog erhält dieselben drei Felder.
+
+**3. Tagesabrechnung (`Tagesabrechnung.tsx`)**
+
+Logik:
+- Filter wechselt von `datum` auf `einreichungsdatum` (mit COALESCE-Fallback auf `datum` für Altdaten)
+- Query lädt zusätzlich `einreichungsdatum`, `instructor_id`, `instructors(vorname, nachname)`
+
+Tabelle erhält neue Spalten:
+| Datum | Schüler | Verwendungszweck | Fahrlehrer | Zahlungsart | Einnahme am | Einreichung am | Betrag |
+
+- "Einnahme am" = `datum` (originaler Tag der Geldannahme)
+- "Einreichung am" = `einreichungsdatum` (Tag der Bürobgabe — das Filterkriterium)
+- "Fahrlehrer" = Name aus `instructors`-Join, "–" falls keiner zugeordnet
+
+Print/PDF-Export wird entsprechend erweitert (gleiche Spalten).
+
+**4. Memory-Update**
+Die alte Memory-Notiz (`features/tagesabrechnung-kassenbericht`) besagt, dass kein Einreichungsdatum verwendet wird — diese wird in der Implementierung implizit überschrieben durch das neue Verhalten.
+
+### Beispiel-Verhalten
+- Fahrlehrer kassiert am 15.03. 100 € → speichert "Einnahmedatum: 15.03., Einreichungsdatum: 17.03., Fahrlehrer: Müller"
+- Tagesabrechnung vom 17.03. zeigt diesen Eintrag mit Hinweis "Einnahme am 15.03." und Spalte "Fahrlehrer: Müller"
 
 ### Technische Details
 
-| Bereich | Änderung |
+| Datei | Änderung |
 |---|---|
-| PageHeader `action` | "Fahrlehrer verwalten"-Button entfernen, nur "Account erstellen" bleibt |
-| Neuer Abschnitt nach Benutzer-Tabelle | Überschrift "Fahrlehrer" + Button + Inline-Tabelle |
-| Neue Query `instructors_manage` | `supabase.from("instructors").select("id, vorname, nachname, aktiv").order("nachname")` |
-| Inline-Tabelle | Spalten: Name, Status (Aktiv/Inaktiv Badge) |
-| Button "Fahrlehrer verwalten" | Öffnet weiterhin `InstructorManageDialog` zum Hinzufügen/Bearbeiten |
+| Migration | `ALTER TABLE payments ADD COLUMN instructor_id uuid`; Backfill `einreichungsdatum = datum WHERE einreichungsdatum IS NULL` |
+| `Zahlungen.tsx` | Form um `einreichungsdatum` + `instructor_id` erweitern; Insert/Update mitschreiben; Edit-Dialog ebenso |
+| `FahrschuelerDetail.tsx` | Gleiche Erweiterung für `mutZahlung` und `mutEditZahlung` |
+| `Tagesabrechnung.tsx` | Query: `einreichungsdatum, instructor_id, instructors(vorname, nachname)` joinen; Filter auf `COALESCE(einreichungsdatum, datum)`; Tabelle + Print um Spalten "Fahrlehrer", "Einnahme am", "Einreichung am" erweitern |
+| Default-Wert | Beim Erfassen: `einreichungsdatum = heute`, `datum = heute` (Fahrlehrer kann zurückdatieren) |
 
