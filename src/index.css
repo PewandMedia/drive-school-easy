@@ -154,4 +154,20 @@
     overflow-wrap: break-word;
     vertical-align: top;
   }
+  .print-area th,
+  .print-area td {
+    padding: 4px 8px;
+  }
+  .print-area th:first-child,
+  .print-area td:first-child {
+    padding-left: 0;
+  }
+  .print-area th:last-child,
+  .print-area td:last-child {
+    padding-right: 0;
+  }
+  .print-area td.nowrap,
+  .print-area th.nowrap {
+    white-space: nowrap;
+  }
 }
