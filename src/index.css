@@ -133,8 +133,25 @@
     left: 0;
     top: 0;
     width: 100%;
-    padding: 20mm;
+    padding: 15mm;
     color: black;
     background: white;
+  }
+  .print-area table {
+    table-layout: fixed;
+    font-size: 10pt;
+    line-height: 1.3;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-area th {
+    white-space: nowrap;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+  .print-area td {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    vertical-align: top;
   }
 }
