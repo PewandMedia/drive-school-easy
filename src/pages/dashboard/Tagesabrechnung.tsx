@@ -308,37 +308,37 @@ const Tagesabrechnung = () => {
           <>
             <table className="mb-4">
               <colgroup>
-                <col style={{ width: "15%" }} />
-                <col style={{ width: "32%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "8%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "10%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "28%" }} />
                 <col style={{ width: "12%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "13%" }} />
               </colgroup>
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-1 pr-2">Schüler</th>
-                  <th className="text-left py-1 pr-2">Verwendungszweck</th>
-                  <th className="text-left py-1 pr-2">Fahrlehrer</th>
-                  <th className="text-left py-1 pr-2">Art</th>
-                  <th className="text-left py-1 pr-2">Kassiert am</th>
-                  <th className="text-left py-1 pr-2">Im Büro am</th>
-                  <th className="text-right py-1">Betrag</th>
+                  <th className="text-left py-1">Schüler</th>
+                  <th className="text-left py-1">Verwendungszweck</th>
+                  <th className="text-left py-1">Fahrlehrer</th>
+                  <th className="text-left py-1">Art</th>
+                  <th className="text-left py-1 nowrap">Kassiert am</th>
+                  <th className="text-left py-1 nowrap">Im Büro am</th>
+                  <th className="text-right py-1 nowrap">Betrag</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPayments.map((p) => (
                   <tr key={p.id} className="border-b">
-                    <td className="py-1 pr-2">
+                    <td className="py-1">
                       {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
                     </td>
-                    <td className="py-1 pr-2">{getVerwendungszweck(p.payment_allocations)}</td>
-                    <td className="py-1 pr-2">{getInstructorName(p)}</td>
-                    <td className="py-1 pr-2">{zahlungsartLabel[p.zahlungsart]}</td>
-                    <td className="py-1 pr-2">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                    <td className="py-1 pr-2">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
-                    <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
+                    <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
+                    <td className="py-1">{getInstructorName(p)}</td>
+                    <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
+                    <td className="py-1 nowrap">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                    <td className="py-1 nowrap">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
+                    <td className="py-1 text-right nowrap">{formatEUR(p.betrag)}</td>
                   </tr>
                 ))}
               </tbody>
