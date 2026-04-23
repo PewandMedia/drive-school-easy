@@ -46,6 +46,8 @@ type PaymentForm = {
   betrag: string;
   zahlungsart: Zahlungsart;
   datum: string;
+  einreichungsdatum: string;
+  instructor_id: string;
   selectedOpenItems: string[];
   istGutschrift: boolean;
   gutschriftNotiz: string;
@@ -56,6 +58,8 @@ const defaultForm = (): PaymentForm => ({
   betrag: "",
   zahlungsart: "bar",
   datum: new Date().toISOString().slice(0, 10),
+  einreichungsdatum: new Date().toISOString().slice(0, 10),
+  instructor_id: "",
   selectedOpenItems: [],
   istGutschrift: false,
   gutschriftNotiz: "",
