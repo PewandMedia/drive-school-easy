@@ -1,53 +1,27 @@
 
 
-## Tagesabrechnung nach Einreichungsdatum + Fahrlehrer-Zuordnung
+## Bugfix: Tagesabrechnung zeigt keine Daten
 
-Aktuell wird die Tagesabrechnung nach dem Zahlungsdatum (`datum`) gefiltert. Das Feld `einreichungsdatum` existiert bereits in der `payments`-Tabelle, wird aber nirgendwo genutzt. Es fehlt außerdem eine Fahrlehrer-Zuordnung pro Zahlung.
+### Problem
+Die Query in `Tagesabrechnung.tsx` versucht über `instructors(vorname, nachname)` einen Join, aber zwischen `payments.instructor_id` und `instructors.id` existiert kein Foreign Key. Dadurch schlägt die gesamte Query mit `PGRST200` fehl und es werden keine Zahlungen geladen.
 
-### Änderungen
+### Lösung
 
-**1. Datenbank-Migration**
-- Spalte `instructor_id uuid` (nullable) zur Tabelle `payments` hinzufügen
-- Bestehende Zahlungen erhalten `einreichungsdatum = datum` als Fallback (Backfill-Update)
+**1. Datenbank-Migration: Foreign Key hinzufügen**
 
-**2. Zahlung erfassen (`Zahlungen.tsx` und `FahrschuelerDetail.tsx`)**
+```sql
+ALTER TABLE public.payments
+  ADD CONSTRAINT payments_instructor_id_fkey
+  FOREIGN KEY (instructor_id) REFERENCES public.instructors(id) ON DELETE SET NULL;
+```
 
-Im "Zahlung erfassen"-Dialog zwei neue Felder:
-- **Einnahmedatum beim Fahrlehrer** (= bisheriges `datum`-Feld, Beschriftung anpassen)
-- **Einreichungsdatum im Büro** (default: heute, separates Datums-Feld)
-- **Fahrlehrer** (Dropdown aus `instructors_active`, optional — nur relevant für Bar-/EC-Übergaben durch Fahrlehrer)
-
-Bearbeiten-Dialog erhält dieselben drei Felder.
-
-**3. Tagesabrechnung (`Tagesabrechnung.tsx`)**
-
-Logik:
-- Filter wechselt von `datum` auf `einreichungsdatum` (mit COALESCE-Fallback auf `datum` für Altdaten)
-- Query lädt zusätzlich `einreichungsdatum`, `instructor_id`, `instructors(vorname, nachname)`
-
-Tabelle erhält neue Spalten:
-| Datum | Schüler | Verwendungszweck | Fahrlehrer | Zahlungsart | Einnahme am | Einreichung am | Betrag |
-
-- "Einnahme am" = `datum` (originaler Tag der Geldannahme)
-- "Einreichung am" = `einreichungsdatum` (Tag der Bürobgabe — das Filterkriterium)
-- "Fahrlehrer" = Name aus `instructors`-Join, "–" falls keiner zugeordnet
-
-Print/PDF-Export wird entsprechend erweitert (gleiche Spalten).
-
-**4. Memory-Update**
-Die alte Memory-Notiz (`features/tagesabrechnung-kassenbericht`) besagt, dass kein Einreichungsdatum verwendet wird — diese wird in der Implementierung implizit überschrieben durch das neue Verhalten.
-
-### Beispiel-Verhalten
-- Fahrlehrer kassiert am 15.03. 100 € → speichert "Einnahmedatum: 15.03., Einreichungsdatum: 17.03., Fahrlehrer: Müller"
-- Tagesabrechnung vom 17.03. zeigt diesen Eintrag mit Hinweis "Einnahme am 15.03." und Spalte "Fahrlehrer: Müller"
+Das löst auch gleich den Hinweis aus dem Plan (Foreign Keys fehlen generell — wir reparieren hier nur den, der den Bug verursacht).
 
 ### Technische Details
 
 | Datei | Änderung |
 |---|---|
-| Migration | `ALTER TABLE payments ADD COLUMN instructor_id uuid`; Backfill `einreichungsdatum = datum WHERE einreichungsdatum IS NULL` |
-| `Zahlungen.tsx` | Form um `einreichungsdatum` + `instructor_id` erweitern; Insert/Update mitschreiben; Edit-Dialog ebenso |
-| `FahrschuelerDetail.tsx` | Gleiche Erweiterung für `mutZahlung` und `mutEditZahlung` |
-| `Tagesabrechnung.tsx` | Query: `einreichungsdatum, instructor_id, instructors(vorname, nachname)` joinen; Filter auf `COALESCE(einreichungsdatum, datum)`; Tabelle + Print um Spalten "Fahrlehrer", "Einnahme am", "Einreichung am" erweitern |
-| Default-Wert | Beim Erfassen: `einreichungsdatum = heute`, `datum = heute` (Fahrlehrer kann zurückdatieren) |
+| Migration | FK `payments.instructor_id → instructors.id` ergänzen, damit PostgREST den Embed `instructors(vorname, nachname)` auflösen kann |
+
+Nach der Migration funktioniert die bestehende Query in `Tagesabrechnung.tsx` ohne Code-Änderung. Die 10 vorhandenen Zahlungen mit Einreichungsdatum 23.04.2026 werden dann sofort angezeigt.
 
