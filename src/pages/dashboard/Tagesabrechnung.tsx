@@ -14,7 +14,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+
+type FilterModus = "einreichung" | "einnahme";
 
 type Allocation = {
   betrag: number;
@@ -61,23 +65,28 @@ const getInstructorName = (p: PaymentRow) =>
 
 const Tagesabrechnung = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [filterModus, setFilterModus] = useState<FilterModus>("einreichung");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
+  const [activeModus, setActiveModus] = useState<FilterModus>("einreichung");
+  const [activeDate, setActiveDate] = useState<string>(selectedDate);
 
   const fetchPayments = async () => {
     setLoading(true);
     const dayStart = startOfDay(new Date(selectedDate));
     const dayEnd = addDays(dayStart, 1);
 
-    // Filter nach Einreichungsdatum (mit Fallback auf datum für Altdaten ohne einreichungsdatum)
+    const dateField = filterModus === "einreichung" ? "einreichungsdatum" : "datum";
+
     const { data, error } = await supabase
       .from("payments")
       .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .or(`and(einreichungsdatum.gte.${dayStart.toISOString()},einreichungsdatum.lt.${dayEnd.toISOString()}),and(einreichungsdatum.is.null,datum.gte.${dayStart.toISOString()},datum.lt.${dayEnd.toISOString()})`)
-      .order("einreichungsdatum", { ascending: true });
+      .gte(dateField, dayStart.toISOString())
+      .lt(dateField, dayEnd.toISOString())
+      .order(dateField, { ascending: true });
 
     if (error) {
       toast.error("Fehler beim Laden der Zahlungen");
@@ -85,6 +94,8 @@ const Tagesabrechnung = () => {
     } else {
       setPayments((data as unknown as PaymentRow[]) || []);
     }
+    setActiveModus(filterModus);
+    setActiveDate(selectedDate);
     setSubmitted(true);
     setLoading(false);
   };
@@ -129,7 +140,6 @@ const Tagesabrechnung = () => {
       <TableBody>
         {rows.map((p) => {
           const Icon = zahlungsartIcon[p.zahlungsart];
-          const einreichung = p.einreichungsdatum ?? p.datum;
           return (
             <TableRow key={p.id}>
               <TableCell>
@@ -150,8 +160,8 @@ const Tagesabrechnung = () => {
               <TableCell className="text-muted-foreground">
                 {format(new Date(p.datum), "dd.MM.yyyy")}
               </TableCell>
-              <TableCell>
-                {format(new Date(einreichung), "dd.MM.yyyy")}
+              <TableCell className={p.einreichungsdatum ? "" : "text-muted-foreground"}>
+                {p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}
               </TableCell>
               <TableCell className="text-right font-medium">{formatEUR(p.betrag)}</TableCell>
             </TableRow>
@@ -189,40 +199,74 @@ const Tagesabrechnung = () => {
     <>
       {/* ===== SCREEN VIEW ===== */}
       <div className="space-y-6 print:hidden">
-        <PageHeader icon={FileText} title="Tagesabrechnung" description="Täglicher Kassenbericht (nach Einreichungsdatum im Büro)" />
+        <PageHeader
+          icon={FileText}
+          title="Tagesabrechnung"
+          description={
+            activeModus === "einreichung"
+              ? "Täglicher Kassenbericht (nach Einreichungsdatum im Büro)"
+              : "Täglicher Kassenbericht (nach Einnahmedatum beim Fahrlehrer)"
+          }
+        />
 
         <Card>
-          <CardContent className="flex flex-wrap items-end gap-4 p-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Einreichungsdatum</label>
-              <Input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => { setSelectedDate(e.target.value); setSubmitted(false); }}
-                className="w-48"
-              />
+          <CardContent className="space-y-4 p-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground">Filtern nach</Label>
+              <RadioGroup
+                value={filterModus}
+                onValueChange={(v) => { setFilterModus(v as FilterModus); setSubmitted(false); }}
+                className="flex flex-wrap gap-6"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="einreichung" id="modus-einreichung" />
+                  <Label htmlFor="modus-einreichung" className="cursor-pointer font-normal">
+                    Einreichung im Büro
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="einnahme" id="modus-einnahme" />
+                  <Label htmlFor="modus-einnahme" className="cursor-pointer font-normal">
+                    Einnahme beim Fahrlehrer
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
-            <Button onClick={fetchPayments} disabled={loading}>
-              {loading ? "Laden…" : "Tagesabrechnung erstellen"}
-            </Button>
-            {submitted && payments.length > 0 && (
-              <>
-                <Select value={filterZahlungsart} onValueChange={setFilterZahlungsart}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder="Zahlungsart" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="alle">Alle Zahlungsarten</SelectItem>
-                    <SelectItem value="bar">Bar</SelectItem>
-                    <SelectItem value="ec">EC-Karte</SelectItem>
-                    <SelectItem value="ueberweisung">Überweisung</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
-                </Button>
-              </>
-            )}
+
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  {filterModus === "einreichung" ? "Einreichungsdatum" : "Einnahmedatum"}
+                </Label>
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => { setSelectedDate(e.target.value); setSubmitted(false); }}
+                  className="w-48"
+                />
+              </div>
+              <Button onClick={fetchPayments} disabled={loading}>
+                {loading ? "Laden…" : "Tagesabrechnung erstellen"}
+              </Button>
+              {submitted && payments.length > 0 && (
+                <>
+                  <Select value={filterZahlungsart} onValueChange={setFilterZahlungsart}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Zahlungsart" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle Zahlungsarten</SelectItem>
+                      <SelectItem value="bar">Bar</SelectItem>
+                      <SelectItem value="ec">EC-Karte</SelectItem>
+                      <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={() => window.print()}>
+                    <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
+                  </Button>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -230,7 +274,9 @@ const Tagesabrechnung = () => {
           payments.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                Für dieses Datum wurden keine Zahlungen im Büro eingereicht.
+                {activeModus === "einreichung"
+                  ? "Für dieses Datum wurden keine Zahlungen im Büro eingereicht."
+                  : "Für dieses Datum wurden keine Zahlungen vom Fahrlehrer eingenommen."}
               </CardContent>
             </Card>
           ) : (
@@ -278,7 +324,8 @@ const Tagesabrechnung = () => {
         <div className="mb-6 border-b pb-4">
           <h1 className="text-2xl font-bold">Fahrschulverwaltung – Tagesabrechnung</h1>
           <p className="text-lg mt-1">
-            Einreichungsdatum: {selectedDate ? format(new Date(selectedDate), "dd.MM.yyyy", { locale: de }) : "–"}
+            {activeModus === "einreichung" ? "Einreichungsdatum (Büro)" : "Einnahmedatum (Fahrlehrer)"}:{" "}
+            {activeDate ? format(new Date(activeDate), "dd.MM.yyyy", { locale: de }) : "–"}
           </p>
           {filterZahlungsart !== "alle" && (
             <p className="text-sm mt-1 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
@@ -300,22 +347,19 @@ const Tagesabrechnung = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredPayments.map((p) => {
-                  const einreichung = p.einreichungsdatum ?? p.datum;
-                  return (
-                    <tr key={p.id} className="border-b">
-                      <td className="py-1">
-                        {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
-                      </td>
-                      <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
-                      <td className="py-1">{getInstructorName(p)}</td>
-                      <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
-                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                      <td className="py-1">{format(new Date(einreichung), "dd.MM.yyyy")}</td>
-                      <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
-                    </tr>
-                  );
-                })}
+                {filteredPayments.map((p) => (
+                  <tr key={p.id} className="border-b">
+                    <td className="py-1">
+                      {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
+                    </td>
+                    <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
+                    <td className="py-1">{getInstructorName(p)}</td>
+                    <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
+                    <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                    <td className="py-1">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
+                    <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
