@@ -347,22 +347,19 @@ const Tagesabrechnung = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredPayments.map((p) => {
-                  const einreichung = p.einreichungsdatum ?? p.datum;
-                  return (
-                    <tr key={p.id} className="border-b">
-                      <td className="py-1">
-                        {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
-                      </td>
-                      <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
-                      <td className="py-1">{getInstructorName(p)}</td>
-                      <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
-                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                      <td className="py-1">{format(new Date(einreichung), "dd.MM.yyyy")}</td>
-                      <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
-                    </tr>
-                  );
-                })}
+                {filteredPayments.map((p) => (
+                  <tr key={p.id} className="border-b">
+                    <td className="py-1">
+                      {p.students ? `${p.students.vorname} ${p.students.nachname}` : "–"}
+                    </td>
+                    <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
+                    <td className="py-1">{getInstructorName(p)}</td>
+                    <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
+                    <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                    <td className="py-1">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
+                    <td className="py-1 text-right">{formatEUR(p.betrag)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
