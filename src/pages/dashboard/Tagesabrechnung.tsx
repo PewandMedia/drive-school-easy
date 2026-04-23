@@ -14,11 +14,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-
-type FilterModus = "einreichung" | "einnahme";
 
 type Allocation = {
   betrag: number;
@@ -65,13 +62,11 @@ const getInstructorName = (p: PaymentRow) =>
 
 const Tagesabrechnung = () => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [filterModus, setFilterModus] = useState<FilterModus>("einreichung");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
-  const [activeModus, setActiveModus] = useState<FilterModus>("einreichung");
   const [activeDate, setActiveDate] = useState<string>(selectedDate);
 
   const fetchPayments = async () => {
@@ -79,14 +74,12 @@ const Tagesabrechnung = () => {
     const dayStart = startOfDay(new Date(selectedDate));
     const dayEnd = addDays(dayStart, 1);
 
-    const dateField = filterModus === "einreichung" ? "einreichungsdatum" : "datum";
-
     const { data, error } = await supabase
       .from("payments")
       .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .gte(dateField, dayStart.toISOString())
-      .lt(dateField, dayEnd.toISOString())
-      .order(dateField, { ascending: true });
+      .gte("einreichungsdatum", dayStart.toISOString())
+      .lt("einreichungsdatum", dayEnd.toISOString())
+      .order("einreichungsdatum", { ascending: true });
 
     if (error) {
       toast.error("Fehler beim Laden der Zahlungen");
@@ -94,7 +87,6 @@ const Tagesabrechnung = () => {
     } else {
       setPayments((data as unknown as PaymentRow[]) || []);
     }
-    setActiveModus(filterModus);
     setActiveDate(selectedDate);
     setSubmitted(true);
     setLoading(false);
@@ -202,41 +194,15 @@ const Tagesabrechnung = () => {
         <PageHeader
           icon={FileText}
           title="Tagesabrechnung"
-          description={
-            activeModus === "einreichung"
-              ? "Täglicher Kassenbericht (nach Einreichungsdatum im Büro)"
-              : "Täglicher Kassenbericht (nach Einnahmedatum beim Fahrlehrer)"
-          }
+          description="Täglicher Kassenbericht (nach Einreichungsdatum im Büro)"
         />
 
         <Card>
           <CardContent className="space-y-4 p-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-muted-foreground">Filtern nach</Label>
-              <RadioGroup
-                value={filterModus}
-                onValueChange={(v) => { setFilterModus(v as FilterModus); setSubmitted(false); }}
-                className="flex flex-wrap gap-6"
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="einreichung" id="modus-einreichung" />
-                  <Label htmlFor="modus-einreichung" className="cursor-pointer font-normal">
-                    Einreichung im Büro
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="einnahme" id="modus-einnahme" />
-                  <Label htmlFor="modus-einnahme" className="cursor-pointer font-normal">
-                    Einnahme beim Fahrlehrer
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
             <div className="flex flex-wrap items-end gap-4">
               <div className="space-y-1">
                 <Label className="text-sm font-medium text-muted-foreground">
-                  {filterModus === "einreichung" ? "Einreichungsdatum" : "Einnahmedatum"}
+                  Einreichungsdatum
                 </Label>
                 <Input
                   type="date"
@@ -274,9 +240,7 @@ const Tagesabrechnung = () => {
           payments.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
-                {activeModus === "einreichung"
-                  ? "Für dieses Datum wurden keine Zahlungen im Büro eingereicht."
-                  : "Für dieses Datum wurden keine Zahlungen vom Fahrlehrer eingenommen."}
+                Für dieses Datum wurden keine Zahlungen im Büro eingereicht.
               </CardContent>
             </Card>
           ) : (
@@ -324,7 +288,7 @@ const Tagesabrechnung = () => {
         <div className="mb-6 border-b pb-4">
           <h1 className="text-2xl font-bold">Fahrschulverwaltung – Tagesabrechnung</h1>
           <p className="text-lg mt-1">
-            {activeModus === "einreichung" ? "Einreichungsdatum (Büro)" : "Einnahmedatum (Fahrlehrer)"}:{" "}
+            Einreichungsdatum (Büro):{" "}
             {activeDate ? format(new Date(activeDate), "dd.MM.yyyy", { locale: de }) : "–"}
           </p>
           {filterZahlungsart !== "alle" && (
