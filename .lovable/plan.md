@@ -1,68 +1,72 @@
 
 
-## PDF-Layout der Tagesabrechnung verbessern
+## Tagesabrechnung-PDF: Spaltenabstände & Datums-Spalten fixen
 
-### Probleme im aktuellen PDF (siehe Screenshot)
-1. Die Spalten "Einnahme am" und "Einreichung am" sind eng gequetscht und brechen auf zwei Zeilen um — die Header sehen abgeschnitten aus
-2. Die Beschriftungen sind nicht eindeutig: nicht klar, was "Einnahme" und "Einreichung" jeweils bedeuten
-3. Die Spaltenbreiten sind nicht optimal verteilt (z.B. "Verwendungszweck" zu schmal, Datums-Spalten zu breit)
-4. Bei vielen Allokationen (z.B. "Omran Abo Shaar" mit 8x Fahrstunde) wird die Liste sehr lang — Zeile sprengt das Layout
+### Probleme im aktuellen PDF (Screenshot)
+1. **Header verschmelzen**: "Kassiert am" und "Im Büro am" stehen ohne Lücke direkt aneinander → liest sich als "Kassiert amIm Büro am"
+2. **Datum bricht um**: "22.04.2026" passt nicht in 10% Spaltenbreite und wird zu "22.04.20 / 26" auf zwei Zeilen umgebrochen
+3. **Insgesamt zu wenig horizontaler Abstand** zwischen den Spalten
+
+### Ursache
+- Spaltenbreiten 10% pro Datum sind zu knapp für ein 10pt-Datum mit Padding
+- `pr-2` (8px) Padding reicht nicht als visuelle Trennung zwischen Spalten
+- Keine vertikale Trennlinie / Padding-Left zwischen Zellen
 
 ### Lösung
 
-**1. Spaltenüberschriften klarer & kompakter**
+**1. Spaltenbreiten neu verteilen — Datums-Spalten breiter**
 
-| Alt | Neu |
-|---|---|
-| "Einnahme am" | "Kassiert am" |
-| "Einreichung am" | "Im Büro am" |
-| "Zahlungsart" | "Art" |
+| Spalte | Alt | Neu |
+|---|---|---|
+| Schüler | 15% | 14% |
+| Verwendungszweck | 32% | 28% |
+| Fahrlehrer | 13% | 12% |
+| Art | 8% | 7% |
+| Kassiert am | 10% | **13%** |
+| Im Büro am | 10% | **13%** |
+| Betrag | 12% | 13% |
 
-Beide Datumsspalten bekommen einen kurzen, eindeutigen Titel der nicht umbricht. "Kassiert am" = Fahrlehrer hat Geld vom Schüler bekommen. "Im Büro am" = im Büro abgegeben.
+Mit 13% ist genug Platz für "22.04.2026" in 10pt-Schrift ohne Umbruch.
 
-**2. Feste Spaltenbreiten via `<colgroup>` im Print-Table**
+**2. Globales Zell-Padding statt nur `pr-2`**
 
-```text
-Schüler           15%
-Verwendungszweck  32%
-Fahrlehrer        13%
-Art                8%
-Kassiert am       10%
-Im Büro am        10%
-Betrag            12%  (rechtsbündig)
+In `src/index.css` für `.print-area td` und `.print-area th` ein konsequentes `padding: 4px 8px` setzen — gibt jeder Zelle links UND rechts Luft, sodass benachbarte Header nicht mehr verschmelzen können.
+
+```css
+.print-area th,
+.print-area td {
+  padding: 4px 8px;
+}
+.print-area th:first-child,
+.print-area td:first-child {
+  padding-left: 0;
+}
+.print-area th:last-child,
+.print-area td:last-child {
+  padding-right: 0;
+}
 ```
 
-Plus `table-layout: fixed` und `word-wrap: break-word`, damit lange Inhalte sauber umbrechen statt das Layout zu sprengen.
+**3. Datums-Spalten zusätzlich `white-space: nowrap` auf den Zellen (nicht nur Header)**
 
-**3. Verwendungszweck bei vielen Allokationen kompakter**
+Damit das Datum 22.04.2026 nie umbricht — falls die Spalte trotzdem mal eng wird, wird die Spalte automatisch verbreitert statt umgebrochen.
 
-Wenn mehr als 3 gleiche Einträge (z.B. "Fahrstunde 45min (1E)" 7×), zusammenfassen zu „Fahrstunde 45min (1E) ×7, Fahrstunde 90min (2E)". Spart Platz, bleibt lesbar.
+```css
+.print-area td.nowrap { white-space: nowrap; }
+```
 
-**4. Header-Bereich aufräumen**
+In `Tagesabrechnung.tsx` die beiden Datums-`<td>` und den Betrag-`<td>` mit `className="nowrap"` markieren.
 
-- Titel einzeilig: „Tagesabrechnung – Fahrschulverwaltung"
-- Untertitel kleiner: „Im Büro eingereicht am: 22.04.2026"
-- Optional Filter-Hinweis nur wenn aktiv
+**4. Inline `pr-2`-Klassen aus den `<th>`/`<td>` entfernen**
 
-**5. Summen-Block als Box rechts unten statt linksbündig**
-
-Bar / EC / Überweisung Subtotals + Gesamt in einer kleinen Tabelle rechts, klar abgegrenzt — wirkt professioneller.
-
-**6. Schriftgröße & Zeilenhöhe**
-
-- Tabelle: `font-size: 10pt`, `line-height: 1.3`
-- Header: `font-size: 9pt`, fett, kein Umbruch (`white-space: nowrap`)
-
-### Bildschirm-Tabelle ebenfalls anpassen
-
-Damit Screen und PDF konsistent sind: Spaltenüberschriften „Kassiert am" / „Im Büro am" / „Art" auch in der Live-Tabelle übernehmen.
+Werden durch das globale CSS-Padding ersetzt → konsistenter und sauberer.
 
 ### Technische Details
 
 | Datei | Änderung |
 |---|---|
-| `src/pages/dashboard/Tagesabrechnung.tsx` | Spaltennamen umbenennen (Screen + Print); `<colgroup>` mit festen Breiten im Print-Table; `table-layout: fixed`; Verwendungszweck-Funktion `getVerwendungszweck` um Gruppierung gleicher Beschreibungen erweitern (`×N`); Print-Header-Bereich neu strukturieren (kleinerer Untertitel); Summen-Block rechtsbündig in Box |
-| `src/index.css` | Print-Bereich: spezifische Regeln für `.print-area table { table-layout: fixed; font-size: 10pt; } .print-area th { white-space: nowrap; font-size: 9pt; }` ergänzen |
+| `src/index.css` | `.print-area th, .print-area td { padding: 4px 8px; }` ergänzen; first/last-child padding-reset; `.nowrap`-Helper |
+| `src/pages/dashboard/Tagesabrechnung.tsx` | colgroup-Breiten anpassen (Datums-Spalten 13%); `pr-2`-Klassen aus Print-`<th>`/`<td>` entfernen; Datums- und Betrag-Zellen `className="nowrap"` |
 
-Keine DB-Änderungen, keine neuen Dependencies.
+Keine DB-Änderungen, keine Logik-Änderungen — reines Layout.
 
