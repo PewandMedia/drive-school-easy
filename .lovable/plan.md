@@ -1,64 +1,54 @@
 
 
-## Tagesabrechnung: Zwei separate Datums-Filter
+## Tagesabrechnung vereinfachen + falsche Einreichungsdaten bereinigen
 
-### Problem
-Aktuell werden alte Zahlungen ohne `einreichungsdatum` per Fallback dem `datum` zugeordnet — das verfälscht die Tagesabrechnung. Außerdem braucht man die Möglichkeit, sowohl nach Einreichungsdatum als auch nach Einnahmedatum zu filtern.
+### Probleme
+1. Alle bestehenden Zahlungen haben `einreichungsdatum = 23.04.2026` als Default (falsch — wurde automatisch beim Insert gesetzt)
+2. Der Modus-Umschalter "Einreichung / Einnahme" wird nicht gebraucht — es soll nur nach Einreichungsdatum gefiltert werden
 
 ### Lösung
 
-**1. Backfill rückgängig machen**
-Alle `einreichungsdatum`-Werte, die durch die letzte Migration auf `datum` gesetzt wurden, wieder auf `NULL` setzen. Damit haben Altdaten kein Einreichungsdatum und tauchen nicht fälschlicherweise im Bürobericht auf.
+**1. Datenbereinigung (UPDATE statt Migration)**
+
+Für ALLE bestehenden Zahlungen `einreichungsdatum = datum` setzen, damit das Einreichungsdatum auf den ursprünglichen Einnahmetag zeigt — statt fälschlich auf den 23.04.2026.
 
 ```sql
--- Nur dort zurücksetzen, wo einreichungsdatum exakt gleich datum ist
--- (das war der Backfill der vorherigen Migration)
-UPDATE payments 
-SET einreichungsdatum = NULL 
-WHERE einreichungsdatum = datum 
-  AND created_at < '2026-04-23 16:00:00';
+UPDATE payments SET einreichungsdatum = datum;
 ```
 
-**2. Tagesabrechnung-UI: Zwei Filter-Modi**
+Damit verschwindet die falsche "23.04.2026"-Häufung. In Zukunft wird `einreichungsdatum` beim Erfassen einer neuen Zahlung korrekt vom Nutzer eingetragen (Default = heute, wie im Erfassungsdialog).
 
-Im Filter-Bereich oben werden zwei Datumsfelder angeboten:
+**2. Default-Wert der Spalte entfernen**
 
-- **Einreichungsdatum (Büro)** — Standard-Filter, zeigt was heute im Büro abgegeben wurde
-- **Einnahmedatum (Fahrlehrer)** — alternativer Filter, zeigt was an einem bestimmten Tag vom Fahrlehrer kassiert wurde
+Die Spalte `einreichungsdatum` hat aktuell `DEFAULT now()` — das war der Auslöser. Diesen Default entfernen, damit nur das eingetragen wird, was die App explizit setzt:
 
-Dazu ein Umschalter (Radio/Tabs) "Filtern nach: [Einreichung im Büro] [Einnahme beim Fahrlehrer]".
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│ Filtern nach:  ( ) Einreichung im Büro                  │
-│                ( ) Einnahme beim Fahrlehrer             │
-│                                                         │
-│ Datum: [23.04.2026]   [Tagesabrechnung erstellen]      │
-└─────────────────────────────────────────────────────────┘
+```sql
+ALTER TABLE payments ALTER COLUMN einreichungsdatum DROP DEFAULT;
 ```
 
-**3. Query-Logik (kein Fallback mehr)**
+**3. Tagesabrechnung-UI vereinfachen (`Tagesabrechnung.tsx`)**
 
-- Modus "Einreichung": filtert strikt auf `einreichungsdatum` (NULL-Werte werden NICHT angezeigt)
-- Modus "Einnahme": filtert strikt auf `datum`
+- Radio-Group "Filtern nach: Einreichung / Einnahme" komplett entfernen
+- State `filterModus` und `activeModus` entfernen
+- Query filtert immer auf `einreichungsdatum`
+- PageHeader-Description fix: "Täglicher Kassenbericht (nach Einreichungsdatum im Büro)"
+- Datum-Label fix: "Einreichungsdatum"
+- Empty-State-Text fix: "Für dieses Datum wurden keine Zahlungen im Büro eingereicht."
+- PDF-Header fix: "Einreichungsdatum (Büro): …"
 
-So sind Altdaten ohne Einreichungsdatum nur im "Einnahme"-Modus sichtbar — niemals fälschlich im Bürobericht.
+### Verhalten nach der Änderung
 
-**4. Tabelle bleibt gleich**
-Beide Spalten "Einnahme am" und "Einreichung am" bleiben sichtbar (Einreichung zeigt "–" wenn NULL). Der Header der Seite passt sich an den gewählten Modus an.
+| Fall | Anzeige in Tagesabrechnung 23.04. |
+|---|---|
+| Bestehende Zahlung (Einnahme 20.04.) | Einreichung jetzt = 20.04. → erscheint unter 20.04., NICHT mehr unter 23.04. |
+| Neue Zahlung heute eingetragen | Einreichung = heute (vom User gesetzt), erscheint korrekt |
+| Neue Zahlung mit zurückdatiertem Einreichungsdatum | Erscheint am eingestellten Einreichungstag |
 
 ### Technische Details
 
 | Datei | Änderung |
 |---|---|
-| Migration | `UPDATE payments SET einreichungsdatum = NULL` für Backfill-Reset (alte Daten ohne echtes Einreichungsdatum) |
-| `Tagesabrechnung.tsx` | State `filterModus: "einreichung" \| "einnahme"`; Query strikt nach gewähltem Feld filtern (kein OR-Fallback mehr); UI um Modus-Umschalter ergänzen; PageHeader-Description und PDF-Header dynamisch |
-
-### Verhalten
-
-| Fall | Modus "Einreichung" 23.04. | Modus "Einnahme" 23.04. |
-|---|---|---|
-| Zahlung mit Einnahme 20.04., Einreichung 23.04. | ✅ angezeigt | ❌ nicht angezeigt |
-| Zahlung mit Einnahme 23.04., Einreichung 23.04. | ✅ angezeigt | ✅ angezeigt |
-| Alte Zahlung mit Einnahme 23.04., Einreichung NULL | ❌ nicht angezeigt | ✅ angezeigt |
+| Daten-Update (insert tool) | `UPDATE payments SET einreichungsdatum = datum` — bereinigt alle 200+ falsch markierten Datensätze |
+| Migration | `ALTER TABLE payments ALTER COLUMN einreichungsdatum DROP DEFAULT` — verhindert künftige Auto-Defaults |
+| `Tagesabrechnung.tsx` | RadioGroup-Block entfernen, `filterModus`/`activeModus` States raus, Query/Labels/PDF-Header auf "Einreichung" hartkodieren |
 
