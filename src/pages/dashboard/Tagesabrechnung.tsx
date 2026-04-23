@@ -324,7 +324,8 @@ const Tagesabrechnung = () => {
         <div className="mb-6 border-b pb-4">
           <h1 className="text-2xl font-bold">Fahrschulverwaltung – Tagesabrechnung</h1>
           <p className="text-lg mt-1">
-            Einreichungsdatum: {selectedDate ? format(new Date(selectedDate), "dd.MM.yyyy", { locale: de }) : "–"}
+            {activeModus === "einreichung" ? "Einreichungsdatum (Büro)" : "Einnahmedatum (Fahrlehrer)"}:{" "}
+            {activeDate ? format(new Date(activeDate), "dd.MM.yyyy", { locale: de }) : "–"}
           </p>
           {filterZahlungsart !== "alle" && (
             <p className="text-sm mt-1 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
