@@ -173,7 +173,6 @@ const Fahrschueler = () => {
 
   // Persist list state on every change (so unmount via sidebar / navigate keeps it)
   useEffect(() => {
-    const scroller = document.getElementById("dashboard-scroll");
     const prev = (() => {
       try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
       catch { return {}; }
@@ -184,23 +183,27 @@ const Fahrschueler = () => {
       filterFahrschule,
       showArchive,
       visibleCount,
-      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
+      scrollY: getScrollTop() || prev.scrollY || 0,
     }));
   }, [search, filterFahrschule, showArchive, visibleCount]);
 
   // Save scroll position continuously
   useEffect(() => {
-    const scroller = document.getElementById("dashboard-scroll");
+    const scroller = getScrollTarget();
     if (!scroller) return;
     const onScroll = () => {
       try {
         const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
-        prev.scrollY = scroller.scrollTop;
+        prev.scrollY = getScrollTop();
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prev));
       } catch {}
     };
+    window.addEventListener("scroll", onScroll, { passive: true });
     scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => scroller.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   // Restore position once data is loaded — prefer scrolling to last opened student
@@ -210,17 +213,14 @@ const Fahrschueler = () => {
     let saved: any = {};
     try { saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); } catch {}
 
-    const scroller = document.getElementById("dashboard-scroll");
+    const scroller = getScrollTarget();
 
     const tryRestore = () => {
       const lastId: string | undefined = saved.lastStudentId;
       if (lastId) {
         const el = document.querySelector<HTMLElement>(`[data-student-id="${lastId}"]`);
-        if (el && scroller) {
-          const elRect = el.getBoundingClientRect();
-          const scRect = scroller.getBoundingClientRect();
-          const target = scroller.scrollTop + (elRect.top - scRect.top) - (scRect.height / 2) + (elRect.height / 2);
-          scroller.scrollTo({ top: Math.max(0, target) });
+        if (el) {
+          el.scrollIntoView({ block: "center", inline: "nearest" });
           setHighlightId(lastId);
           setTimeout(() => setHighlightId(null), 1400);
           // clear so a fresh visit starts at top
@@ -233,7 +233,7 @@ const Fahrschueler = () => {
         }
       }
       if (typeof saved.scrollY === "number" && scroller) {
-        scroller.scrollTo({ top: saved.scrollY });
+        scrollToTopPosition(saved.scrollY);
         return true;
       }
       return false;
