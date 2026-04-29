@@ -169,6 +169,22 @@ const Fahrschueler = () => {
     return map;
   }, [lessons, exams, services, payments]);
 
+  const filtered = students.filter((s) => {
+    // Archive filter
+    const isArchived = s.status === "archiviert";
+    if (showArchive && !isArchived) return false;
+    if (!showArchive && isArchived) return false;
+
+    if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
+    const q = search.toLowerCase();
+    return (
+      s.vorname.toLowerCase().includes(q) ||
+      s.nachname.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.fuehrerscheinklasse.toLowerCase().includes(q)
+    );
+  });
+
   const allLoading = isLoading || isLoadingLessons || isLoadingExams || isLoadingServices || isLoadingPayments;
 
   // Persist list state on every change (so unmount via sidebar / navigate keeps it)
@@ -324,22 +340,6 @@ const Fahrschueler = () => {
       toast({ title: "Schüler wiederhergestellt" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
-  });
-
-  const filtered = students.filter((s) => {
-    // Archive filter
-    const isArchived = s.status === "archiviert";
-    if (showArchive && !isArchived) return false;
-    if (!showArchive && isArchived) return false;
-
-    if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
-    const q = search.toLowerCase();
-    return (
-      s.vorname.toLowerCase().includes(q) ||
-      s.nachname.toLowerCase().includes(q) ||
-      s.email?.toLowerCase().includes(q) ||
-      s.fuehrerscheinklasse.toLowerCase().includes(q)
-    );
   });
 
   // Apply limit
