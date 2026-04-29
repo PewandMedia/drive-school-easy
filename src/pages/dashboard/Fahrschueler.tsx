@@ -21,6 +21,27 @@ import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 import { formatStudentName } from "@/lib/formatStudentName";
 
+const STORAGE_KEY = "fahrschueler-list-state";
+
+const getScrollTarget = () => {
+  const dashboardScroll = document.getElementById("dashboard-scroll");
+  const scrollingElement = document.scrollingElement as HTMLElement | null;
+
+  if (dashboardScroll && dashboardScroll.scrollHeight > dashboardScroll.clientHeight) {
+    return dashboardScroll;
+  }
+
+  return scrollingElement ?? dashboardScroll;
+};
+
+const getScrollTop = () => getScrollTarget()?.scrollTop ?? window.scrollY ?? 0;
+
+const scrollToTopPosition = (top: number) => {
+  const target = getScrollTarget();
+  if (target) target.scrollTo({ top: Math.max(0, top) });
+  window.scrollTo({ top: Math.max(0, top) });
+};
+
 type Student = {
   id: string;
   created_at: string;
@@ -65,7 +86,6 @@ const Fahrschueler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const STORAGE_KEY = "fahrschueler-list-state";
   const savedState = (() => {
     try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
     catch { return {}; }
@@ -149,11 +169,26 @@ const Fahrschueler = () => {
     return map;
   }, [lessons, exams, services, payments]);
 
+  const filtered = students.filter((s) => {
+    // Archive filter
+    const isArchived = s.status === "archiviert";
+    if (showArchive && !isArchived) return false;
+    if (!showArchive && isArchived) return false;
+
+    if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
+    const q = search.toLowerCase();
+    return (
+      s.vorname.toLowerCase().includes(q) ||
+      s.nachname.toLowerCase().includes(q) ||
+      s.email?.toLowerCase().includes(q) ||
+      s.fuehrerscheinklasse.toLowerCase().includes(q)
+    );
+  });
+
   const allLoading = isLoading || isLoadingLessons || isLoadingExams || isLoadingServices || isLoadingPayments;
 
   // Persist list state on every change (so unmount via sidebar / navigate keeps it)
   useEffect(() => {
-    const scroller = document.getElementById("dashboard-scroll");
     const prev = (() => {
       try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
       catch { return {}; }
@@ -164,23 +199,27 @@ const Fahrschueler = () => {
       filterFahrschule,
       showArchive,
       visibleCount,
-      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
+      scrollY: getScrollTop() || prev.scrollY || 0,
     }));
   }, [search, filterFahrschule, showArchive, visibleCount]);
 
   // Save scroll position continuously
   useEffect(() => {
-    const scroller = document.getElementById("dashboard-scroll");
+    const scroller = getScrollTarget();
     if (!scroller) return;
     const onScroll = () => {
       try {
         const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
-        prev.scrollY = scroller.scrollTop;
+        prev.scrollY = getScrollTop();
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prev));
       } catch {}
     };
+    window.addEventListener("scroll", onScroll, { passive: true });
     scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => scroller.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   // Restore position once data is loaded — prefer scrolling to last opened student
@@ -190,17 +229,20 @@ const Fahrschueler = () => {
     let saved: any = {};
     try { saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); } catch {}
 
-    const scroller = document.getElementById("dashboard-scroll");
+    const scroller = getScrollTarget();
+    const lastId: string | undefined = saved.lastStudentId;
+    const lastIndex = lastId ? filtered.findIndex((student) => student.id === lastId) : -1;
+
+    if (lastIndex >= visibleCount) {
+      setVisibleCount(Math.ceil((lastIndex + 1) / 30) * 30);
+      return;
+    }
 
     const tryRestore = () => {
-      const lastId: string | undefined = saved.lastStudentId;
       if (lastId) {
         const el = document.querySelector<HTMLElement>(`[data-student-id="${lastId}"]`);
-        if (el && scroller) {
-          const elRect = el.getBoundingClientRect();
-          const scRect = scroller.getBoundingClientRect();
-          const target = scroller.scrollTop + (elRect.top - scRect.top) - (scRect.height / 2) + (elRect.height / 2);
-          scroller.scrollTo({ top: Math.max(0, target) });
+        if (el) {
+          el.scrollIntoView({ block: "center", inline: "nearest" });
           setHighlightId(lastId);
           setTimeout(() => setHighlightId(null), 1400);
           // clear so a fresh visit starts at top
@@ -213,7 +255,7 @@ const Fahrschueler = () => {
         }
       }
       if (typeof saved.scrollY === "number" && scroller) {
-        scroller.scrollTo({ top: saved.scrollY });
+        scrollToTopPosition(saved.scrollY);
         return true;
       }
       return false;
@@ -223,7 +265,7 @@ const Fahrschueler = () => {
       requestAnimationFrame(() => { tryRestore(); });
     });
     setRestored(true);
-  }, [allLoading, restored]);
+  }, [allLoading, restored, filtered, visibleCount]);
 
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
@@ -298,22 +340,6 @@ const Fahrschueler = () => {
       toast({ title: "Schüler wiederhergestellt" });
     },
     onError: (e: Error) => toast({ title: "Fehler", description: e.message, variant: "destructive" }),
-  });
-
-  const filtered = students.filter((s) => {
-    // Archive filter
-    const isArchived = s.status === "archiviert";
-    if (showArchive && !isArchived) return false;
-    if (!showArchive && isArchived) return false;
-
-    if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
-    const q = search.toLowerCase();
-    return (
-      s.vorname.toLowerCase().includes(q) ||
-      s.nachname.toLowerCase().includes(q) ||
-      s.email?.toLowerCase().includes(q) ||
-      s.fuehrerscheinklasse.toLowerCase().includes(q)
-    );
   });
 
   // Apply limit
@@ -438,7 +464,6 @@ const Fahrschueler = () => {
                 data-student-id={student.id}
                 onClick={() => {
                   try {
-                    const scroller = document.getElementById("dashboard-scroll");
                     const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
                     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
                       ...prev,
@@ -446,7 +471,7 @@ const Fahrschueler = () => {
                       filterFahrschule,
                       showArchive,
                       visibleCount,
-                      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
+                      scrollY: getScrollTop() || prev.scrollY || 0,
                       lastStudentId: student.id,
                     }));
                   } catch {}

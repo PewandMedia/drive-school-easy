@@ -12,9 +12,9 @@ const DashboardLayout = () => {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="flex h-screen w-full overflow-hidden bg-background">
         <AppSidebar />
-        <SidebarInset className="flex flex-col">
+        <SidebarInset className="flex min-h-0 flex-col">
           {/* Top Header */}
           <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-card px-4 shrink-0">
             <SidebarTrigger />
@@ -34,7 +34,7 @@ const DashboardLayout = () => {
             </div>
           </header>
           {/* Page Content */}
-          <main id="dashboard-scroll" className="flex-1 overflow-auto p-6">
+          <main id="dashboard-scroll" className="min-h-0 flex-1 overflow-auto p-6">
             <Outlet />
           </main>
         </SidebarInset>
