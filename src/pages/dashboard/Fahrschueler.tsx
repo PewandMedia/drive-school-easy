@@ -65,15 +65,21 @@ const Fahrschueler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
-  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
-  const [showArchive, setShowArchive] = useState(false);
+  const STORAGE_KEY = "fahrschueler-list-state";
+  const savedState = (() => {
+    try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
+    catch { return {}; }
+  })();
+
+  const [search, setSearch] = useState<string>(savedState.search ?? "");
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">(savedState.filterFahrschule ?? "alle");
+  const [showArchive, setShowArchive] = useState<boolean>(savedState.showArchive ?? false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
   const [anmeldedatumText, setAnmeldedatumText] = useState(format(new Date(), "dd.MM.yyyy"));
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState<number>(savedState.visibleCount ?? 30);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [angebotsNotiz, setAngebotsNotiz] = useState("");
 
@@ -143,6 +149,48 @@ const Fahrschueler = () => {
   }, [lessons, exams, services, payments]);
 
   const allLoading = isLoading || isLoadingLessons || isLoadingExams || isLoadingServices || isLoadingPayments;
+
+  // Persist list state on every change (so unmount via sidebar / navigate keeps it)
+  useEffect(() => {
+    const scroller = document.querySelector("main");
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      search,
+      filterFahrschule,
+      showArchive,
+      visibleCount,
+      scrollY: scroller?.scrollTop ?? 0,
+    }));
+  }, [search, filterFahrschule, showArchive, visibleCount]);
+
+  // Save scroll position continuously
+  useEffect(() => {
+    const scroller = document.querySelector("main");
+    if (!scroller) return;
+    const onScroll = () => {
+      try {
+        const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+        prev.scrollY = scroller.scrollTop;
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prev));
+      } catch {}
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Restore scroll position once data is loaded
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (allLoading || restored) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+      if (typeof saved.scrollY === "number") {
+        requestAnimationFrame(() => {
+          document.querySelector("main")?.scrollTo({ top: saved.scrollY });
+        });
+      }
+    } catch {}
+    setRestored(true);
+  }, [allLoading, restored]);
 
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
@@ -270,13 +318,13 @@ const Fahrschueler = () => {
       {/* Archive Toggle */}
       <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
         <button
-          onClick={() => { setShowArchive(false); setVisibleCount(10); }}
+          onClick={() => { setShowArchive(false); setVisibleCount(30); }}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${!showArchive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
         >
           Aktive Schüler
         </button>
         <button
-          onClick={() => { setShowArchive(true); setVisibleCount(10); }}
+          onClick={() => { setShowArchive(true); setVisibleCount(30); }}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${showArchive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
         >
           <Archive className="h-3.5 w-3.5" />
@@ -292,7 +340,7 @@ const Fahrschueler = () => {
             className="pl-9"
             placeholder="Schüler suchen..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setVisibleCount(10); }}
+            onChange={(e) => { setSearch(e.target.value); setVisibleCount(30); }}
           />
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
@@ -434,9 +482,9 @@ const Fahrschueler = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setVisibleCount((c) => c + 10)}
+              onClick={() => setVisibleCount((c) => c + 30)}
             >
-              Weitere {Math.min(10, remaining)} von {filtered.length} anzeigen
+              Weitere {Math.min(30, remaining)} von {filtered.length} anzeigen
             </Button>
           </div>
         )}
