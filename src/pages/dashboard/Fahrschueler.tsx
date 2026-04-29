@@ -21,6 +21,27 @@ import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 import { formatStudentName } from "@/lib/formatStudentName";
 
+const STORAGE_KEY = "fahrschueler-list-state";
+
+const getScrollTarget = () => {
+  const dashboardScroll = document.getElementById("dashboard-scroll");
+  const scrollingElement = document.scrollingElement as HTMLElement | null;
+
+  if (dashboardScroll && dashboardScroll.scrollHeight > dashboardScroll.clientHeight) {
+    return dashboardScroll;
+  }
+
+  return scrollingElement ?? dashboardScroll;
+};
+
+const getScrollTop = () => getScrollTarget()?.scrollTop ?? window.scrollY ?? 0;
+
+const scrollToTopPosition = (top: number) => {
+  const target = getScrollTarget();
+  if (target) target.scrollTo({ top: Math.max(0, top) });
+  window.scrollTo({ top: Math.max(0, top) });
+};
+
 type Student = {
   id: string;
   created_at: string;
@@ -65,7 +86,6 @@ const Fahrschueler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const STORAGE_KEY = "fahrschueler-list-state";
   const savedState = (() => {
     try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
     catch { return {}; }
