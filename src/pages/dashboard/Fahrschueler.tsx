@@ -318,13 +318,13 @@ const Fahrschueler = () => {
       {/* Archive Toggle */}
       <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
         <button
-          onClick={() => { setShowArchive(false); setVisibleCount(10); }}
+          onClick={() => { setShowArchive(false); setVisibleCount(30); }}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${!showArchive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
         >
           Aktive Schüler
         </button>
         <button
-          onClick={() => { setShowArchive(true); setVisibleCount(10); }}
+          onClick={() => { setShowArchive(true); setVisibleCount(30); }}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${showArchive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
         >
           <Archive className="h-3.5 w-3.5" />
@@ -340,7 +340,7 @@ const Fahrschueler = () => {
             className="pl-9"
             placeholder="Schüler suchen..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setVisibleCount(10); }}
+            onChange={(e) => { setSearch(e.target.value); setVisibleCount(30); }}
           />
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
@@ -482,9 +482,9 @@ const Fahrschueler = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setVisibleCount((c) => c + 10)}
+              onClick={() => setVisibleCount((c) => c + 30)}
             >
-              Weitere {Math.min(10, remaining)} von {filtered.length} anzeigen
+              Weitere {Math.min(30, remaining)} von {filtered.length} anzeigen
             </Button>
           </div>
         )}
