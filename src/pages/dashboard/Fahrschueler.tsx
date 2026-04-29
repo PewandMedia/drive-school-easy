@@ -214,9 +214,15 @@ const Fahrschueler = () => {
     try { saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); } catch {}
 
     const scroller = getScrollTarget();
+    const lastId: string | undefined = saved.lastStudentId;
+    const lastIndex = lastId ? filtered.findIndex((student) => student.id === lastId) : -1;
+
+    if (lastIndex >= visibleCount) {
+      setVisibleCount(Math.ceil((lastIndex + 1) / 30) * 30);
+      return;
+    }
 
     const tryRestore = () => {
-      const lastId: string | undefined = saved.lastStudentId;
       if (lastId) {
         const el = document.querySelector<HTMLElement>(`[data-student-id="${lastId}"]`);
         if (el) {
@@ -243,7 +249,7 @@ const Fahrschueler = () => {
       requestAnimationFrame(() => { tryRestore(); });
     });
     setRestored(true);
-  }, [allLoading, restored]);
+  }, [allLoading, restored, filtered, visibleCount]);
 
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
