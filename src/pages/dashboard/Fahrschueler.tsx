@@ -435,8 +435,24 @@ const Fahrschueler = () => {
             {visibleStudents.map((student) => (
               <button
                 key={student.id}
-                onClick={() => navigate(`/dashboard/fahrschueler/${student.id}`)}
-                className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
+                data-student-id={student.id}
+                onClick={() => {
+                  try {
+                    const scroller = document.getElementById("dashboard-scroll");
+                    const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+                    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+                      ...prev,
+                      search,
+                      filterFahrschule,
+                      showArchive,
+                      visibleCount,
+                      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
+                      lastStudentId: student.id,
+                    }));
+                  } catch {}
+                  navigate(`/dashboard/fahrschueler/${student.id}`);
+                }}
+                className={`w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group ${highlightId === student.id ? "bg-primary/10 ring-2 ring-primary/40 ring-inset" : ""}`}
               >
                 <div className="min-w-0">
                   <p className="font-medium text-foreground truncate">
