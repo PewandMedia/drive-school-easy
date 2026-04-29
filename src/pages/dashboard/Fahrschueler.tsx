@@ -150,6 +150,48 @@ const Fahrschueler = () => {
 
   const allLoading = isLoading || isLoadingLessons || isLoadingExams || isLoadingServices || isLoadingPayments;
 
+  // Persist list state on every change (so unmount via sidebar / navigate keeps it)
+  useEffect(() => {
+    const scroller = document.querySelector("main");
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      search,
+      filterFahrschule,
+      showArchive,
+      visibleCount,
+      scrollY: scroller?.scrollTop ?? 0,
+    }));
+  }, [search, filterFahrschule, showArchive, visibleCount]);
+
+  // Save scroll position continuously
+  useEffect(() => {
+    const scroller = document.querySelector("main");
+    if (!scroller) return;
+    const onScroll = () => {
+      try {
+        const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+        prev.scrollY = scroller.scrollTop;
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prev));
+      } catch {}
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Restore scroll position once data is loaded
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (allLoading || restored) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+      if (typeof saved.scrollY === "number") {
+        requestAnimationFrame(() => {
+          document.querySelector("main")?.scrollTo({ top: saved.scrollY });
+        });
+      }
+    } catch {}
+    setRestored(true);
+  }, [allLoading, restored]);
+
   const createMutation = useMutation({
     mutationFn: async (values: typeof defaultForm) => {
       // 1. Aktive Preise für Grundbetrag + Lernmaterial laden
