@@ -80,6 +80,7 @@ const Fahrschueler = () => {
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
   const [anmeldedatumText, setAnmeldedatumText] = useState(format(new Date(), "dd.MM.yyyy"));
   const [visibleCount, setVisibleCount] = useState<number>(savedState.visibleCount ?? 30);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [angebotsNotiz, setAngebotsNotiz] = useState("");
 
