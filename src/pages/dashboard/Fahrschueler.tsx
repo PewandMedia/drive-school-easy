@@ -65,15 +65,21 @@ const Fahrschueler = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
-  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
-  const [showArchive, setShowArchive] = useState(false);
+  const STORAGE_KEY = "fahrschueler-list-state";
+  const savedState = (() => {
+    try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
+    catch { return {}; }
+  })();
+
+  const [search, setSearch] = useState<string>(savedState.search ?? "");
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">(savedState.filterFahrschule ?? "alle");
+  const [showArchive, setShowArchive] = useState<boolean>(savedState.showArchive ?? false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState("");
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
   const [anmeldedatumText, setAnmeldedatumText] = useState(format(new Date(), "dd.MM.yyyy"));
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState<number>(savedState.visibleCount ?? 30);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [angebotsNotiz, setAngebotsNotiz] = useState("");
 

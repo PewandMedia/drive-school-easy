@@ -1,72 +1,75 @@
+## Fahrschüler-Liste: 30er-Schritte + Position merken
 
-
-## Tagesabrechnung-PDF: Spaltenabstände & Datums-Spalten fixen
-
-### Probleme im aktuellen PDF (Screenshot)
-1. **Header verschmelzen**: "Kassiert am" und "Im Büro am" stehen ohne Lücke direkt aneinander → liest sich als "Kassiert amIm Büro am"
-2. **Datum bricht um**: "22.04.2026" passt nicht in 10% Spaltenbreite und wird zu "22.04.20 / 26" auf zwei Zeilen umgebrochen
-3. **Insgesamt zu wenig horizontaler Abstand** zwischen den Spalten
-
-### Ursache
-- Spaltenbreiten 10% pro Datum sind zu knapp für ein 10pt-Datum mit Padding
-- `pr-2` (8px) Padding reicht nicht als visuelle Trennung zwischen Spalten
-- Keine vertikale Trennlinie / Padding-Left zwischen Zellen
+### Probleme
+1. **"Weitere anzeigen"-Button** lädt aktuell nur 10 weitere Schüler — soll **30** sein.
+2. Wenn man auf ein Profil klickt und mit Browser-Zurück (oder über die Sidebar "Fahrschüler") zurückkehrt, springt die Liste an den **Anfang**. Suche, Archiv-Toggle, Fahrschule-Filter, geladene Anzahl und Scroll-Position gehen verloren.
 
 ### Lösung
 
-**1. Spaltenbreiten neu verteilen — Datums-Spalten breiter**
+**1. Pagination auf 30 umstellen** (`src/pages/dashboard/Fahrschueler.tsx`)
 
-| Spalte | Alt | Neu |
+| Stelle | Alt | Neu |
 |---|---|---|
-| Schüler | 15% | 14% |
-| Verwendungszweck | 32% | 28% |
-| Fahrlehrer | 13% | 12% |
-| Art | 8% | 7% |
-| Kassiert am | 10% | **13%** |
-| Im Büro am | 10% | **13%** |
-| Betrag | 12% | 13% |
+| Initialer `visibleCount` | `useState(10)` | `useState(30)` |
+| Reset bei Toggle/Filter/Suche | `setVisibleCount(10)` | `setVisibleCount(30)` |
+| Increment-Step im Button | `c + 10` | `c + 30` |
+| Button-Label-Math | `Math.min(10, remaining)` | `Math.min(30, remaining)` |
 
-Mit 13% ist genug Platz für "22.04.2026" in 10pt-Schrift ohne Umbruch.
+**2. Liste-Status beim Verlassen merken**
 
-**2. Globales Zell-Padding statt nur `pr-2`**
+State, der erhalten bleiben soll:
+- `search` (Suchtext)
+- `filterFahrschule` ("alle" / "riemke" / "rathaus")
+- `showArchive` (true/false)
+- `visibleCount` (geladene Anzahl)
+- `window.scrollY` (Scroll-Position)
 
-In `src/index.css` für `.print-area td` und `.print-area th` ein konsequentes `padding: 4px 8px` setzen — gibt jeder Zelle links UND rechts Luft, sodass benachbarte Header nicht mehr verschmelzen können.
+**Ansatz**: `sessionStorage` mit Key `fahrschueler-list-state`. Vorteile: einfach, überlebt sowohl Sidebar-Klick (komplettes Unmount) als auch Browser-Zurück, wird beim Tab-Schließen automatisch verworfen.
 
-```css
-.print-area th,
-.print-area td {
-  padding: 4px 8px;
-}
-.print-area th:first-child,
-.print-area td:first-child {
-  padding-left: 0;
-}
-.print-area th:last-child,
-.print-area td:last-child {
-  padding-right: 0;
-}
+Implementierung in `Fahrschueler.tsx`:
+
+```ts
+const STORAGE_KEY = "fahrschueler-list-state";
+
+// Beim Mount: gespeicherten State laden (lazy initial state)
+const [search, setSearch] = useState(() => {
+  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}").search ?? ""; }
+  catch { return ""; }
+});
+// analog für filterFahrschule, showArchive, visibleCount (Default 30)
+
+// Beim Unmount + bei jeder Navigation zum Profil: State + scrollY speichern
+useEffect(() => {
+  return () => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      search, filterFahrschule, showArchive, visibleCount,
+      scrollY: window.scrollY,
+    }));
+  };
+}, [search, filterFahrschule, showArchive, visibleCount]);
+
+// Nach Daten-Load: Scroll-Position wiederherstellen (einmalig)
+useEffect(() => {
+  if (allLoading) return;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+    if (typeof saved.scrollY === "number") {
+      window.scrollTo({ top: saved.scrollY, behavior: "instant" as ScrollBehavior });
+    }
+  } catch {}
+  // nur einmal nach erstem erfolgreichem Load
+}, [allLoading]);
 ```
 
-**3. Datums-Spalten zusätzlich `white-space: nowrap` auf den Zellen (nicht nur Header)**
+Wichtig: Scroll-Container im Layout ist `<main class="flex-1 overflow-auto">` in `DashboardLayout.tsx` — `window.scrollY` reicht hier nicht. Stattdessen müssen wir das `<main>`-Element scrollen. Lösung:
 
-Damit das Datum 22.04.2026 nie umbricht — falls die Spalte trotzdem mal eng wird, wird die Spalte automatisch verbreitert statt umgebrochen.
-
-```css
-.print-area td.nowrap { white-space: nowrap; }
-```
-
-In `Tagesabrechnung.tsx` die beiden Datums-`<td>` und den Betrag-`<td>` mit `className="nowrap"` markieren.
-
-**4. Inline `pr-2`-Klassen aus den `<th>`/`<td>` entfernen**
-
-Werden durch das globale CSS-Padding ersetzt → konsistenter und sauberer.
+- Im Restore: `document.querySelector("main")?.scrollTo({ top: saved.scrollY })`
+- Im Save: `scrollY = document.querySelector("main")?.scrollTop ?? 0`
 
 ### Technische Details
 
 | Datei | Änderung |
 |---|---|
-| `src/index.css` | `.print-area th, .print-area td { padding: 4px 8px; }` ergänzen; first/last-child padding-reset; `.nowrap`-Helper |
-| `src/pages/dashboard/Tagesabrechnung.tsx` | colgroup-Breiten anpassen (Datums-Spalten 13%); `pr-2`-Klassen aus Print-`<th>`/`<td>` entfernen; Datums- und Betrag-Zellen `className="nowrap"` |
+| `src/pages/dashboard/Fahrschueler.tsx` | `visibleCount` Default & Reset auf 30; Increment im Button auf 30; sessionStorage-basiertes State-Persisting für `search`, `filterFahrschule`, `showArchive`, `visibleCount` und `main`-Scroll-Position; Restore nach erstem Daten-Load |
 
-Keine DB-Änderungen, keine Logik-Änderungen — reines Layout.
-
+Keine DB-Änderungen, keine neuen Dependencies, keine Änderungen an Sidebar/Layout.
