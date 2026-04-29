@@ -458,7 +458,6 @@ const Fahrschueler = () => {
                 data-student-id={student.id}
                 onClick={() => {
                   try {
-                    const scroller = document.getElementById("dashboard-scroll");
                     const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
                     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
                       ...prev,
@@ -466,7 +465,7 @@ const Fahrschueler = () => {
                       filterFahrschule,
                       showArchive,
                       visibleCount,
-                      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
+                      scrollY: getScrollTop() || prev.scrollY || 0,
                       lastStudentId: student.id,
                     }));
                   } catch {}
