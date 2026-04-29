@@ -80,6 +80,7 @@ const Fahrschueler = () => {
   const [geburtsdatumText, setGeburtsdatumText] = useState("");
   const [anmeldedatumText, setAnmeldedatumText] = useState(format(new Date(), "dd.MM.yyyy"));
   const [visibleCount, setVisibleCount] = useState<number>(savedState.visibleCount ?? 30);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [angebotsNotiz, setAngebotsNotiz] = useState("");
 
@@ -152,19 +153,24 @@ const Fahrschueler = () => {
 
   // Persist list state on every change (so unmount via sidebar / navigate keeps it)
   useEffect(() => {
-    const scroller = document.querySelector("main");
+    const scroller = document.getElementById("dashboard-scroll");
+    const prev = (() => {
+      try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); }
+      catch { return {}; }
+    })();
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      ...prev,
       search,
       filterFahrschule,
       showArchive,
       visibleCount,
-      scrollY: scroller?.scrollTop ?? 0,
+      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
     }));
   }, [search, filterFahrschule, showArchive, visibleCount]);
 
   // Save scroll position continuously
   useEffect(() => {
-    const scroller = document.querySelector("main");
+    const scroller = document.getElementById("dashboard-scroll");
     if (!scroller) return;
     const onScroll = () => {
       try {
@@ -177,18 +183,45 @@ const Fahrschueler = () => {
     return () => scroller.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Restore scroll position once data is loaded
+  // Restore position once data is loaded — prefer scrolling to last opened student
   const [restored, setRestored] = useState(false);
   useEffect(() => {
     if (allLoading || restored) return;
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
-      if (typeof saved.scrollY === "number") {
-        requestAnimationFrame(() => {
-          document.querySelector("main")?.scrollTo({ top: saved.scrollY });
-        });
+    let saved: any = {};
+    try { saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}"); } catch {}
+
+    const scroller = document.getElementById("dashboard-scroll");
+
+    const tryRestore = () => {
+      const lastId: string | undefined = saved.lastStudentId;
+      if (lastId) {
+        const el = document.querySelector<HTMLElement>(`[data-student-id="${lastId}"]`);
+        if (el && scroller) {
+          const elRect = el.getBoundingClientRect();
+          const scRect = scroller.getBoundingClientRect();
+          const target = scroller.scrollTop + (elRect.top - scRect.top) - (scRect.height / 2) + (elRect.height / 2);
+          scroller.scrollTo({ top: Math.max(0, target) });
+          setHighlightId(lastId);
+          setTimeout(() => setHighlightId(null), 1400);
+          // clear so a fresh visit starts at top
+          try {
+            const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+            delete prev.lastStudentId;
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(prev));
+          } catch {}
+          return true;
+        }
       }
-    } catch {}
+      if (typeof saved.scrollY === "number" && scroller) {
+        scroller.scrollTo({ top: saved.scrollY });
+        return true;
+      }
+      return false;
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { tryRestore(); });
+    });
     setRestored(true);
   }, [allLoading, restored]);
 
@@ -402,8 +435,24 @@ const Fahrschueler = () => {
             {visibleStudents.map((student) => (
               <button
                 key={student.id}
-                onClick={() => navigate(`/dashboard/fahrschueler/${student.id}`)}
-                className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group"
+                data-student-id={student.id}
+                onClick={() => {
+                  try {
+                    const scroller = document.getElementById("dashboard-scroll");
+                    const prev = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+                    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+                      ...prev,
+                      search,
+                      filterFahrschule,
+                      showArchive,
+                      visibleCount,
+                      scrollY: scroller?.scrollTop ?? prev.scrollY ?? 0,
+                      lastStudentId: student.id,
+                    }));
+                  } catch {}
+                  navigate(`/dashboard/fahrschueler/${student.id}`);
+                }}
+                className={`w-full grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-4 items-center px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-secondary/40 transition-colors text-left group ${highlightId === student.id ? "bg-primary/10 ring-2 ring-primary/40 ring-inset" : ""}`}
               >
                 <div className="min-w-0">
                   <p className="font-medium text-foreground truncate">

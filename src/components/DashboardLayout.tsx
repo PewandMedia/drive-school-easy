@@ -34,7 +34,7 @@ const DashboardLayout = () => {
             </div>
           </header>
           {/* Page Content */}
-          <main className="flex-1 overflow-auto p-6">
+          <main id="dashboard-scroll" className="flex-1 overflow-auto p-6">
             <Outlet />
           </main>
         </SidebarInset>

@@ -1,75 +1,43 @@
-## Fahrschüler-Liste: 30er-Schritte + Position merken
+## Ziel
 
-### Probleme
-1. **"Weitere anzeigen"-Button** lädt aktuell nur 10 weitere Schüler — soll **30** sein.
-2. Wenn man auf ein Profil klickt und mit Browser-Zurück (oder über die Sidebar "Fahrschüler") zurückkehrt, springt die Liste an den **Anfang**. Suche, Archiv-Toggle, Fahrschule-Filter, geladene Anzahl und Scroll-Position gehen verloren.
+Beim Klick auf einen Fahrschüler die ID merken und beim Zurückkehren genau zu dieser Zeile in der Liste scrollen — unabhängig davon, ob die Liste in der Zwischenzeit anders gerendert wurde.
 
-### Lösung
+## Problem in der aktuellen Implementierung
 
-**1. Pagination auf 30 umstellen** (`src/pages/dashboard/Fahrschueler.tsx`)
+In `Fahrschueler.tsx` wird `document.querySelector("main")` verwendet, um die Scroll-Position zu speichern und wiederherzustellen. Das Layout enthält jedoch zwei `<main>`-Elemente:
 
-| Stelle | Alt | Neu |
-|---|---|---|
-| Initialer `visibleCount` | `useState(10)` | `useState(30)` |
-| Reset bei Toggle/Filter/Suche | `setVisibleCount(10)` | `setVisibleCount(30)` |
-| Increment-Step im Button | `c + 10` | `c + 30` |
-| Button-Label-Math | `Math.min(10, remaining)` | `Math.min(30, remaining)` |
+- `SidebarInset` (`src/components/ui/sidebar.tsx`) rendert ein `<main>` ohne Scroll
+- `DashboardLayout` (`src/components/DashboardLayout.tsx`) rendert _innerhalb_ davon ein zweites `<main className="flex-1 overflow-auto p-6">` — das ist der echte Scroll-Container
 
-**2. Liste-Status beim Verlassen merken**
+`querySelector("main")` trifft den ersten Treffer (den nicht-scrollenden), folglich ist `scrollTop` immer 0 und das Restore tut nichts Sichtbares.
 
-State, der erhalten bleiben soll:
-- `search` (Suchtext)
-- `filterFahrschule` ("alle" / "riemke" / "rathaus")
-- `showArchive` (true/false)
-- `visibleCount` (geladene Anzahl)
-- `window.scrollY` (Scroll-Position)
+## Lösung
 
-**Ansatz**: `sessionStorage` mit Key `fahrschueler-list-state`. Vorteile: einfach, überlebt sowohl Sidebar-Klick (komplettes Unmount) als auch Browser-Zurück, wird beim Tab-Schließen automatisch verworfen.
+### 1. `DashboardLayout.tsx` — Scroll-Container eindeutig markieren
 
-Implementierung in `Fahrschueler.tsx`:
+Dem scrollenden `<main>` ein stabiles Attribut geben, z. B. `id="dashboard-scroll"`, damit alle Seiten denselben Container ansprechen können.
 
-```ts
-const STORAGE_KEY = "fahrschueler-list-state";
+### 2. `Fahrschueler.tsx` — ID-basiertes Restore
 
-// Beim Mount: gespeicherten State laden (lazy initial state)
-const [search, setSearch] = useState(() => {
-  try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}").search ?? ""; }
-  catch { return ""; }
-});
-// analog für filterFahrschule, showArchive, visibleCount (Default 30)
+- Beim Klick auf einen Schüler vor dem `navigate(...)` die `student.id` zusammen mit Filterzustand und visibleCount in `sessionStorage` speichern (Key bleibt `fahrschueler-list-state`, neues Feld `lastStudentId`).
+- `scrollY` parallel weiter speichern als Fallback (gegen `#dashboard-scroll`).
+- Restore-Logik (nach `allLoading === false`):
+  1. Wenn `lastStudentId` vorhanden: Element via `document.querySelector(\`[data-student-id="\${id}"]\`)` suchen, in zwei `requestAnimationFrame`-Frames auf den Container scrollen (`scrollIntoView({ block: "center" })`). Kurzes Highlight (z. B. `ring-2 ring-primary/40` für ~1.2s) zur visuellen Bestätigung.
+  2. Sonst Fallback auf gespeichertes `scrollY`.
+  3. `lastStudentId` nach erfolgreichem Restore löschen, damit ein normales Neuladen der Seite oben startet.
+- Den Listen-Eintrag (`<button>`) mit `data-student-id={student.id}` versehen.
+- Alle vorhandenen `document.querySelector("main")` durch `document.getElementById("dashboard-scroll")` ersetzen.
 
-// Beim Unmount + bei jeder Navigation zum Profil: State + scrollY speichern
-useEffect(() => {
-  return () => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-      search, filterFahrschule, showArchive, visibleCount,
-      scrollY: window.scrollY,
-    }));
-  };
-}, [search, filterFahrschule, showArchive, visibleCount]);
+### 3. Edge Cases
 
-// Nach Daten-Load: Scroll-Position wiederherstellen (einmalig)
-useEffect(() => {
-  if (allLoading) return;
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
-    if (typeof saved.scrollY === "number") {
-      window.scrollTo({ top: saved.scrollY, behavior: "instant" as ScrollBehavior });
-    }
-  } catch {}
-  // nur einmal nach erstem erfolgreichem Load
-}, [allLoading]);
-```
+- Wenn der Nutzer einen Filter ändert und der gemerkte Schüler nicht mehr sichtbar ist (z. B. Klasse passt nicht), greift der Fallback auf `scrollY`.
+- Sidebar-Navigation („Fahrschüler" erneut klicken) führt aktuell schon dazu, dass die Komponente bestehen bleibt; der Fix ändert daran nichts.
 
-Wichtig: Scroll-Container im Layout ist `<main class="flex-1 overflow-auto">` in `DashboardLayout.tsx` — `window.scrollY` reicht hier nicht. Stattdessen müssen wir das `<main>`-Element scrollen. Lösung:
-
-- Im Restore: `document.querySelector("main")?.scrollTo({ top: saved.scrollY })`
-- Im Save: `scrollY = document.querySelector("main")?.scrollTop ?? 0`
-
-### Technische Details
+## Technische Details
 
 | Datei | Änderung |
 |---|---|
-| `src/pages/dashboard/Fahrschueler.tsx` | `visibleCount` Default & Reset auf 30; Increment im Button auf 30; sessionStorage-basiertes State-Persisting für `search`, `filterFahrschule`, `showArchive`, `visibleCount` und `main`-Scroll-Position; Restore nach erstem Daten-Load |
+| `src/components/DashboardLayout.tsx` | `<main>` erhält `id="dashboard-scroll"` |
+| `src/pages/dashboard/Fahrschueler.tsx` | `STORAGE_KEY` um `lastStudentId` erweitern; `onClick` der Schülerzeile setzt `lastStudentId` vor `navigate`; `data-student-id` am Listen-Button; Restore-`useEffect` scrollt zur Zeile via `scrollIntoView`, mit Fallback auf `scrollY`; alle `querySelector("main")` ersetzt durch `getElementById("dashboard-scroll")`; kurzer Highlight-State (`highlightId`) für ~1200 ms |
 
-Keine DB-Änderungen, keine neuen Dependencies, keine Änderungen an Sidebar/Layout.
+Keine DB-Änderungen, keine neuen Dependencies, keine Logikänderung an Daten.
