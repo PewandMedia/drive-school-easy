@@ -1,42 +1,39 @@
-# Mobile-Performance verbessern
+# Mobile-Druck mit nativem Dialog
 
-## Ziel
-Schnellere Ladezeiten und flüssigere Bedienung auf Handys, ohne Funktionalität oder Design zu ändern.
+## Problem
+Der aktuelle Mobile-Export erzeugt zwar eine PDF, öffnet sie aber nur als Vorschau ohne Druck-/Speichern-Button (iOS Safari / Android Chrome zeigen das PDF inline an, ohne Aktionen).
 
-## Maßnahmen
+## Lösung
+Statt einer fertigen PDF-Datei via jsPDF zu generieren, öffnen wir den Print-Bereich in einem neuen Fenster/Tab und rufen dort den nativen Druckdialog auf. Damit bekommt der Nutzer auf jedem Gerät:
+- iOS: Teilen-Sheet mit „Drucken" und „In Dateien sichern"
+- Android: Druckdialog mit „Als PDF speichern" und Druckerauswahl
+- Desktop: gewohnter Druckdialog
 
-### 1. Code-Splitting via Lazy Loading
-Aktuell wird in `src/App.tsx` jede Dashboard-Seite synchron importiert (~9.500 Zeilen Code im initialen Bundle, plus jspdf/html2canvas). Auf Mobile = sehr großer JS-Download.
-- Alle Dashboard-Routen mit `React.lazy()` laden.
-- `<Suspense>` mit kleinem Lade-Spinner um die Routes legen.
-- `Login` und `DashboardLayout` bleiben eager (sofort sichtbar).
-- Erwartung: initiales Bundle ~60–80 % kleiner.
+Ergebnis: identisches Verhalten wie auf dem PC, mit echtem Drucken-Button.
 
-### 2. PDF-Export-Libs nur bei Bedarf laden
-`jspdf` und `html2canvas` (~400 KB) werden in `src/lib/exportPdf.ts` aktuell statisch importiert.
-- Auf dynamische Imports umstellen (`await import("jspdf")`).
-- Wird damit erst geladen, wenn der Nutzer wirklich auf "PDF exportieren" tippt.
+## Technische Schritte
 
-### 3. React Query Defaults schärfen
-In `src/App.tsx` wird `new QueryClient()` ohne Defaults verwendet → unnötiges Refetching auf Mobile (jeder Tab-Wechsel triggert Netzwerk).
-- `staleTime: 60_000` (Daten 1 min frisch).
-- `refetchOnWindowFocus: false`, `refetchOnReconnect: false`.
-- `gcTime: 5 * 60_000`.
+1. **`src/lib/exportPdf.ts` umbauen**
+   - Funktion `printElement(el, title)`:
+     - Öffnet `window.open("", "_blank")`.
+     - Schreibt ein vollständiges HTML-Dokument: `<html>` mit allen aktuellen `<style>`/`<link>`-Tags der App + dem `outerHTML` des Print-Bereichs.
+     - CSS direkt einbettet (A4-Layout, Tabellen-Styles, schwarze Schrift) – identisch zum bisherigen `.pdf-export-mode`.
+     - Nach `onload`: `win.focus(); win.print();` – Browser zeigt nativen Drucken-Dialog.
+   - Bisheriger jsPDF-Pfad bleibt als Fallback, falls Popup blockiert wird (toast mit Hinweis).
+   - jspdf/html2canvas-Imports entfernen (nicht mehr nötig).
 
-### 4. Schwere Listen weniger render-intensiv
-- `Fahrschueler.tsx` (786 Zeilen, große Studentenliste): Listenzeilen mit `React.memo` umhüllen, damit nicht alle Zeilen bei Highlight/State-Änderung neu rendern.
-- Bestehende Pagination (`visibleCount` mit "Load more") bleibt — sie schützt vor zu vielen DOM-Knoten.
+2. **`src/pages/dashboard/Tagesabrechnung.tsx`**
+   - `handleExport`: auf Mobile `printElement(printRef.current, "Tagesabrechnung_<datum>")` aufrufen, Desktop weiter `window.print()`.
 
-### 5. Kleinere Mobile-Optimierungen
-- In `index.html` `<meta name="viewport">` prüfen und falls nötig `viewport-fit=cover` ergänzen.
-- `will-change`/Animationen auf Mobile reduzieren ist nicht nötig — Code nutzt bereits Tailwind-Standardanimationen.
+3. **`src/pages/dashboard/FahrschuelerDetail.tsx`**
+   - Print-Trigger im `useEffect`: Mobile → `printElement(...)`, Desktop → `window.print()`.
 
-## Out of Scope
-- FahrschuelerDetail.tsx (3130 Zeilen) komplett refactoren — zu großer Eingriff, separater Plan empfohlen.
-- Backend/Query-Änderungen.
-- Design-Änderungen.
+4. **CSS / Print-Styles**
+   - Im neuen Fenster ein eingebettetes Stylesheet mit den bestehenden Print-Regeln (A4, Tabellen, Schriftgrößen) verwenden, damit das Ergebnis sauber aussieht.
 
 ## Erwartung
-- Initialer Login → Dashboard deutlich schneller auf Mobile (kleineres JS-Bundle).
-- Weniger Netzwerk-Traffic beim Tab-Wechsel.
-- PDF-Funktion lädt ihre Libs erst bei Klick → spart ~400 KB beim Start.
+Nutzer tippt auf „Als PDF exportieren" → es öffnet sich der native Druckdialog des Geräts → Nutzer kann „Als PDF speichern" oder direkt drucken wählen, genau wie am PC.
+
+## Out of Scope
+- Backend-Änderungen.
+- Inhaltliche Änderungen an den Berichten.
