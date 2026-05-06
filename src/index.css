@@ -171,3 +171,33 @@
     white-space: nowrap;
   }
 }
+
+/* PDF export mode: temporarily render the print-area off-screen so html2canvas can capture it */
+.pdf-export-mode {
+  display: block !important;
+  visibility: visible !important;
+  position: fixed !important;
+  left: -10000px !important;
+  top: 0 !important;
+  width: 800px !important;
+  max-width: 800px !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  padding: 24px !important;
+  z-index: -1 !important;
+  font-family: 'Inter', sans-serif;
+}
+.pdf-export-mode table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.pdf-export-mode th,
+.pdf-export-mode td {
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.pdf-export-mode .border-b { border-bottom: 1px solid #ddd; }
+.pdf-export-mode .border-t-2 { border-top: 2px solid #000; }
+.pdf-export-mode .border { border: 1px solid #ddd; }

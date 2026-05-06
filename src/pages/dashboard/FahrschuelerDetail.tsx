@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { exportElementToPdf, isMobileDevice } from "@/lib/exportPdf";
 import { parse, isValid } from "date-fns";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, CheckCircle2, Car, BookOpen, Settings, GraduationCap, XCircle, AlertTriangle, ShieldCheck, ShieldAlert, CreditCard, Plus, ChevronDown, Cake, Check, Pencil, Trash2, Printer, Archive, RotateCcw } from "lucide-react";
@@ -129,6 +130,8 @@ const FahrschuelerDetail = () => {
   const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
   const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | "pruefungen" | null>(null);
   const [printSections, setPrintSections] = useState<string[]>([]);
+  const singlePrintRef = useRef<HTMLDivElement>(null);
+  const multiPrintRef = useRef<HTMLDivElement>(null);
   const [dlgPrint, setDlgPrint] = useState(false);
   const [dlgPrintSel, setDlgPrintSel] = useState<string[]>([]);
 
@@ -303,7 +306,25 @@ const FahrschuelerDetail = () => {
   // Print trigger
   useEffect(() => {
     if (!printSection && printSections.length === 0) return;
-    const timer = setTimeout(() => window.print(), 100);
+    const timer = setTimeout(async () => {
+      if (isMobileDevice()) {
+        const el = printSection ? singlePrintRef.current : multiPrintRef.current;
+        const name = printSection
+          ? `Schueler_${printSection}.pdf`
+          : `Schueler_Uebersicht.pdf`;
+        if (el) {
+          try {
+            await exportElementToPdf(el, name);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        setPrintSection(null);
+        setPrintSections([]);
+      } else {
+        window.print();
+      }
+    }, 150);
     const onAfterPrint = () => {
       setPrintSection(null);
       setPrintSections([]);
@@ -2793,7 +2814,7 @@ const FahrschuelerDetail = () => {
 
       {/* ===== PRINT AREA ===== */}
       {printSection && (
-        <div className="print-area hidden print:block">
+        <div ref={singlePrintRef} className="print-area hidden print:block">
           <div className="mb-6 border-b pb-4">
             <h1 className="text-2xl font-bold">
               Fahrschulverwaltung – {printSection === "fahrstunden" ? "Fahrstunden" : printSection === "leistungen" ? "Leistungen" : printSection === "pruefungen" ? "Prüfungen" : "Zahlungen"}
@@ -2971,7 +2992,7 @@ const FahrschuelerDetail = () => {
 
       {/* ===== MULTI-PRINT AREA ===== */}
       {printSections.length > 0 && (
-        <div className="print-area hidden print:block">
+        <div ref={multiPrintRef} className="print-area hidden print:block">
           <div className="mb-6 border-b pb-4">
             <h1 className="text-2xl font-bold">Fahrschulverwaltung – Übersicht</h1>
             <p className="text-lg mt-1">

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { exportElementToPdf, isMobileDevice } from "@/lib/exportPdf";
 import { format, startOfDay, addDays } from "date-fns";
 import { de } from "date-fns/locale";
 import { FileText, Printer, Banknote, CreditCard, Building2 } from "lucide-react";
@@ -74,6 +75,20 @@ const Tagesabrechnung = () => {
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
   const [activeDate, setActiveDate] = useState<string>(selectedDate);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handleExport = async () => {
+    if (isMobileDevice() && printRef.current) {
+      try {
+        await exportElementToPdf(printRef.current, `Tagesabrechnung_${activeDate}.pdf`);
+      } catch (e) {
+        console.error(e);
+        toast.error("PDF-Export fehlgeschlagen");
+      }
+    } else {
+      window.print();
+    }
+  };
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -233,7 +248,7 @@ const Tagesabrechnung = () => {
                       <SelectItem value="ueberweisung">Überweisung</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={() => window.print()}>
+                  <Button variant="outline" onClick={handleExport}>
                     <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
                   </Button>
                 </>
@@ -290,7 +305,7 @@ const Tagesabrechnung = () => {
       </div>
 
       {/* ===== PRINT AREA ===== */}
-      <div className="print-area hidden print:block">
+      <div ref={printRef} className="print-area hidden print:block">
         <div className="mb-4 border-b pb-3">
           <h1 className="text-xl font-bold">Tagesabrechnung – Fahrschulverwaltung</h1>
           <p className="text-xs mt-1">
