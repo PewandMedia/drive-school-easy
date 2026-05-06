@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,29 +8,41 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import DashboardLayout from "@/components/DashboardLayout";
-
-
-import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 
-// Dashboard pages
-import Dashboard from "./pages/dashboard/Dashboard";
-import Fahrschueler from "./pages/dashboard/Fahrschueler";
-import FahrschuelerDetail from "./pages/dashboard/FahrschuelerDetail";
-import Leistungen from "./pages/dashboard/Leistungen";
-import Fahrstunden from "./pages/dashboard/Fahrstunden";
-import Theorie from "./pages/dashboard/Theorie";
-import Schaltstunden from "./pages/dashboard/Schaltstunden";
-import Pruefungen from "./pages/dashboard/Pruefungen";
-import Zahlungen from "./pages/dashboard/Zahlungen";
-import Abrechnung from "./pages/dashboard/Abrechnung";
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const Fahrschueler = lazy(() => import("./pages/dashboard/Fahrschueler"));
+const FahrschuelerDetail = lazy(() => import("./pages/dashboard/FahrschuelerDetail"));
+const Leistungen = lazy(() => import("./pages/dashboard/Leistungen"));
+const Fahrstunden = lazy(() => import("./pages/dashboard/Fahrstunden"));
+const Theorie = lazy(() => import("./pages/dashboard/Theorie"));
+const Schaltstunden = lazy(() => import("./pages/dashboard/Schaltstunden"));
+const Pruefungen = lazy(() => import("./pages/dashboard/Pruefungen"));
+const Zahlungen = lazy(() => import("./pages/dashboard/Zahlungen"));
+const Abrechnung = lazy(() => import("./pages/dashboard/Abrechnung"));
+const FahrlehrerStatistik = lazy(() => import("./pages/dashboard/FahrlehrerStatistik"));
+const Tagesabrechnung = lazy(() => import("./pages/dashboard/Tagesabrechnung"));
+const Auswertung = lazy(() => import("./pages/dashboard/Auswertung"));
+const Benutzerverwaltung = lazy(() => import("./pages/dashboard/Benutzerverwaltung"));
 
-import FahrlehrerStatistik from "./pages/dashboard/FahrlehrerStatistik";
-import Tagesabrechnung from "./pages/dashboard/Tagesabrechnung";
-import Auswertung from "./pages/dashboard/Auswertung";
-import Benutzerverwaltung from "./pages/dashboard/Benutzerverwaltung";
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: 1,
+    },
+  },
+});
 
-const queryClient = new QueryClient();
+const PageFallback = () => (
+  <div className="flex h-full w-full items-center justify-center p-12">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -38,40 +51,41 @@ const App = () => (
         <TooltipProvider>
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
 
-            {/* Protected Dashboard Routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <DashboardLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="fahrschueler" element={<Fahrschueler />} />
-              <Route path="fahrschueler/:id" element={<FahrschuelerDetail />} />
-              <Route path="leistungen" element={<Leistungen />} />
-              <Route path="fahrstunden" element={<Fahrstunden />} />
-              <Route path="theorie" element={<Theorie />} />
-              <Route path="schaltstunden" element={<Schaltstunden />} />
-              <Route path="pruefungen" element={<Pruefungen />} />
-              <Route path="zahlungen" element={<Zahlungen />} />
-              <Route path="abrechnung" element={<Abrechnung />} />
-              
-              {/* Admin-only routes */}
-              <Route path="fahrlehrer-statistik" element={<ProtectedRoute requiredRole="admin"><FahrlehrerStatistik /></ProtectedRoute>} />
-              <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
-              <Route path="auswertung" element={<ProtectedRoute requiredRole="admin"><Auswertung /></ProtectedRoute>} />
-              <Route path="benutzerverwaltung" element={<ProtectedRoute requiredRole="admin"><Benutzerverwaltung /></ProtectedRoute>} />
-            </Route>
+              {/* Protected Dashboard Routes */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <DashboardLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="fahrschueler" element={<Fahrschueler />} />
+                <Route path="fahrschueler/:id" element={<FahrschuelerDetail />} />
+                <Route path="leistungen" element={<Leistungen />} />
+                <Route path="fahrstunden" element={<Fahrstunden />} />
+                <Route path="theorie" element={<Theorie />} />
+                <Route path="schaltstunden" element={<Schaltstunden />} />
+                <Route path="pruefungen" element={<Pruefungen />} />
+                <Route path="zahlungen" element={<Zahlungen />} />
+                <Route path="abrechnung" element={<Abrechnung />} />
 
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+                {/* Admin-only routes */}
+                <Route path="fahrlehrer-statistik" element={<ProtectedRoute requiredRole="admin"><FahrlehrerStatistik /></ProtectedRoute>} />
+                <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
+                <Route path="auswertung" element={<ProtectedRoute requiredRole="admin"><Auswertung /></ProtectedRoute>} />
+                <Route path="benutzerverwaltung" element={<ProtectedRoute requiredRole="admin"><Benutzerverwaltung /></ProtectedRoute>} />
+              </Route>
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

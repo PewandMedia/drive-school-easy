@@ -1,13 +1,15 @@
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
-
 /**
  * Renders a DOM element into a multi-page A4 PDF and triggers a download.
- * Designed for mobile devices where window.print() is unreliable.
+ * jsPDF and html2canvas are dynamically imported so they're only loaded on demand.
  */
 export async function exportElementToPdf(el: HTMLElement, filename: string) {
+  const [{ jsPDF }, html2canvasMod] = await Promise.all([
+    import("jspdf"),
+    import("html2canvas"),
+  ]);
+  const html2canvas = html2canvasMod.default;
+
   el.classList.add("pdf-export-mode");
-  // Allow layout to flush
   await new Promise((r) => setTimeout(r, 50));
   try {
     const canvas = await html2canvas(el, {
