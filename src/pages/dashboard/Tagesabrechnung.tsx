@@ -234,7 +234,7 @@ const Tagesabrechnung = () => {
                       <SelectItem value="ueberweisung">Überweisung</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={() => window.print()}>
+                  <Button variant="outline" onClick={handleExport}>
                     <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
                   </Button>
                 </>
@@ -291,7 +291,7 @@ const Tagesabrechnung = () => {
       </div>
 
       {/* ===== PRINT AREA ===== */}
-      <div className="print-area hidden print:block">
+      <div ref={printRef} className="print-area hidden print:block">
         <div className="mb-4 border-b pb-3">
           <h1 className="text-xl font-bold">Tagesabrechnung – Fahrschulverwaltung</h1>
           <p className="text-xs mt-1">
