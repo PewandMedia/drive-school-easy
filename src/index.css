@@ -172,32 +172,78 @@
   }
 }
 
-/* PDF export mode: temporarily render the print-area off-screen so html2canvas can capture it */
+/* PDF export mode: render the print-area off-screen at A4 width with desktop print styles */
 .pdf-export-mode {
   display: block !important;
   visibility: visible !important;
   position: fixed !important;
   left: -10000px !important;
   top: 0 !important;
-  width: 800px !important;
-  max-width: 800px !important;
+  width: 794px !important;        /* A4 width @ 96dpi */
+  max-width: 794px !important;
+  min-height: 1123px;             /* A4 height @ 96dpi */
   background: #ffffff !important;
   color: #000000 !important;
-  padding: 24px !important;
+  padding: 56px !important;       /* ~15mm margin */
   z-index: -1 !important;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 11pt;
+  line-height: 1.4;
 }
+.pdf-export-mode * {
+  visibility: visible !important;
+  color: #000 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.pdf-export-mode h1 { font-size: 18pt !important; font-weight: 700; margin: 0 0 6px; }
+.pdf-export-mode h2 { font-size: 14pt !important; font-weight: 700; margin: 12px 0 6px; }
+.pdf-export-mode p  { margin: 2px 0; }
+.pdf-export-mode .mb-6 { margin-bottom: 18px !important; }
+.pdf-export-mode .mb-4 { margin-bottom: 12px !important; }
+.pdf-export-mode .mb-2 { margin-bottom: 6px !important; }
+.pdf-export-mode .mt-1 { margin-top: 3px !important; }
+.pdf-export-mode .pb-4 { padding-bottom: 12px !important; }
+.pdf-export-mode .pb-3 { padding-bottom: 9px !important; }
+.pdf-export-mode .border-b { border-bottom: 1px solid #888 !important; }
+.pdf-export-mode .border-t-2 { border-top: 2px solid #000 !important; }
+.pdf-export-mode .border { border: 1px solid #888 !important; }
 .pdf-export-mode table {
-  width: 100%;
+  table-layout: fixed;
+  width: 100% !important;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 9.5pt;
+  line-height: 1.3;
+  margin-bottom: 12px;
 }
-.pdf-export-mode th,
+.pdf-export-mode th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 9pt;
+  padding: 4px 8px;
+  border-bottom: 1px solid #000 !important;
+  white-space: nowrap;
+}
 .pdf-export-mode td {
   padding: 4px 8px;
-  text-align: left;
   vertical-align: top;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  border-bottom: 1px solid #ddd !important;
 }
-.pdf-export-mode .border-b { border-bottom: 1px solid #ddd; }
-.pdf-export-mode .border-t-2 { border-top: 2px solid #000; }
-.pdf-export-mode .border { border: 1px solid #ddd; }
+.pdf-export-mode th:first-child,
+.pdf-export-mode td:first-child { padding-left: 0; }
+.pdf-export-mode th:last-child,
+.pdf-export-mode td:last-child { padding-right: 0; }
+.pdf-export-mode td.nowrap,
+.pdf-export-mode th.nowrap { white-space: nowrap; }
+.pdf-export-mode .text-right { text-align: right !important; }
+.pdf-export-mode .text-left { text-align: left !important; }
+.pdf-export-mode .text-center { text-align: center !important; }
+.pdf-export-mode .font-bold { font-weight: 700 !important; }
+.pdf-export-mode .italic { font-style: italic !important; }
+.pdf-export-mode .text-xs { font-size: 8.5pt !important; }
+.pdf-export-mode .text-sm { font-size: 10pt !important; }
+.pdf-export-mode .text-lg { font-size: 13pt !important; }
+.pdf-export-mode .text-xl { font-size: 15pt !important; }
+.pdf-export-mode .text-2xl { font-size: 18pt !important; }

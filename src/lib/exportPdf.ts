@@ -17,7 +17,9 @@ export async function exportElementToPdf(el: HTMLElement, filename: string) {
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
-      windowWidth: el.scrollWidth,
+      width: 794,
+      height: el.scrollHeight,
+      windowWidth: 794,
     });
     const pdf = new jsPDF("p", "mm", "a4");
     const pageW = 210;
