@@ -130,6 +130,8 @@ const FahrschuelerDetail = () => {
   const [deletingItem, setDeletingItem] = useState<{ type: "fahrstunde" | "theorie" | "pruefung" | "leistung" | "zahlung"; id: string; label: string } | null>(null);
   const [printSection, setPrintSection] = useState<"fahrstunden" | "leistungen" | "zahlungen" | "pruefungen" | null>(null);
   const [printSections, setPrintSections] = useState<string[]>([]);
+  const singlePrintRef = useRef<HTMLDivElement>(null);
+  const multiPrintRef = useRef<HTMLDivElement>(null);
   const [dlgPrint, setDlgPrint] = useState(false);
   const [dlgPrintSel, setDlgPrintSel] = useState<string[]>([]);
 
@@ -304,7 +306,25 @@ const FahrschuelerDetail = () => {
   // Print trigger
   useEffect(() => {
     if (!printSection && printSections.length === 0) return;
-    const timer = setTimeout(() => window.print(), 100);
+    const timer = setTimeout(async () => {
+      if (isMobileDevice()) {
+        const el = printSection ? singlePrintRef.current : multiPrintRef.current;
+        const name = printSection
+          ? `Schueler_${printSection}.pdf`
+          : `Schueler_Uebersicht.pdf`;
+        if (el) {
+          try {
+            await exportElementToPdf(el, name);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        setPrintSection(null);
+        setPrintSections([]);
+      } else {
+        window.print();
+      }
+    }, 150);
     const onAfterPrint = () => {
       setPrintSection(null);
       setPrintSections([]);
