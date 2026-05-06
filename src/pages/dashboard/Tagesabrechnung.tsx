@@ -75,6 +75,20 @@ const Tagesabrechnung = () => {
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
   const [activeDate, setActiveDate] = useState<string>(selectedDate);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handleExport = async () => {
+    if (isMobileDevice() && printRef.current) {
+      try {
+        await exportElementToPdf(printRef.current, `Tagesabrechnung_${activeDate}.pdf`);
+      } catch (e) {
+        console.error(e);
+        toast.error("PDF-Export fehlgeschlagen");
+      }
+    } else {
+      window.print();
+    }
+  };
 
   const fetchPayments = async () => {
     setLoading(true);
