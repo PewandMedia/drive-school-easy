@@ -1,43 +1,98 @@
-## Ziel
+# PDF-Export auf Handy reparieren
 
-Beim Klick auf einen Fahrschüler die ID merken und beim Zurückkehren genau zu dieser Zeile in der Liste scrollen — unabhängig davon, ob die Liste in der Zwischenzeit anders gerendert wurde.
+## Problem
+Auf der Handy-Ansicht funktioniert der „Drucken / Als PDF exportieren"-Button nicht zuverlässig. `window.print()` öffnet auf iOS/Android oft keinen vernünftigen Dialog, das `@media print`-Layout bricht im mobilen Viewport, und der `print-area`-Container wird durch den begrenzten Scroll-Container (`#dashboard-scroll`, `overflow-hidden`) abgeschnitten.
 
-## Problem in der aktuellen Implementierung
-
-In `Fahrschueler.tsx` wird `document.querySelector("main")` verwendet, um die Scroll-Position zu speichern und wiederherzustellen. Das Layout enthält jedoch zwei `<main>`-Elemente:
-
-- `SidebarInset` (`src/components/ui/sidebar.tsx`) rendert ein `<main>` ohne Scroll
-- `DashboardLayout` (`src/components/DashboardLayout.tsx`) rendert _innerhalb_ davon ein zweites `<main className="flex-1 overflow-auto p-6">` — das ist der echte Scroll-Container
-
-`querySelector("main")` trifft den ersten Treffer (den nicht-scrollenden), folglich ist `scrollTop` immer 0 und das Restore tut nichts Sichtbares.
+Betroffene Stellen:
+- `src/pages/dashboard/Tagesabrechnung.tsx` – Tagesabrechnung als PDF
+- `src/pages/dashboard/FahrschuelerDetail.tsx` – Druck einzelner Sektionen (Fahrstunden, Leistungen, Zahlungen, Prüfungen) und „Alles drucken"
 
 ## Lösung
+Hybrid-Ansatz: Auf Mobile echten PDF-Download via `jsPDF` + `html2canvas`, auf Desktop weiterhin `window.print()` (funktioniert dort einwandfrei).
 
-### 1. `DashboardLayout.tsx` — Scroll-Container eindeutig markieren
+### Schritte
 
-Dem scrollenden `<main>` ein stabiles Attribut geben, z. B. `id="dashboard-scroll"`, damit alle Seiten denselben Container ansprechen können.
+1. **Pakete hinzufügen**
+   - `jspdf` und `html2canvas` installieren.
 
-### 2. `Fahrschueler.tsx` — ID-basiertes Restore
+2. **Helper anlegen** (`src/lib/exportPdf.ts`)
+   - Funktion `exportElementToPdf(elementId, filename)`:
+     - Rendert den Print-Bereich mit `html2canvas` (Scale 2, weißer Hintergrund, CORS aktiv).
+     - Teilt das Canvas bei Bedarf auf mehrere A4-Seiten auf (Multi-Page-Logik), damit lange Listen nicht abgeschnitten werden.
+     - Speichert die Datei via `jsPDF.save(filename)` → triggert auf Mobilgeräten echten Download/Share.
 
-- Beim Klick auf einen Schüler vor dem `navigate(...)` die `student.id` zusammen mit Filterzustand und visibleCount in `sessionStorage` speichern (Key bleibt `fahrschueler-list-state`, neues Feld `lastStudentId`).
-- `scrollY` parallel weiter speichern als Fallback (gegen `#dashboard-scroll`).
-- Restore-Logik (nach `allLoading === false`):
-  1. Wenn `lastStudentId` vorhanden: Element via `document.querySelector(\`[data-student-id="\${id}"]\`)` suchen, in zwei `requestAnimationFrame`-Frames auf den Container scrollen (`scrollIntoView({ block: "center" })`). Kurzes Highlight (z. B. `ring-2 ring-primary/40` für ~1.2s) zur visuellen Bestätigung.
-  2. Sonst Fallback auf gespeichertes `scrollY`.
-  3. `lastStudentId` nach erfolgreichem Restore löschen, damit ein normales Neuladen der Seite oben startet.
-- Den Listen-Eintrag (`<button>`) mit `data-student-id={student.id}` versehen.
-- Alle vorhandenen `document.querySelector("main")` durch `document.getElementById("dashboard-scroll")` ersetzen.
+3. **Print-Bereich mobil-tauglich machen**
+   - Der `.print-area`-Container ist aktuell `hidden print:block`. Für die Bildschirm-Erfassung brauchen wir ihn temporär sichtbar, aber off-screen.
+   - Beim Export-Klick: Klasse umschalten (`hidden` → `fixed -left-[9999px] top-0 block w-[800px]`), Canvas erzeugen, danach Klasse zurücksetzen.
+   - Alternativ: zusätzliche Wrapper-Klasse `print-export-active` einführen, die per Inline-Style sichtbar macht.
 
-### 3. Edge Cases
+4. **Mobile-Erkennung & Button-Logik**
+   - In `Tagesabrechnung.tsx` und `FahrschuelerDetail.tsx`: `useIsMobile()`-Hook nutzen.
+   - Beim Klick auf „Als PDF exportieren":
+     - Mobile → `exportElementToPdf()` aufrufen.
+     - Desktop → bisheriger `window.print()`-Pfad bleibt erhalten.
 
-- Wenn der Nutzer einen Filter ändert und der gemerkte Schüler nicht mehr sichtbar ist (z. B. Klasse passt nicht), greift der Fallback auf `scrollY`.
-- Sidebar-Navigation („Fahrschüler" erneut klicken) führt aktuell schon dazu, dass die Komponente bestehen bleibt; der Fix ändert daran nichts.
+5. **Tagesabrechnung anpassen**
+   - Print-Button-Handler ersetzen.
+   - Sicherstellen, dass `print-area` bereits gerendert ist, bevor html2canvas läuft (in der bestehenden Struktur immer im DOM, nur via CSS versteckt).
+
+6. **FahrschuelerDetail anpassen**
+   - Bestehende Logik mit `printSection` / `printSections` beibehalten (steuert, was im print-area gerendert wird).
+   - Statt direkt `window.print()` im `useEffect` aufzurufen, prüfen: Mobile → `exportElementToPdf()`, sonst `window.print()`.
+   - Dateinamen sinnvoll setzen, z. B. `Schueler_<Nachname>_<Sektion>.pdf`.
+
+7. **CSS-Anpassung** (`src/index.css`)
+   - Neue Klasse `.pdf-export-mode` ergänzen, die den `.print-area` während des Exports sichtbar macht (off-screen positioniert), mit fester Breite ~800px für konsistentes Layout.
+   - Bestehendes `@media print` unverändert lassen (Desktop-Druck).
 
 ## Technische Details
 
-| Datei | Änderung |
-|---|---|
-| `src/components/DashboardLayout.tsx` | `<main>` erhält `id="dashboard-scroll"` |
-| `src/pages/dashboard/Fahrschueler.tsx` | `STORAGE_KEY` um `lastStudentId` erweitern; `onClick` der Schülerzeile setzt `lastStudentId` vor `navigate`; `data-student-id` am Listen-Button; Restore-`useEffect` scrollt zur Zeile via `scrollIntoView`, mit Fallback auf `scrollY`; alle `querySelector("main")` ersetzt durch `getElementById("dashboard-scroll")`; kurzer Highlight-State (`highlightId`) für ~1200 ms |
+```ts
+// src/lib/exportPdf.ts
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
-Keine DB-Änderungen, keine neuen Dependencies, keine Logikänderung an Daten.
+export async function exportElementToPdf(el: HTMLElement, filename: string) {
+  el.classList.add("pdf-export-mode");
+  try {
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#fff", useCORS: true });
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageW = 210, pageH = 297;
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    let heightLeft = imgH;
+    let position = 0;
+    const img = canvas.toDataURL("image/png");
+    pdf.addImage(img, "PNG", 0, position, imgW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      position -= pageH;
+      pdf.addPage();
+      pdf.addImage(img, "PNG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+    }
+    pdf.save(filename);
+  } finally {
+    el.classList.remove("pdf-export-mode");
+  }
+}
+```
+
+```css
+/* src/index.css */
+.pdf-export-mode {
+  position: fixed !important;
+  left: -10000px !important;
+  top: 0 !important;
+  display: block !important;
+  width: 800px !important;
+  background: white !important;
+  color: black !important;
+  padding: 24px !important;
+  z-index: -1;
+}
+```
+
+## Out of Scope
+- Keine Änderungen an Inhalten/Spalten der Reports.
+- Keine Änderung des Desktop-Druckverhaltens.
