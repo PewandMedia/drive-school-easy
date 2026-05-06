@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { exportElementToPdf, isMobileDevice } from "@/lib/exportPdf";
 import { format, startOfDay, addDays } from "date-fns";
 import { de } from "date-fns/locale";
 import { FileText, Printer, Banknote, CreditCard, Building2 } from "lucide-react";
