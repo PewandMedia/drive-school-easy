@@ -96,18 +96,19 @@ const Tagesabrechnung = () => {
     const dayStart = startOfDay(new Date(selectedDate));
     const dayEnd = addDays(dayStart, 1);
 
-    const { data, error } = await supabase
-      .from("payments")
-      .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
-      .gte("einreichungsdatum", dayStart.toISOString())
-      .lt("einreichungsdatum", dayEnd.toISOString())
-      .order("einreichungsdatum", { ascending: true });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<PaymentRow>(
+        supabase
+          .from("payments")
+          .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+          .gte("einreichungsdatum", dayStart.toISOString())
+          .lt("einreichungsdatum", dayEnd.toISOString())
+          .order("einreichungsdatum", { ascending: true }) as any
+      );
+      setPayments(data || []);
+    } catch (error) {
       toast.error("Fehler beim Laden der Zahlungen");
       console.error(error);
-    } else {
-      setPayments((data as unknown as PaymentRow[]) || []);
     }
     setActiveDate(selectedDate);
     setSubmitted(true);
