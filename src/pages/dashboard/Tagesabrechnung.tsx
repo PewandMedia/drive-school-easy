@@ -4,6 +4,7 @@ import { format, startOfDay, addDays } from "date-fns";
 import { de } from "date-fns/locale";
 import { FileText, Printer, Banknote, CreditCard, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
