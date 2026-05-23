@@ -78,15 +78,14 @@ const Schaltstunden = () => {
 
   const { data: students = [] } = useQuery<Student[]>({
     queryKey: ["students", "b197"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, vorname, nachname, geburtsdatum")
-        .eq("fuehrerscheinklasse", "B197")
-        .order("nachname");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      fetchAllRows<Student>(
+        supabase
+          .from("students")
+          .select("id, vorname, nachname, geburtsdatum")
+          .eq("fuehrerscheinklasse", "B197")
+          .order("nachname")
+      ),
   });
 
   const b197StudentIds = students.map((s) => s.id);
