@@ -1,39 +1,57 @@
-# Mobile-Druck mit nativem Dialog
+# Supabase 1000-Zeilen-Limit überall entfernen
 
-## Problem
-Der aktuelle Mobile-Export erzeugt zwar eine PDF, öffnet sie aber nur als Vorschau ohne Druck-/Speichern-Button (iOS Safari / Android Chrome zeigen das PDF inline an, ohne Aktionen).
+## Ziel
+Sicherstellen, dass alle Dashboard-Seiten und Statistiken **alle** Datensätze aus Supabase laden – auch wenn die Tabelle mehr als 1000 Einträge enthält. Dafür wird der bereits vorhandene `fetchAllRows`-Helper (paginiert in 1000er-Blöcken via `.range()`) überall dort eingesetzt, wo Listen oder Aggregate gelesen werden.
 
-## Lösung
-Statt einer fertigen PDF-Datei via jsPDF zu generieren, öffnen wir den Print-Bereich in einem neuen Fenster/Tab und rufen dort den nativen Druckdialog auf. Damit bekommt der Nutzer auf jedem Gerät:
-- iOS: Teilen-Sheet mit „Drucken" und „In Dateien sichern"
-- Android: Druckdialog mit „Als PDF speichern" und Druckerauswahl
-- Desktop: gewohnter Druckdialog
+## Befund (Audit)
+Bereits korrekt (nutzen `fetchAllRows`):
+- Dashboard, Abrechnung, Fahrschueler, Fahrstunden, Theorie (Sessions/Students), Pruefungen, Leistungen, Zahlungen, Auswertung, FahrlehrerStatistik (lessons + theory).
 
-Ergebnis: identisches Verhalten wie auf dem PC, mit echtem Drucken-Button.
+Noch **ohne** `fetchAllRows` – können bei Wachstum abgeschnitten werden:
+1. `src/pages/dashboard/FahrlehrerStatistik.tsx`
+   - `exams` (Praxis, mit instructor) – Statistik-relevant
+   - `instructors`-Liste (klein, aber zur Konsistenz)
+2. `src/pages/dashboard/Tagesabrechnung.tsx`
+   - `payments` für den ausgewählten Tag (Tagessummen/Anzahl)
+3. `src/pages/dashboard/Schaltstunden.tsx`
+   - `students` (B197) – Liste
+4. `src/pages/dashboard/FahrschuelerDetail.tsx` (pro Schüler, beeinflusst angezeigte Zahlen/Saldo):
+   - driving_lessons, services, theory_sessions, exams, payments, prices, instructors, payment-IDs
+5. `src/pages/dashboard/Theorie.tsx`, `Zahlungen.tsx`, `Benutzerverwaltung.tsx`
+   - Referenzlisten (instructors, profiles, user_roles) – klein, aber zur Sicherheit ebenfalls umstellen
 
-## Technische Schritte
+## Umsetzung
+- Jede betroffene `useQuery`-`queryFn` so umbauen, dass die Supabase-Query in `fetchAllRows(...)` gewrappt wird, statt direkt `await`-ed zu werden.
+- `import { fetchAllRows } from "@/lib/fetchAllRows";` wo nötig ergänzen.
+- Fehlerbehandlung beibehalten (fetchAllRows wirft bei Fehler, React Query fängt das ab).
+- Einzelsatz-Lookups (`.single()`, `.maybeSingle()`, `.eq("id", …)`) bleiben unverändert – dort gibt es kein Limit-Problem.
+- Mutationen (insert/update/delete) bleiben unverändert.
 
-1. **`src/lib/exportPdf.ts` umbauen**
-   - Funktion `printElement(el, title)`:
-     - Öffnet `window.open("", "_blank")`.
-     - Schreibt ein vollständiges HTML-Dokument: `<html>` mit allen aktuellen `<style>`/`<link>`-Tags der App + dem `outerHTML` des Print-Bereichs.
-     - CSS direkt einbettet (A4-Layout, Tabellen-Styles, schwarze Schrift) – identisch zum bisherigen `.pdf-export-mode`.
-     - Nach `onload`: `win.focus(); win.print();` – Browser zeigt nativen Drucken-Dialog.
-   - Bisheriger jsPDF-Pfad bleibt als Fallback, falls Popup blockiert wird (toast mit Hinweis).
-   - jspdf/html2canvas-Imports entfernen (nicht mehr nötig).
+## Technische Details
+`fetchAllRows` paginiert in 1000er-Blöcken via `.range(from, to)` und bricht ab, sobald eine Seite < 1000 Zeilen liefert. Das umgeht den Supabase-Default-`max_rows`-Limit zuverlässig.
 
-2. **`src/pages/dashboard/Tagesabrechnung.tsx`**
-   - `handleExport`: auf Mobile `printElement(printRef.current, "Tagesabrechnung_<datum>")` aufrufen, Desktop weiter `window.print()`.
+Beispiel-Refactor:
+```ts
+// vorher
+const { data, error } = await supabase
+  .from("exams")
+  .select("instructor_id, datum, status")
+  .eq("typ", "praxis")
+  .not("instructor_id", "is", null);
+if (error) throw error;
+return data;
 
-3. **`src/pages/dashboard/FahrschuelerDetail.tsx`**
-   - Print-Trigger im `useEffect`: Mobile → `printElement(...)`, Desktop → `window.print()`.
+// nachher
+return fetchAllRows(
+  supabase
+    .from("exams")
+    .select("instructor_id, datum, status")
+    .eq("typ", "praxis")
+    .not("instructor_id", "is", null)
+);
+```
 
-4. **CSS / Print-Styles**
-   - Im neuen Fenster ein eingebettetes Stylesheet mit den bestehenden Print-Regeln (A4, Tabellen, Schriftgrößen) verwenden, damit das Ergebnis sauber aussieht.
-
-## Erwartung
-Nutzer tippt auf „Als PDF exportieren" → es öffnet sich der native Druckdialog des Geräts → Nutzer kann „Als PDF speichern" oder direkt drucken wählen, genau wie am PC.
-
-## Out of Scope
-- Backend-Änderungen.
-- Inhaltliche Änderungen an den Berichten.
+## Nicht enthalten
+- Keine Schema-Änderungen, keine RLS-Änderungen.
+- Keine UI-Änderungen.
+- Keine Änderungen an Mutations- oder Auth-Logik.

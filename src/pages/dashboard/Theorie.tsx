@@ -80,11 +80,9 @@ const Theorie = () => {
 
   const { data: instructors = [] } = useQuery<Instructor[]>({
     queryKey: ["instructors_active"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(
+      supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname")
+    ),
   });
 
   const insertMutation = useMutation({

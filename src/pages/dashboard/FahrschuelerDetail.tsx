@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -189,31 +190,19 @@ const FahrschuelerDetail = () => {
 
   const { data: lessons = [], isLoading: loadingLessons } = useQuery({
     queryKey: ["driving_lessons", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("driving_lessons").select("*").eq("student_id", id!).order("datum", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("driving_lessons").select("*").eq("student_id", id!).order("datum", { ascending: false })),
     enabled: !!id,
   });
 
   const { data: services = [], isLoading: loadingServices } = useQuery({
     queryKey: ["services", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("services").select("*").eq("student_id", id!).order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("services").select("*").eq("student_id", id!).order("created_at", { ascending: false })),
     enabled: !!id,
   });
 
   const { data: theorySessions = [], isLoading: loadingTheory } = useQuery({
     queryKey: ["theory_sessions", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("theory_sessions").select("*").eq("student_id", id!).order("datum", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("theory_sessions").select("*").eq("student_id", id!).order("datum", { ascending: false })),
     enabled: !!id,
   });
 
@@ -221,36 +210,22 @@ const FahrschuelerDetail = () => {
 
   const { data: exams = [], isLoading: loadingExams } = useQuery({
     queryKey: ["exams", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("exams").select("*").eq("student_id", id!).order("datum", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("exams").select("*").eq("student_id", id!).order("datum", { ascending: false })),
     enabled: !!id,
   });
 
   const { data: payments = [], isLoading: loadingPayments } = useQuery({
     queryKey: ["payments", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("payments").select("*").eq("student_id", id!).order("datum", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(supabase.from("payments").select("*").eq("student_id", id!).order("datum", { ascending: false })),
     enabled: !!id,
   });
 
   // Open items query
   const { data: openItems = [] } = useQuery({
     queryKey: ["open_items", id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("open_items")
-        .select("*")
-        .eq("student_id", id!)
-        .order("datum", { ascending: true });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(
+      supabase.from("open_items").select("*").eq("student_id", id!).order("datum", { ascending: true })
+    ),
     enabled: !!id,
   });
 
@@ -258,15 +233,14 @@ const FahrschuelerDetail = () => {
   const { data: paymentAllocations = [] } = useQuery({
     queryKey: ["payment_allocations", id],
     queryFn: async () => {
-      const { data: paymentIds } = await supabase.from("payments").select("id").eq("student_id", id!);
-      if (!paymentIds || paymentIds.length === 0) return [];
-      const ids = paymentIds.map((p: any) => p.id);
-      const { data, error } = await supabase
-        .from("payment_allocations")
-        .select("*")
-        .in("payment_id", ids);
-      if (error) throw error;
-      return data ?? [];
+      const paymentIds = await fetchAllRows<{ id: string }>(
+        supabase.from("payments").select("id").eq("student_id", id!)
+      );
+      if (paymentIds.length === 0) return [];
+      const ids = paymentIds.map((p) => p.id);
+      return fetchAllRows(
+        supabase.from("payment_allocations").select("*").in("payment_id", ids)
+      );
     },
     enabled: !!id,
   });
@@ -274,20 +248,16 @@ const FahrschuelerDetail = () => {
   // Additional queries for modals
   const { data: prices = [] } = useQuery({
     queryKey: ["prices", "active"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("prices").select("*").eq("aktiv", true).order("kategorie").order("bezeichnung");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(
+      supabase.from("prices").select("*").eq("aktiv", true).order("kategorie").order("bezeichnung")
+    ),
   });
 
   const { data: instructors = [] } = useQuery({
     queryKey: ["instructors_active"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => fetchAllRows(
+      supabase.from("instructors").select("id, vorname, nachname").eq("aktiv", true).order("nachname")
+    ),
   });
 
   // Auto-fill exam price

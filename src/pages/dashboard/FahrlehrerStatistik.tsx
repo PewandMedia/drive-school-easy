@@ -61,14 +61,10 @@ const FahrlehrerStatistik = () => {
   // ── Queries ──────────────────────────────────────────
   const { data: instructors, isLoading: l1 } = useQuery({
     queryKey: ["instructors-all"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("instructors")
-        .select("id, vorname, nachname")
-        .order("nachname");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () =>
+      fetchAllRows(
+        supabase.from("instructors").select("id, vorname, nachname").order("nachname")
+      ),
   });
 
   const { data: drivingLessons, isLoading: l2 } = useQuery({
@@ -95,15 +91,14 @@ const FahrlehrerStatistik = () => {
 
   const { data: exams, isLoading: l4 } = useQuery({
     queryKey: ["exams-praxis-stats"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("exams")
-        .select("instructor_id, datum, status")
-        .eq("typ", "praxis")
-        .not("instructor_id", "is", null);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () =>
+      fetchAllRows(
+        supabase
+          .from("exams")
+          .select("instructor_id, datum, status")
+          .eq("typ", "praxis")
+          .not("instructor_id", "is", null)
+      ),
   });
 
   const isLoading = l1 || l2 || l3 || l4;
