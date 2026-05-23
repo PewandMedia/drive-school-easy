@@ -77,29 +77,23 @@ const Benutzerverwaltung = () => {
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin_profiles"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").neq("email", "media@gmail.com").order("created_at") as any;
-      if (error) throw error;
-      return data as Profile[];
-    },
+    queryFn: () => fetchAllRows<Profile>(
+      supabase.from("profiles").select("*").neq("email", "media@gmail.com").order("created_at") as any
+    ),
   });
 
   const { data: instructors = [] } = useQuery({
     queryKey: ["instructors_manage"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("instructors").select("id, vorname, nachname, aktiv").order("nachname") as any;
-      if (error) throw error;
-      return data as { id: string; vorname: string; nachname: string; aktiv: boolean }[];
-    },
+    queryFn: () => fetchAllRows<{ id: string; vorname: string; nachname: string; aktiv: boolean }>(
+      supabase.from("instructors").select("id, vorname, nachname, aktiv").order("nachname") as any
+    ),
   });
 
   const { data: roles = [] } = useQuery({
     queryKey: ["admin_user_roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("user_roles").select("user_id, role") as any;
-      if (error) throw error;
-      return data as UserRole[];
-    },
+    queryFn: () => fetchAllRows<UserRole>(
+      supabase.from("user_roles").select("user_id, role") as any
+    ),
   });
 
   const { data: userLogs = [], isLoading: logsLoading } = useQuery({
