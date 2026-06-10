@@ -123,9 +123,12 @@ const Tagesabrechnung = () => {
   };
 
   const filteredPayments = useMemo(() => {
-    if (filterZahlungsart === "alle") return payments;
-    return payments.filter((p) => p.zahlungsart === filterZahlungsart);
-  }, [payments, filterZahlungsart]);
+    return payments.filter((p) => {
+      if (filterZahlungsart !== "alle" && p.zahlungsart !== filterZahlungsart) return false;
+      if (filterFahrschule !== "alle" && (p.students?.fahrschule ?? "riemke") !== filterFahrschule) return false;
+      return true;
+    });
+  }, [payments, filterZahlungsart, filterFahrschule]);
 
   const totals = useMemo(() => {
     const t = { bar: 0, ec: 0, ueberweisung: 0, gesamt: 0 };
