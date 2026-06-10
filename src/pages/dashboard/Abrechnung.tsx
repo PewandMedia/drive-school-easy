@@ -23,6 +23,7 @@ const Abrechnung = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
   const [sortBySaldo, setSortBySaldo] = useState(true);
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
 
   // Reset visible count on search change
   useEffect(() => { setVisibleCount(10); }, [searchTerm]);
