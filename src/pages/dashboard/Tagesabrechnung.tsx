@@ -81,6 +81,7 @@ const Tagesabrechnung = () => {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
   const [activeDate, setActiveDate] = useState<string>(selectedDate);
   const printRef = useRef<HTMLDivElement>(null);
 
