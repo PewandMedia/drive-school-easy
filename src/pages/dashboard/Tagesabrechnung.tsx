@@ -339,6 +339,9 @@ const Tagesabrechnung = () => {
           {filterZahlungsart !== "alle" && (
             <p className="text-xs mt-0.5 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
           )}
+          {filterFahrschule !== "alle" && (
+            <p className="text-xs mt-0.5 italic">Filiale: {FAHRSCHULE_LABELS[filterFahrschule]}</p>
+          )}
         </div>
 
         {filteredPayments.length > 0 && (
