@@ -26,7 +26,7 @@ const Abrechnung = () => {
   const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
 
   // Reset visible count on search change
-  useEffect(() => { setVisibleCount(10); }, [searchTerm]);
+  useEffect(() => { setVisibleCount(10); }, [searchTerm, filterFahrschule]);
 
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
