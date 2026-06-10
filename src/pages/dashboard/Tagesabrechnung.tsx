@@ -269,6 +269,7 @@ const Tagesabrechnung = () => {
                       <SelectItem value="riemke">Riemke Markt</SelectItem>
                       <SelectItem value="rathaus">Rathaus</SelectItem>
                     </SelectContent>
+                  </Select>
                   <Button variant="outline" onClick={handleExport}>
                     <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
                   </Button>
