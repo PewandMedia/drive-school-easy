@@ -39,13 +39,17 @@ const Abrechnung = () => {
   });
 
   // ── Saldo pro Schüler berechnen (aus open_items) ─────────────────────────────
-  const saldoMap = students.map((s) => {
+  const saldoMapAll = students.map((s) => {
     const items = openItems.filter((oi: any) => oi.student_id === s.id);
     const forderungen = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_gesamt), 0);
     const bezahlt = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_bezahlt), 0);
     const saldo = forderungen - bezahlt;
     return { ...s, forderungen, bezahlt, saldo };
   });
+
+  const saldoMap = saldoMapAll.filter((s: any) =>
+    filterFahrschule === "alle" ? true : (s.fahrschule ?? "riemke") === filterFahrschule
+  );
 
   const sorted = [...saldoMap].sort((a, b) =>
     sortBySaldo ? b.saldo - a.saldo : a.nachname.localeCompare(b.nachname, "de")
