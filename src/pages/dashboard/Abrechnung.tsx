@@ -23,9 +23,10 @@ const Abrechnung = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
   const [sortBySaldo, setSortBySaldo] = useState(true);
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
 
   // Reset visible count on search change
-  useEffect(() => { setVisibleCount(10); }, [searchTerm]);
+  useEffect(() => { setVisibleCount(10); }, [searchTerm, filterFahrschule]);
 
   const { data: students = [] } = useQuery({
     queryKey: ["students"],
@@ -38,13 +39,17 @@ const Abrechnung = () => {
   });
 
   // ── Saldo pro Schüler berechnen (aus open_items) ─────────────────────────────
-  const saldoMap = students.map((s) => {
+  const saldoMapAll = students.map((s) => {
     const items = openItems.filter((oi: any) => oi.student_id === s.id);
     const forderungen = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_gesamt), 0);
     const bezahlt = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_bezahlt), 0);
     const saldo = forderungen - bezahlt;
     return { ...s, forderungen, bezahlt, saldo };
   });
+
+  const saldoMap = saldoMapAll.filter((s: any) =>
+    filterFahrschule === "alle" ? true : (s.fahrschule ?? "riemke") === filterFahrschule
+  );
 
   const sorted = [...saldoMap].sort((a, b) =>
     sortBySaldo ? b.saldo - a.saldo : a.nachname.localeCompare(b.nachname, "de")
@@ -111,7 +116,18 @@ const Abrechnung = () => {
               {sortBySaldo ? "Sortiert nach offenstem Saldo" : "Sortiert alphabetisch"} · Klick auf Zeile öffnet Schülerdetail
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-md border border-border p-1">
+              {([["alle", "Alle"], ["riemke", "Riemke Markt"], ["rathaus", "Rathaus"]] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setFilterFahrschule(val)}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${filterFahrschule === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <Button
               variant={sortBySaldo ? "default" : "outline"}
               size="sm"

@@ -31,9 +31,15 @@ type PaymentRow = {
   datum: string;
   einreichungsdatum: string | null;
   instructor_id: string | null;
-  students: { vorname: string; nachname: string } | null;
+  students: { vorname: string; nachname: string; fahrschule: string | null } | null;
   instructors: { vorname: string; nachname: string } | null;
   payment_allocations: Allocation[];
+};
+
+const FAHRSCHULE_LABELS: Record<string, string> = {
+  alle: "Alle Filialen",
+  riemke: "Riemke Markt",
+  rathaus: "Rathaus",
 };
 
 const zahlungsartLabel: Record<string, string> = {
@@ -75,6 +81,7 @@ const Tagesabrechnung = () => {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [notiz, setNotiz] = useState("");
   const [filterZahlungsart, setFilterZahlungsart] = useState("alle");
+  const [filterFahrschule, setFilterFahrschule] = useState<"alle" | "riemke" | "rathaus">("alle");
   const [activeDate, setActiveDate] = useState<string>(selectedDate);
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +107,7 @@ const Tagesabrechnung = () => {
       const data = await fetchAllRows<PaymentRow>(
         supabase
           .from("payments")
-          .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+          .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname, fahrschule), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
           .gte("einreichungsdatum", dayStart.toISOString())
           .lt("einreichungsdatum", dayEnd.toISOString())
           .order("einreichungsdatum", { ascending: true }) as any
@@ -116,9 +123,12 @@ const Tagesabrechnung = () => {
   };
 
   const filteredPayments = useMemo(() => {
-    if (filterZahlungsart === "alle") return payments;
-    return payments.filter((p) => p.zahlungsart === filterZahlungsart);
-  }, [payments, filterZahlungsart]);
+    return payments.filter((p) => {
+      if (filterZahlungsart !== "alle" && p.zahlungsart !== filterZahlungsart) return false;
+      if (filterFahrschule !== "alle" && (p.students?.fahrschule ?? "riemke") !== filterFahrschule) return false;
+      return true;
+    });
+  }, [payments, filterZahlungsart, filterFahrschule]);
 
   const totals = useMemo(() => {
     const t = { bar: 0, ec: 0, ueberweisung: 0, gesamt: 0 };
@@ -250,6 +260,16 @@ const Tagesabrechnung = () => {
                       <SelectItem value="ueberweisung">Überweisung</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={filterFahrschule} onValueChange={(v: any) => setFilterFahrschule(v)}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Filiale" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle Filialen</SelectItem>
+                      <SelectItem value="riemke">Riemke Markt</SelectItem>
+                      <SelectItem value="rathaus">Rathaus</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button variant="outline" onClick={handleExport}>
                     <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
                   </Button>
@@ -318,6 +338,9 @@ const Tagesabrechnung = () => {
           </p>
           {filterZahlungsart !== "alle" && (
             <p className="text-xs mt-0.5 italic">Filter: Nur {zahlungsartLabel[filterZahlungsart]}</p>
+          )}
+          {filterFahrschule !== "alle" && (
+            <p className="text-xs mt-0.5 italic">Filiale: {FAHRSCHULE_LABELS[filterFahrschule]}</p>
           )}
         </div>
 

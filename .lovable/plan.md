@@ -1,57 +1,23 @@
-# Supabase 1000-Zeilen-Limit überall entfernen
+# Filiale-Filter für Abrechnungen
 
-## Ziel
-Sicherstellen, dass alle Dashboard-Seiten und Statistiken **alle** Datensätze aus Supabase laden – auch wenn die Tabelle mehr als 1000 Einträge enthält. Dafür wird der bereits vorhandene `fetchAllRows`-Helper (paginiert in 1000er-Blöcken via `.range()`) überall dort eingesetzt, wo Listen oder Aggregate gelesen werden.
+Auf den Abrechnungsseiten soll man nach Fahrschul-Filiale filtern können (Riemke Markt / Rathaus / Alle), analog zum Filter auf der Fahrschüler-Seite.
 
-## Befund (Audit)
-Bereits korrekt (nutzen `fetchAllRows`):
-- Dashboard, Abrechnung, Fahrschueler, Fahrstunden, Theorie (Sessions/Students), Pruefungen, Leistungen, Zahlungen, Auswertung, FahrlehrerStatistik (lessons + theory).
+## Änderungen
 
-Noch **ohne** `fetchAllRows` – können bei Wachstum abgeschnitten werden:
-1. `src/pages/dashboard/FahrlehrerStatistik.tsx`
-   - `exams` (Praxis, mit instructor) – Statistik-relevant
-   - `instructors`-Liste (klein, aber zur Konsistenz)
-2. `src/pages/dashboard/Tagesabrechnung.tsx`
-   - `payments` für den ausgewählten Tag (Tagessummen/Anzahl)
-3. `src/pages/dashboard/Schaltstunden.tsx`
-   - `students` (B197) – Liste
-4. `src/pages/dashboard/FahrschuelerDetail.tsx` (pro Schüler, beeinflusst angezeigte Zahlen/Saldo):
-   - driving_lessons, services, theory_sessions, exams, payments, prices, instructors, payment-IDs
-5. `src/pages/dashboard/Theorie.tsx`, `Zahlungen.tsx`, `Benutzerverwaltung.tsx`
-   - Referenzlisten (instructors, profiles, user_roles) – klein, aber zur Sicherheit ebenfalls umstellen
+### 1. `src/pages/dashboard/Abrechnung.tsx`
+- Neuer State `filterFahrschule: "alle" | "riemke" | "rathaus"` (Default `"alle"`).
+- Drei Filter-Buttons (Alle / Riemke Markt / Rathaus) in der Toolbar neben "Nach Saldo" / Suche, gleiches Styling wie auf der Fahrschüler-Seite.
+- Filterung von `sorted` zusätzlich nach `s.fahrschule`.
+- Statistik-Karten (Gesamtforderungen, Bezahlt, Saldo) werden ebenfalls auf die gefilterte Filiale berechnet, damit Zahlen zur Auswahl passen.
 
-## Umsetzung
-- Jede betroffene `useQuery`-`queryFn` so umbauen, dass die Supabase-Query in `fetchAllRows(...)` gewrappt wird, statt direkt `await`-ed zu werden.
-- `import { fetchAllRows } from "@/lib/fetchAllRows";` wo nötig ergänzen.
-- Fehlerbehandlung beibehalten (fetchAllRows wirft bei Fehler, React Query fängt das ab).
-- Einzelsatz-Lookups (`.single()`, `.maybeSingle()`, `.eq("id", …)`) bleiben unverändert – dort gibt es kein Limit-Problem.
-- Mutationen (insert/update/delete) bleiben unverändert.
+### 2. `src/pages/dashboard/Tagesabrechnung.tsx`
+- Neuer State `filterFahrschule`.
+- Filter-Buttons im Header (Alle / Riemke Markt / Rathaus).
+- Payments werden über `student_id → students.fahrschule` der gewählten Filiale zugeordnet. Dafür `students` (id, fahrschule) zusätzlich via `fetchAllRows` laden und beim Filtern joinen.
+- Summen (Bar / EC / Überweisung / Gesamt) und Tabelle reagieren auf den Filter.
+- PDF-Export nimmt den aktuell gefilterten Zustand (Titel zeigt Filialname, z. B. "Tagesabrechnung – Riemke Markt – TT.MM.JJJJ").
 
-## Technische Details
-`fetchAllRows` paginiert in 1000er-Blöcken via `.range(from, to)` und bricht ab, sobald eine Seite < 1000 Zeilen liefert. Das umgeht den Supabase-Default-`max_rows`-Limit zuverlässig.
-
-Beispiel-Refactor:
-```ts
-// vorher
-const { data, error } = await supabase
-  .from("exams")
-  .select("instructor_id, datum, status")
-  .eq("typ", "praxis")
-  .not("instructor_id", "is", null);
-if (error) throw error;
-return data;
-
-// nachher
-return fetchAllRows(
-  supabase
-    .from("exams")
-    .select("instructor_id, datum, status")
-    .eq("typ", "praxis")
-    .not("instructor_id", "is", null)
-);
-```
-
-## Nicht enthalten
-- Keine Schema-Änderungen, keine RLS-Änderungen.
-- Keine UI-Änderungen.
-- Keine Änderungen an Mutations- oder Auth-Logik.
+## Technische Hinweise
+- `FAHRSCHULE_LABELS = { riemke: "Riemke Markt", rathaus: "Rathaus" }` lokal je Datei (wie bereits in Fahrschüler.tsx).
+- Keine DB-Änderungen nötig, das Feld `students.fahrschule` existiert.
+- Keine Änderung an Berechtigungen/RLS.
