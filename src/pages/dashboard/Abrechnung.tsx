@@ -116,7 +116,18 @@ const Abrechnung = () => {
               {sortBySaldo ? "Sortiert nach offenstem Saldo" : "Sortiert alphabetisch"} · Klick auf Zeile öffnet Schülerdetail
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-md border border-border p-1">
+              {([["alle", "Alle"], ["riemke", "Riemke Markt"], ["rathaus", "Rathaus"]] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setFilterFahrschule(val)}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${filterFahrschule === val ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <Button
               variant={sortBySaldo ? "default" : "outline"}
               size="sm"
