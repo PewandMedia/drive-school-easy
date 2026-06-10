@@ -31,9 +31,15 @@ type PaymentRow = {
   datum: string;
   einreichungsdatum: string | null;
   instructor_id: string | null;
-  students: { vorname: string; nachname: string } | null;
+  students: { vorname: string; nachname: string; fahrschule: string | null } | null;
   instructors: { vorname: string; nachname: string } | null;
   payment_allocations: Allocation[];
+};
+
+const FAHRSCHULE_LABELS: Record<string, string> = {
+  alle: "Alle Filialen",
+  riemke: "Riemke Markt",
+  rathaus: "Rathaus",
 };
 
 const zahlungsartLabel: Record<string, string> = {
