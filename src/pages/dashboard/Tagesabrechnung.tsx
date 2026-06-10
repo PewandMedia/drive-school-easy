@@ -260,6 +260,15 @@ const Tagesabrechnung = () => {
                       <SelectItem value="ueberweisung">Überweisung</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={filterFahrschule} onValueChange={(v: any) => setFilterFahrschule(v)}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Filiale" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle Filialen</SelectItem>
+                      <SelectItem value="riemke">Riemke Markt</SelectItem>
+                      <SelectItem value="rathaus">Rathaus</SelectItem>
+                    </SelectContent>
                   <Button variant="outline" onClick={handleExport}>
                     <Printer className="mr-1 h-4 w-4" /> Als PDF exportieren
                   </Button>
