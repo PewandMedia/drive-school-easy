@@ -35,14 +35,29 @@ const Abrechnung = () => {
 
   const { data: openItems = [] } = useQuery({
     queryKey: ["open_items_all"],
-    queryFn: () => fetchAllRows(supabase.from("open_items").select("student_id, betrag_gesamt, betrag_bezahlt") as any) as Promise<any[]>,
+    queryFn: () => fetchAllRows(supabase.from("open_items").select("student_id, betrag_gesamt") as any) as Promise<any[]>,
   });
 
-  // ── Saldo pro Schüler berechnen (aus open_items) ─────────────────────────────
+  const { data: paymentsAll = [] } = useQuery({
+    queryKey: ["payments_abrechnung"],
+    queryFn: () => fetchAllRows(supabase.from("payments").select("student_id, betrag") as any) as Promise<any[]>,
+  });
+
+  // ── Saldo pro Schüler berechnen ─────────────────────────────────────────────
+  // Forderungen aus open_items, Bezahlt direkt aus payments (echte Quelle).
+  // Garantiert Konsistenz mit Fahrschüler-Liste und Profil.
+  const forderungenByStudent: Record<string, number> = {};
+  for (const oi of openItems as any[]) {
+    forderungenByStudent[oi.student_id] = (forderungenByStudent[oi.student_id] || 0) + Number(oi.betrag_gesamt);
+  }
+  const bezahltByStudent: Record<string, number> = {};
+  for (const p of paymentsAll as any[]) {
+    bezahltByStudent[p.student_id] = (bezahltByStudent[p.student_id] || 0) + Number(p.betrag);
+  }
+
   const saldoMapAll = students.map((s) => {
-    const items = openItems.filter((oi: any) => oi.student_id === s.id);
-    const forderungen = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_gesamt), 0);
-    const bezahlt = items.reduce((acc: number, oi: any) => acc + Number(oi.betrag_bezahlt), 0);
+    const forderungen = forderungenByStudent[s.id] || 0;
+    const bezahlt = bezahltByStudent[s.id] || 0;
     const saldo = forderungen - bezahlt;
     return { ...s, forderungen, bezahlt, saldo };
   });
