@@ -178,10 +178,10 @@ const Fahrschueler = () => {
     if (filterFahrschule !== "alle" && s.fahrschule !== filterFahrschule) return false;
     const q = search.toLowerCase();
     return (
-      s.vorname.toLowerCase().includes(q) ||
-      s.nachname.toLowerCase().includes(q) ||
+      s.vorname?.toLowerCase().includes(q) ||
+      s.nachname?.toLowerCase().includes(q) ||
       s.email?.toLowerCase().includes(q) ||
-      s.fuehrerscheinklasse.toLowerCase().includes(q)
+      s.fuehrerscheinklasse?.toLowerCase().includes(q)
     );
   });
 
