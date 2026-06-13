@@ -902,17 +902,15 @@ const FahrschuelerDetail = () => {
   const totalLeistungen  = services.reduce((sum, sv) => sum + Number(sv.preis), 0);
   const totalZahlungen   = payments.reduce((sum, p) => sum + Number(p.betrag), 0);
 
-  // Saldo aus open_items berechnen
+  // Saldo: Forderungen aus open_items, Bezahlt direkt aus payments (echte Quelle).
+  // Damit ist die Anzeige konsistent mit der Fahrschüler-Liste und unabhängig
+  // von ggf. veralteten open_items.betrag_bezahlt-Werten.
   const totalForderungen = openItems.reduce((sum: number, oi: any) => sum + Number(oi.betrag_gesamt), 0);
-  const totalBezahlt = openItems.reduce((sum: number, oi: any) => sum + Number(oi.betrag_bezahlt), 0);
-
-  // Guthaben = positive Zahlungen - zugeordnete Beträge
-  const positiveZahlungen = payments.filter((p: any) => Number(p.betrag) > 0).reduce((s: number, p: any) => s + Number(p.betrag), 0);
-  const summeAllocations = paymentAllocations.reduce((s: number, a: any) => s + Number(a.betrag), 0);
-  const guthaben = Math.max(0, positiveZahlungen - summeAllocations);
+  const totalBezahlt = payments.reduce((sum: number, p: any) => sum + Number(p.betrag), 0);
 
   const saldoRoh = totalForderungen - totalBezahlt;
-  const saldo = Math.max(0, saldoRoh - guthaben);
+  const saldo = Math.max(0, saldoRoh);
+  const guthaben = Math.max(0, -saldoRoh);
 
   const previewPrice = calculatePrice(fsFahrstunde.dauer_minuten);
 
