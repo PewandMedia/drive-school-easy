@@ -2311,7 +2311,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: "", selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (v) { const sf = ((student as any)?.fahrschule === "rathaus" ? "rathaus" : "riemke") as "riemke" | "rathaus"; setFsZahlung(f => ({ ...f, filiale: sf })); } if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", filiale: "riemke", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: "", selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
