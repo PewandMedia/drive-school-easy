@@ -219,10 +219,11 @@ const Zahlungen = () => {
   });
 
   const updatePaymentMutation = useMutation({
-    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string; einreichungsdatum: string; instructor_id: string }) => {
+    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; filiale: Filiale; datum: string; einreichungsdatum: string; instructor_id: string }) => {
       const { error } = await supabase.from("payments").update({
         betrag: parseFloat(vals.betrag) || 0,
         zahlungsart: vals.zahlungsart,
+        filiale: vals.filiale,
         datum: new Date(vals.datum).toISOString(),
         einreichungsdatum: new Date(vals.einreichungsdatum).toISOString(),
         instructor_id: vals.instructor_id || null,
