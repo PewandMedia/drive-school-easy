@@ -705,6 +705,7 @@ const Zahlungen = () => {
                     id: editingPayment.id,
                     betrag: isGutschrift ? String(-Math.abs(parseFloat(editPaymentForm.betrag))) : editPaymentForm.betrag,
                     zahlungsart: editPaymentForm.zahlungsart,
+                    filiale: editPaymentForm.filiale,
                     datum: editPaymentForm.datum,
                     einreichungsdatum: editPaymentForm.einreichungsdatum,
                     instructor_id: editPaymentForm.instructor_id,
