@@ -466,7 +466,11 @@ const Zahlungen = () => {
               <StudentCombobox
                 students={students}
                 value={form.student_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, student_id: v, selectedOpenItems: [] }))}
+                onValueChange={(v) => {
+                  const s = (students as any[]).find((x) => x.id === v);
+                  const stFiliale = (s?.fahrschule as Filiale) || undefined;
+                  setForm((f) => ({ ...f, student_id: v, selectedOpenItems: [], filiale: stFiliale ?? f.filiale }));
+                }}
                 placeholder="Schüler wählen…"
               />
             </div>
