@@ -1,47 +1,49 @@
-# Saldo-Anzeige vereinheitlichen
+## Filiale pro Zahlung — Rathaus oder Riemke
 
-## Problem
+Aktuell wird die Filiale nur beim Fahrschüler hinterlegt und der Filter in Abrechnung/Tagesabrechnung nutzt diese Zuordnung. Neu: Jede Zahlung bekommt eine eigene Filiale (wo das Geld tatsächlich abgegeben wurde), und die Tagesabrechnung/PDF filtert danach.
 
-Bei Aleyna Kir zeigt die Fahrschüler-Liste **975,00 € offen**, das Profil aber **0 € offen + 65 € Guthaben**. Beispieldaten:
+### 1. Datenbank
 
-- Forderungen (driving_lessons + exams + services): **2.469 €**
-- Tatsächliche Zahlungen (payments.betrag): **1.494 €** (379 + 75 + 1.040)
-- Korrekt offen: **2.469 − 1.494 = 975 €** ✅ (so zeigt es die Liste)
+Neue Spalte `filiale` auf `payments` (Enum-artig als Text `riemke` | `rathaus`, nullable für Altdaten).
 
-Das Profil rechnet aber mit `open_items.betrag_bezahlt`. Diese Summe ist **2.469 €**, obwohl die `payment_allocations` nur **1.429 €** ergeben. Die Spalte `betrag_bezahlt` ist also aus dem Tritt geraten (vermutlich durch frühere Updates ohne Trigger-Sync). Dadurch sieht das Profil die Forderungen fälschlich als komplett bezahlt und meldet sogar ein „Guthaben" von 65 €.
+```sql
+ALTER TABLE public.payments ADD COLUMN filiale text;
+ALTER TABLE public.payments ADD CONSTRAINT payments_filiale_check
+  CHECK (filiale IN ('riemke','rathaus') OR filiale IS NULL);
+```
 
-Das Problem betrifft mehrere Schüler und ebenso die Seite **Abrechnung** (nutzt dieselbe `open_items.betrag_bezahlt`-Summe).
+Altdaten bleiben `NULL` → werden als "Filiale unbekannt" behandelt und erscheinen nur bei Filter "Alle".
 
-## Lösung
+### 2. Zahlungserfassung — Filiale-Pflichtfeld
 
-Den „Bezahlt"-Wert überall direkt aus der echten Quelle `payments.betrag` rechnen, nicht aus `open_items.betrag_bezahlt`. Damit sind Liste, Profil und Abrechnung garantiert konsistent.
+Betroffen: Dialog "Zahlung erfassen" und "Zahlung bearbeiten" in
+- `src/pages/dashboard/Zahlungen.tsx`
+- `src/pages/dashboard/FahrschuelerDetail.tsx`
 
-### 1. `src/pages/dashboard/FahrschuelerDetail.tsx`
+Änderungen je Dialog:
+- Neues Feld **Filiale** (Radio oder Select: Riemke Markt / Rathaus) direkt neben Zahlungsart.
+- Default: Filiale des Schülers (falls gesetzt) — muss aber bestätigt/geändert werden können.
+- Validierung: Speichern nur mit gewählter Filiale.
+- Wert wird in `payments.filiale` gespeichert.
 
-- `totalBezahlt` neu: `payments.reduce((s, p) => s + Number(p.betrag), 0)` (statt Summe aus `open_items.betrag_bezahlt`).
-- `totalForderungen` bleibt aus `open_items.betrag_gesamt` (alternativ: lessons+exams+services — Ergebnis identisch).
-- `saldoRoh = totalForderungen − totalBezahlt`.
-- `saldo = max(0, saldoRoh)`.
-- `guthaben = max(0, −saldoRoh)` — ersetzt die bisherige Allocations-Berechnung. Damit verschwindet das falsche „Guthaben 65 €", wenn in Wahrheit noch 975 € offen sind.
-- Anzeige-Block bleibt unverändert (zeigt Forderungen / Bezahlt / ggf. Guthaben / Saldo).
-- „Guthaben verrechnen"-Button bleibt; verwendet weiter die Allocation-Logik (sie wird nur nicht mehr für die Saldo-Anzeige verwendet).
+### 3. Tagesabrechnung — Filter auf Zahlungs-Filiale
 
-### 2. `src/pages/dashboard/Abrechnung.tsx`
+`src/pages/dashboard/Tagesabrechnung.tsx`:
+- Der bestehende Filiale-Filter (Alle / Riemke / Rathaus) filtert ab jetzt nach `payment.filiale` statt nach `student.fahrschule`.
+- "Alle" zeigt weiterhin alles inkl. Altdaten ohne Filiale.
+- Neue Spalte **Filiale** in der Tabelle (Riemke / Rathaus / — bei Altdaten).
+- PDF-Druck-Header zeigt weiterhin die gewählte Filiale ("Filiale: Riemke Markt" / "Rathaus" / "Alle Filialen").
+- Die Filiale-Spalte erscheint im PDF, damit bei "Alle" sichtbar ist, wo jede Zahlung abgegeben wurde.
 
-Analog umstellen: Pro Schüler `bezahlt` aus `payments` (Summe `betrag` je `student_id`) statt aus `open_items.betrag_bezahlt`. Forderungen weiter aus `open_items.betrag_gesamt`. Saldo, Tabelle, Statistik-Karten und Filter funktionieren weiter wie bisher — nur mit korrekten Zahlen.
+### 4. Abrechnung (Salden-Übersicht) — unverändert
 
-- Zusätzlicher `payments`-Query via `fetchAllRows` (`student_id, betrag`).
-- `saldoMapAll`: `bezahlt = Σ payments.betrag` für `student_id == s.id`, `forderungen = Σ open_items.betrag_gesamt`, `saldo = forderungen − bezahlt`.
+`Abrechnung.tsx` bleibt auf der Filiale des **Schülers** (nicht der Zahlung), weil dort Salden pro Schüler dargestellt werden. Das passt zum Nutzungszweck (Wem gehört der Schüler?) und du hast das nicht explizit angefragt. Kann bei Bedarf nachgezogen werden.
 
-### 3. Keine weiteren Seiten betroffen
+### Zusammenfassung
 
-`Fahrschueler.tsx` rechnet bereits korrekt (Forderungen aus den drei Tabellen − Σ payments). Zahlungs- und Tagesabrechnungsseiten zeigen Zahlungen direkt und sind nicht betroffen.
-
-### 4. Keine Daten-Migration / kein DB-Eingriff
-
-Die Spalte `open_items.betrag_bezahlt` bleibt unverändert (wird für `status` und „Guthaben verrechnen" intern weiter genutzt). Wir lesen sie nur nicht mehr für die Saldo-Anzeige. Damit ist das Problem in der UI sofort behoben, unabhängig davon, ob alte Datensätze noch out-of-sync sind.
-
-## Ergebnis für Aleyna Kir nach Fix
-
-- Liste: **975,00 € offen** (unverändert)
-- Profil: Forderungen 2.469 €, Bezahlt −1.494 €, **Offener Saldo 975,00 €**, kein falsches Guthaben.
+| Datei | Änderung |
+|---|---|
+| Migration | Spalte `payments.filiale` + Check-Constraint |
+| `Zahlungen.tsx` | Filiale-Auswahl in Erfassen-/Bearbeiten-Dialog, Default vom Schüler |
+| `FahrschuelerDetail.tsx` | Filiale-Auswahl in Erfassen-/Bearbeiten-Dialog, Default vom Schüler |
+| `Tagesabrechnung.tsx` | Filter nach `payment.filiale`, neue Spalte Filiale in Tabelle + PDF |
