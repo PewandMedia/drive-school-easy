@@ -3009,6 +3009,30 @@ const FahrschuelerDetail = () => {
         </DialogContent>
       </Dialog>
 
+      {/* ── Zahlungen-Druck: Filial-Auswahl ── */}
+      <Dialog open={dlgZahlungPrint} onOpenChange={setDlgZahlungPrint}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Zahlungen drucken</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Label className="text-sm">Welche Filiale?</Label>
+            <Select value={printFilialeFilter} onValueChange={(v) => setPrintFilialeFilter(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Beide zusammen</SelectItem>
+                <SelectItem value="riemke">Nur Riemke Markt</SelectItem>
+                <SelectItem value="rathaus">Nur Rathaus</SelectItem>
+              </SelectContent>
+            </Select>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDlgZahlungPrint(false)}>Abbrechen</Button>
+              <Button onClick={() => { setDlgZahlungPrint(false); setPrintSection("zahlungen"); }}>Drucken</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ===== MULTI-PRINT AREA ===== */}
       {printSections.length > 0 && (
         <div ref={multiPrintRef} className="print-area hidden print:block">
