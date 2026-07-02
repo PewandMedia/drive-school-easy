@@ -111,7 +111,7 @@ const Zahlungen = () => {
 
   const { data: students = [] } = useQuery({
     queryKey: ["students_list"],
-    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum, fahrschule").order("nachname")),
   });
 
   const { data: instructors = [] } = useQuery({
