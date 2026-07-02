@@ -108,7 +108,7 @@ const Tagesabrechnung = () => {
       const data = await fetchAllRows<PaymentRow>(
         supabase
           .from("payments")
-          .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname, fahrschule), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+          .select("id, betrag, zahlungsart, filiale, datum, einreichungsdatum, instructor_id, students(vorname, nachname, fahrschule), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
           .gte("einreichungsdatum", dayStart.toISOString())
           .lt("einreichungsdatum", dayEnd.toISOString())
           .order("einreichungsdatum", { ascending: true }) as any
