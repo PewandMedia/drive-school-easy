@@ -1,49 +1,26 @@
-## Filiale pro Zahlung — Rathaus oder Riemke
+## Ziel
+Beim Drucken der Zahlungs­übersicht eines Schülers soll man vorher nach Filiale filtern (Riemke Markt / Rathaus / Beide) und die gewählte Filiale wird in jeder Zeile der PDF sowie im Kopfbereich angezeigt.
 
-Aktuell wird die Filiale nur beim Fahrschüler hinterlegt und der Filter in Abrechnung/Tagesabrechnung nutzt diese Zuordnung. Neu: Jede Zahlung bekommt eine eigene Filiale (wo das Geld tatsächlich abgegeben wurde), und die Tagesabrechnung/PDF filtert danach.
+## Änderungen in `src/pages/dashboard/FahrschuelerDetail.tsx`
 
-### 1. Datenbank
+1. **Neuer State**
+   - `printFilialeFilter: "alle" | "riemke" | "rathaus"` (Default `"alle"`).
 
-Neue Spalte `filiale` auf `payments` (Enum-artig als Text `riemke` | `rathaus`, nullable für Altdaten).
+2. **Auslöser für Zahlungs-Druck anpassen**
+   - Klick auf das Drucker-Icon im Zahlungs-Abschnitt (Zeile 2006) öffnet nicht mehr direkt den Druck, sondern einen kleinen Auswahl-Dialog „Filiale wählen" mit drei Optionen (Riemke Markt / Rathaus / Beide zusammen). Erst „Drucken" setzt `setPrintSection("zahlungen")`.
+   - Im Sammel-Druck-Dialog (Alle-Bereiche-Auswahl) wird zusätzlich derselbe Filialen-Selector eingeblendet, sobald „Zahlungen" mit ausgewählt ist.
 
-```sql
-ALTER TABLE public.payments ADD COLUMN filiale text;
-ALTER TABLE public.payments ADD CONSTRAINT payments_filiale_check
-  CHECK (filiale IN ('riemke','rathaus') OR filiale IS NULL);
-```
+3. **Filterlogik für den Druck**
+   - Helper `filteredPrintPayments = payments.filter(p => filter==="alle" || (p.filiale ?? student.fahrschule) === filter)`.
+   - Wird sowohl im `singlePrintRef`-Block (Zeilen 2886–2910) als auch im `multiPrintRef`-Block für Zahlungen verwendet.
 
-Altdaten bleiben `NULL` → werden als "Filiale unbekannt" behandelt und erscheinen nur bei Filter "Alle".
+4. **PDF-Darstellung**
+   - Kopfzeile bekommt eine zusätzliche Zeile: `Filiale: Riemke Markt` / `Rathaus` / `Alle Filialen`.
+   - Neue Spalte **„Filiale"** in der Zahlungs-Tabelle (Single- und Multi-Print) mit Werten „Riemke", „Rathaus" oder „–" (bei Altdaten ohne Zuordnung greift Fallback auf Schüler-Filiale).
+   - Gesamtsumme berechnet sich aus den gefilterten Zahlungen.
 
-### 2. Zahlungserfassung — Filiale-Pflichtfeld
+5. **Bildschirm-Ansicht** bleibt unverändert – nur der Druck-Workflow wird erweitert.
 
-Betroffen: Dialog "Zahlung erfassen" und "Zahlung bearbeiten" in
-- `src/pages/dashboard/Zahlungen.tsx`
-- `src/pages/dashboard/FahrschuelerDetail.tsx`
-
-Änderungen je Dialog:
-- Neues Feld **Filiale** (Radio oder Select: Riemke Markt / Rathaus) direkt neben Zahlungsart.
-- Default: Filiale des Schülers (falls gesetzt) — muss aber bestätigt/geändert werden können.
-- Validierung: Speichern nur mit gewählter Filiale.
-- Wert wird in `payments.filiale` gespeichert.
-
-### 3. Tagesabrechnung — Filter auf Zahlungs-Filiale
-
-`src/pages/dashboard/Tagesabrechnung.tsx`:
-- Der bestehende Filiale-Filter (Alle / Riemke / Rathaus) filtert ab jetzt nach `payment.filiale` statt nach `student.fahrschule`.
-- "Alle" zeigt weiterhin alles inkl. Altdaten ohne Filiale.
-- Neue Spalte **Filiale** in der Tabelle (Riemke / Rathaus / — bei Altdaten).
-- PDF-Druck-Header zeigt weiterhin die gewählte Filiale ("Filiale: Riemke Markt" / "Rathaus" / "Alle Filialen").
-- Die Filiale-Spalte erscheint im PDF, damit bei "Alle" sichtbar ist, wo jede Zahlung abgegeben wurde.
-
-### 4. Abrechnung (Salden-Übersicht) — unverändert
-
-`Abrechnung.tsx` bleibt auf der Filiale des **Schülers** (nicht der Zahlung), weil dort Salden pro Schüler dargestellt werden. Das passt zum Nutzungszweck (Wem gehört der Schüler?) und du hast das nicht explizit angefragt. Kann bei Bedarf nachgezogen werden.
-
-### Zusammenfassung
-
-| Datei | Änderung |
-|---|---|
-| Migration | Spalte `payments.filiale` + Check-Constraint |
-| `Zahlungen.tsx` | Filiale-Auswahl in Erfassen-/Bearbeiten-Dialog, Default vom Schüler |
-| `FahrschuelerDetail.tsx` | Filiale-Auswahl in Erfassen-/Bearbeiten-Dialog, Default vom Schüler |
-| `Tagesabrechnung.tsx` | Filter nach `payment.filiale`, neue Spalte Filiale in Tabelle + PDF |
+## Verifikation
+- Manuell: Drucker-Icon bei Zahlungen → Dialog erscheint → jede Filialen-Option erzeugt die richtige PDF-Vorschau (Kopf + Zeilen + Summe).
+- Für Altzahlungen ohne `filiale` wird die Fahrschule des Schülers als Fallback benutzt, damit historische Datensätze korrekt gruppiert werden.
