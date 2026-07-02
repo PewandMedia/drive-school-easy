@@ -2980,6 +2980,19 @@ const FahrschuelerDetail = () => {
                 </div>
               ))}
             </div>
+            {dlgPrintSel.includes("zahlungen") && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="text-sm">Zahlungen – Filiale</Label>
+                <Select value={printFilialeFilter} onValueChange={(v) => setPrintFilialeFilter(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alle">Beide zusammen</SelectItem>
+                    <SelectItem value="riemke">Nur Riemke Markt</SelectItem>
+                    <SelectItem value="rathaus">Nur Rathaus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setDlgPrint(false)}>Abbrechen</Button>
               <Button
