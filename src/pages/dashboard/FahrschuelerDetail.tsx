@@ -2746,16 +2746,28 @@ const FahrschuelerDetail = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Zahlungsart</Label>
-                <Select value={editingPayment.zahlungsart} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, zahlungsart: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bar">Bar</SelectItem>
-                    <SelectItem value="ec">EC-Karte</SelectItem>
-                    <SelectItem value="ueberweisung">Überweisung</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Zahlungsart</Label>
+                  <Select value={editingPayment.zahlungsart} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, zahlungsart: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bar">Bar</SelectItem>
+                      <SelectItem value="ec">EC-Karte</SelectItem>
+                      <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Abgegeben in Filiale</Label>
+                  <Select value={editingPayment.filiale || ((student as any)?.fahrschule === "rathaus" ? "rathaus" : "riemke")} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, filiale: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="riemke">Riemke Markt</SelectItem>
+                      <SelectItem value="rathaus">Rathaus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Betrag (€)</Label>
