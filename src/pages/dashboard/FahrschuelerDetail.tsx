@@ -169,6 +169,7 @@ const FahrschuelerDetail = () => {
   const [fsZahlung, setFsZahlung] = useState({
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
+    filiale: "riemke" as "riemke" | "rathaus",
     datum: new Date().toISOString().slice(0, 10),
     einreichungsdatum: new Date().toISOString().slice(0, 10),
     instructor_id: "",
