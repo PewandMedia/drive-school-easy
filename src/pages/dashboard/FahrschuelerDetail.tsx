@@ -2885,31 +2885,40 @@ const FahrschuelerDetail = () => {
             </>
           )}
 
-          {printSection === "zahlungen" && (
-            <>
-              <table className="w-full text-sm border-collapse mb-6">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1">Datum</th>
-                    <th className="text-left py-1">Zahlungsart</th>
-                    <th className="text-right py-1">Betrag</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id} className="border-b">
-                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                      <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
-                      <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+          {printSection === "zahlungen" && (() => {
+            const filialeOf = (p: any) => (p.filiale ?? (student as any)?.fahrschule ?? null);
+            const filialeLabel = (v: string | null) => v === "riemke" ? "Riemke" : v === "rathaus" ? "Rathaus" : "–";
+            const filtered = payments.filter((p: any) => printFilialeFilter === "alle" || filialeOf(p) === printFilialeFilter);
+            const filialeHeader = printFilialeFilter === "alle" ? "Alle Filialen" : printFilialeFilter === "riemke" ? "Riemke Markt" : "Rathaus";
+            return (
+              <>
+                <p className="text-sm mb-3"><strong>Filiale:</strong> {filialeHeader}</p>
+                <table className="w-full text-sm border-collapse mb-6">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1">Datum</th>
+                      <th className="text-left py-1">Zahlungsart</th>
+                      <th className="text-left py-1">Filiale</th>
+                      <th className="text-right py-1">Betrag</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-base font-bold">
-                Gesamt: {payments.reduce((s, p) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
-              </p>
-            </>
-          )}
+                  </thead>
+                  <tbody>
+                    {filtered.map((p: any) => (
+                      <tr key={p.id} className="border-b">
+                        <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                        <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
+                        <td className="py-1">{filialeLabel(filialeOf(p))}</td>
+                        <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-base font-bold">
+                  Gesamt: {filtered.reduce((s: number, p: any) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                </p>
+              </>
+            );
+          })()}
 
           {printSection === "pruefungen" && (
             <>
