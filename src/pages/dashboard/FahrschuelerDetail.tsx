@@ -2005,7 +2005,7 @@ const FahrschuelerDetail = () => {
                 </h2>
               </div>
               <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => setPrintSection("zahlungen")} title="Als PDF drucken">
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => { setPrintFilialeFilter("alle"); setDlgZahlungPrint(true); }} title="Als PDF drucken">
                   <Printer className="h-3.5 w-3.5" />
                 </Button>
                 <SectionAddBtn label="+ Zahlung hinzufügen" onClick={() => setDlgZahlung(true)} />
