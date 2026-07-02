@@ -135,6 +135,8 @@ const FahrschuelerDetail = () => {
   const multiPrintRef = useRef<HTMLDivElement>(null);
   const [dlgPrint, setDlgPrint] = useState(false);
   const [dlgPrintSel, setDlgPrintSel] = useState<string[]>([]);
+  const [printFilialeFilter, setPrintFilialeFilter] = useState<"alle" | "riemke" | "rathaus">("alle");
+  const [dlgZahlungPrint, setDlgZahlungPrint] = useState(false);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
@@ -2003,7 +2005,7 @@ const FahrschuelerDetail = () => {
                 </h2>
               </div>
               <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => setPrintSection("zahlungen")} title="Als PDF drucken">
+                <Button variant="outline" size="icon" className="h-7 w-7 border-border text-muted-foreground hover:text-foreground" onClick={() => { setPrintFilialeFilter("alle"); setDlgZahlungPrint(true); }} title="Als PDF drucken">
                   <Printer className="h-3.5 w-3.5" />
                 </Button>
                 <SectionAddBtn label="+ Zahlung hinzufügen" onClick={() => setDlgZahlung(true)} />
@@ -2883,31 +2885,40 @@ const FahrschuelerDetail = () => {
             </>
           )}
 
-          {printSection === "zahlungen" && (
-            <>
-              <table className="w-full text-sm border-collapse mb-6">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1">Datum</th>
-                    <th className="text-left py-1">Zahlungsart</th>
-                    <th className="text-right py-1">Betrag</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id} className="border-b">
-                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                      <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
-                      <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+          {printSection === "zahlungen" && (() => {
+            const filialeOf = (p: any) => (p.filiale ?? (student as any)?.fahrschule ?? null);
+            const filialeLabel = (v: string | null) => v === "riemke" ? "Riemke" : v === "rathaus" ? "Rathaus" : "–";
+            const filtered = payments.filter((p: any) => printFilialeFilter === "alle" || filialeOf(p) === printFilialeFilter);
+            const filialeHeader = printFilialeFilter === "alle" ? "Alle Filialen" : printFilialeFilter === "riemke" ? "Riemke Markt" : "Rathaus";
+            return (
+              <>
+                <p className="text-sm mb-3"><strong>Filiale:</strong> {filialeHeader}</p>
+                <table className="w-full text-sm border-collapse mb-6">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1">Datum</th>
+                      <th className="text-left py-1">Zahlungsart</th>
+                      <th className="text-left py-1">Filiale</th>
+                      <th className="text-right py-1">Betrag</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-base font-bold">
-                Gesamt: {payments.reduce((s, p) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
-              </p>
-            </>
-          )}
+                  </thead>
+                  <tbody>
+                    {filtered.map((p: any) => (
+                      <tr key={p.id} className="border-b">
+                        <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                        <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
+                        <td className="py-1">{filialeLabel(filialeOf(p))}</td>
+                        <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-base font-bold">
+                  Gesamt: {filtered.reduce((s: number, p: any) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                </p>
+              </>
+            );
+          })()}
 
           {printSection === "pruefungen" && (
             <>
@@ -2969,6 +2980,19 @@ const FahrschuelerDetail = () => {
                 </div>
               ))}
             </div>
+            {dlgPrintSel.includes("zahlungen") && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="text-sm">Zahlungen – Filiale</Label>
+                <Select value={printFilialeFilter} onValueChange={(v) => setPrintFilialeFilter(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alle">Beide zusammen</SelectItem>
+                    <SelectItem value="riemke">Nur Riemke Markt</SelectItem>
+                    <SelectItem value="rathaus">Nur Rathaus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <DialogFooter>
               <Button variant="outline" onClick={() => setDlgPrint(false)}>Abbrechen</Button>
               <Button
@@ -2980,6 +3004,30 @@ const FahrschuelerDetail = () => {
               >
                 Drucken
               </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Zahlungen-Druck: Filial-Auswahl ── */}
+      <Dialog open={dlgZahlungPrint} onOpenChange={setDlgZahlungPrint}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Zahlungen drucken</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <Label className="text-sm">Welche Filiale?</Label>
+            <Select value={printFilialeFilter} onValueChange={(v) => setPrintFilialeFilter(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Beide zusammen</SelectItem>
+                <SelectItem value="riemke">Nur Riemke Markt</SelectItem>
+                <SelectItem value="rathaus">Nur Rathaus</SelectItem>
+              </SelectContent>
+            </Select>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDlgZahlungPrint(false)}>Abbrechen</Button>
+              <Button onClick={() => { setDlgZahlungPrint(false); setPrintSection("zahlungen"); }}>Drucken</Button>
             </DialogFooter>
           </div>
         </DialogContent>
@@ -3090,32 +3138,40 @@ const FahrschuelerDetail = () => {
             </div>
           )}
 
-          {printSections.includes("zahlungen") && (
-            <div className="mb-8" style={{ pageBreakInside: "avoid" }}>
-              <h2 className="text-lg font-bold mb-2 border-b pb-1">Zahlungen</h2>
-              <table className="w-full text-sm border-collapse mb-2">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1">Datum</th>
-                    <th className="text-left py-1">Zahlungsart</th>
-                    <th className="text-right py-1">Betrag</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id} className="border-b">
-                      <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
-                      <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
-                      <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+          {printSections.includes("zahlungen") && (() => {
+            const filialeOf = (p: any) => (p.filiale ?? (student as any)?.fahrschule ?? null);
+            const filialeLabel = (v: string | null) => v === "riemke" ? "Riemke" : v === "rathaus" ? "Rathaus" : "–";
+            const filtered = payments.filter((p: any) => printFilialeFilter === "alle" || filialeOf(p) === printFilialeFilter);
+            const filialeHeader = printFilialeFilter === "alle" ? "Alle Filialen" : printFilialeFilter === "riemke" ? "Riemke Markt" : "Rathaus";
+            return (
+              <div className="mb-8" style={{ pageBreakInside: "avoid" }}>
+                <h2 className="text-lg font-bold mb-2 border-b pb-1">Zahlungen <span className="text-sm font-normal">({filialeHeader})</span></h2>
+                <table className="w-full text-sm border-collapse mb-2">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1">Datum</th>
+                      <th className="text-left py-1">Zahlungsart</th>
+                      <th className="text-left py-1">Filiale</th>
+                      <th className="text-right py-1">Betrag</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-sm font-bold">
-                Gesamt: {payments.reduce((s, p) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
-              </p>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {filtered.map((p: any) => (
+                      <tr key={p.id} className="border-b">
+                        <td className="py-1">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
+                        <td className="py-1">{p.zahlungsart === "bar" ? "Bar" : p.zahlungsart === "ec" ? "EC-Karte" : "Überweisung"}</td>
+                        <td className="py-1">{filialeLabel(filialeOf(p))}</td>
+                        <td className="py-1 text-right">{Number(p.betrag).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="text-sm font-bold">
+                  Gesamt: {filtered.reduce((s: number, p: any) => s + Number(p.betrag), 0).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                </p>
+              </div>
+            );
+          })()}
         </div>
       )}
     </>
