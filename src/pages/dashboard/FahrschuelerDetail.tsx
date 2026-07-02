@@ -446,6 +446,7 @@ const FahrschuelerDetail = () => {
         student_id: id!,
         betrag,
         zahlungsart: fsZahlung.zahlungsart,
+        filiale: fsZahlung.filiale,
         datum: new Date(fsZahlung.datum).toISOString(),
         einreichungsdatum: new Date(fsZahlung.einreichungsdatum).toISOString(),
         instructor_id: fsZahlung.instructor_id || null,
