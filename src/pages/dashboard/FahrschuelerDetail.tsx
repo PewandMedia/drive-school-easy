@@ -669,6 +669,7 @@ const FahrschuelerDetail = () => {
         .update({
           betrag: parseFloat(payment.betrag) || 0,
           zahlungsart: payment.zahlungsart,
+          filiale: payment.filiale || null,
           datum: new Date(payment.datum).toISOString(),
           einreichungsdatum: new Date(payment.einreichungsdatum ?? payment.datum).toISOString(),
           instructor_id: payment.instructor_id || null,
