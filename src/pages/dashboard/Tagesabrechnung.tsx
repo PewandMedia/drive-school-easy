@@ -154,6 +154,13 @@ const Tagesabrechnung = () => {
     { key: "gesamt", label: "Gesamtbetrag", icon: FileText, amount: totals.amounts.gesamt, count: totals.counts.gesamt },
   ];
 
+  const filialeShort = (p: PaymentRow) => {
+    const f = p.filiale ?? (p.students?.fahrschule as any);
+    if (f === "riemke") return "Riemke";
+    if (f === "rathaus") return "Rathaus";
+    return "–";
+  };
+
   const renderTable = (rows: PaymentRow[], showSubtotals: boolean) => (
     <Table>
       <TableHeader>
@@ -162,6 +169,7 @@ const Tagesabrechnung = () => {
           <TableHead>Verwendungszweck</TableHead>
           <TableHead>Fahrlehrer</TableHead>
           <TableHead>Art</TableHead>
+          <TableHead>Filiale</TableHead>
           <TableHead>Kassiert am</TableHead>
           <TableHead>Im Büro am</TableHead>
           <TableHead className="text-right">Betrag</TableHead>
@@ -187,6 +195,9 @@ const Tagesabrechnung = () => {
                   {zahlungsartLabel[p.zahlungsart]}
                 </span>
               </TableCell>
+              <TableCell className={p.filiale ? "" : "text-muted-foreground italic"}>
+                {filialeShort(p)}
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {format(new Date(p.datum), "dd.MM.yyyy")}
               </TableCell>
@@ -204,7 +215,7 @@ const Tagesabrechnung = () => {
             const Icon = zahlungsartIcon[z];
             return (
               <TableRow key={z}>
-                <TableCell colSpan={5} />
+                <TableCell colSpan={6} />
                 <TableCell>
                   <span className="flex items-center gap-1.5">
                     <Icon className="h-4 w-4" />
@@ -216,7 +227,7 @@ const Tagesabrechnung = () => {
             );
           })}
           <TableRow>
-            <TableCell colSpan={5} />
+            <TableCell colSpan={6} />
             <TableCell className="font-bold">Gesamt ({totals.counts.gesamt})</TableCell>
             <TableCell className="text-right font-bold">{formatEUR(totals.amounts.gesamt)}</TableCell>
           </TableRow>
