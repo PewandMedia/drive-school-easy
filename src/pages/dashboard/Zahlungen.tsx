@@ -319,6 +319,7 @@ const Zahlungen = () => {
               setEditPaymentForm({
                 betrag: String(Math.abs(Number(p.betrag))),
                 zahlungsart: p.zahlungsart as Zahlungsart,
+                filiale: (p.filiale as Filiale) ?? ((p.students?.fahrschule as Filiale) ?? "riemke"),
                 datum: new Date(p.datum).toISOString().slice(0, 10),
                 einreichungsdatum: new Date(p.einreichungsdatum ?? p.datum).toISOString().slice(0, 10),
                 instructor_id: p.instructor_id ?? "",
