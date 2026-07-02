@@ -147,6 +147,7 @@ const Zahlungen = () => {
           student_id: form.student_id,
           betrag,
           zahlungsart: form.zahlungsart,
+          filiale: form.filiale,
           datum: new Date(form.datum).toISOString(),
           einreichungsdatum: new Date(form.einreichungsdatum).toISOString(),
           instructor_id: form.instructor_id || null,
