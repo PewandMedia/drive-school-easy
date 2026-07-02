@@ -126,7 +126,11 @@ const Tagesabrechnung = () => {
   const filteredPayments = useMemo(() => {
     return payments.filter((p) => {
       if (filterZahlungsart !== "alle" && p.zahlungsart !== filterZahlungsart) return false;
-      if (filterFahrschule !== "alle" && (p.students?.fahrschule ?? "riemke") !== filterFahrschule) return false;
+      if (filterFahrschule !== "alle") {
+        // Fallback auf Schüler-Filiale, wenn Zahlung noch keine hat (Altdaten)
+        const paymentFiliale = p.filiale ?? (p.students?.fahrschule as any) ?? null;
+        if (paymentFiliale !== filterFahrschule) return false;
+      }
       return true;
     });
   }, [payments, filterZahlungsart, filterFahrschule]);
