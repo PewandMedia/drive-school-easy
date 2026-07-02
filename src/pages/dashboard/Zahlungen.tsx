@@ -101,7 +101,7 @@ const Zahlungen = () => {
 
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["payments"],
-    queryFn: () => fetchAllRows(supabase.from("payments").select("*, students(vorname, nachname, geburtsdatum)").order("datum", { ascending: false })) as Promise<any[]>,
+    queryFn: () => fetchAllRows(supabase.from("payments").select("*, students(vorname, nachname, geburtsdatum, fahrschule)").order("datum", { ascending: false })) as Promise<any[]>,
   });
 
   const { data: allAllocations = [] } = useQuery({
