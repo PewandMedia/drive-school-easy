@@ -28,6 +28,7 @@ type PaymentRow = {
   id: string;
   betrag: number;
   zahlungsart: "bar" | "ec" | "ueberweisung";
+  filiale: "riemke" | "rathaus" | null;
   datum: string;
   einreichungsdatum: string | null;
   instructor_id: string | null;
