@@ -40,11 +40,18 @@ import {
 } from "@/components/ui/table";
 
 type Zahlungsart = "bar" | "ec" | "ueberweisung";
+type Filiale = "riemke" | "rathaus";
+
+const FILIALE_LABELS: Record<Filiale, string> = {
+  riemke: "Riemke Markt",
+  rathaus: "Rathaus",
+};
 
 type PaymentForm = {
   student_id: string;
   betrag: string;
   zahlungsart: Zahlungsart;
+  filiale: Filiale;
   datum: string;
   einreichungsdatum: string;
   instructor_id: string;
@@ -57,6 +64,7 @@ const defaultForm = (): PaymentForm => ({
   student_id: "",
   betrag: "",
   zahlungsart: "bar",
+  filiale: "riemke",
   datum: new Date().toISOString().slice(0, 10),
   einreichungsdatum: new Date().toISOString().slice(0, 10),
   instructor_id: "",
@@ -86,14 +94,14 @@ const Zahlungen = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleOlderCount, setVisibleOlderCount] = useState(10);
   const [editingPayment, setEditingPayment] = useState<any | null>(null);
-  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, datum: "", einreichungsdatum: "", instructor_id: "" });
+  const [editPaymentForm, setEditPaymentForm] = useState({ betrag: "", zahlungsart: "bar" as Zahlungsart, filiale: "riemke" as Filiale, datum: "", einreichungsdatum: "", instructor_id: "" });
   const { toast } = useToast();
   const { user, profile } = useAuth();
   const qc = useQueryClient();
 
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["payments"],
-    queryFn: () => fetchAllRows(supabase.from("payments").select("*, students(vorname, nachname, geburtsdatum)").order("datum", { ascending: false })) as Promise<any[]>,
+    queryFn: () => fetchAllRows(supabase.from("payments").select("*, students(vorname, nachname, geburtsdatum, fahrschule)").order("datum", { ascending: false })) as Promise<any[]>,
   });
 
   const { data: allAllocations = [] } = useQuery({
@@ -103,7 +111,7 @@ const Zahlungen = () => {
 
   const { data: students = [] } = useQuery({
     queryKey: ["students_list"],
-    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum").order("nachname")),
+    queryFn: () => fetchAllRows(supabase.from("students").select("id, vorname, nachname, geburtsdatum, fahrschule").order("nachname")),
   });
 
   const { data: instructors = [] } = useQuery({
@@ -139,6 +147,7 @@ const Zahlungen = () => {
           student_id: form.student_id,
           betrag,
           zahlungsart: form.zahlungsart,
+          filiale: form.filiale,
           datum: new Date(form.datum).toISOString(),
           einreichungsdatum: new Date(form.einreichungsdatum).toISOString(),
           instructor_id: form.instructor_id || null,
@@ -210,10 +219,11 @@ const Zahlungen = () => {
   });
 
   const updatePaymentMutation = useMutation({
-    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; datum: string; einreichungsdatum: string; instructor_id: string }) => {
+    mutationFn: async (vals: { id: string; betrag: string; zahlungsart: Zahlungsart; filiale: Filiale; datum: string; einreichungsdatum: string; instructor_id: string }) => {
       const { error } = await supabase.from("payments").update({
         betrag: parseFloat(vals.betrag) || 0,
         zahlungsart: vals.zahlungsart,
+        filiale: vals.filiale,
         datum: new Date(vals.datum).toISOString(),
         einreichungsdatum: new Date(vals.einreichungsdatum).toISOString(),
         instructor_id: vals.instructor_id || null,
@@ -311,6 +321,7 @@ const Zahlungen = () => {
               setEditPaymentForm({
                 betrag: String(Math.abs(Number(p.betrag))),
                 zahlungsart: p.zahlungsart as Zahlungsart,
+                filiale: (p.filiale as Filiale) ?? ((p.students?.fahrschule as Filiale) ?? "riemke"),
                 datum: new Date(p.datum).toISOString().slice(0, 10),
                 einreichungsdatum: new Date(p.einreichungsdatum ?? p.datum).toISOString().slice(0, 10),
                 instructor_id: p.instructor_id ?? "",
@@ -455,7 +466,11 @@ const Zahlungen = () => {
               <StudentCombobox
                 students={students}
                 value={form.student_id}
-                onValueChange={(v) => setForm((f) => ({ ...f, student_id: v, selectedOpenItems: [] }))}
+                onValueChange={(v) => {
+                  const s = (students as any[]).find((x) => x.id === v);
+                  const stFiliale = (s?.fahrschule as Filiale) || undefined;
+                  setForm((f) => ({ ...f, student_id: v, selectedOpenItems: [], filiale: stFiliale ?? f.filiale }));
+                }}
                 placeholder="Schüler wählen…"
               />
             </div>
@@ -496,21 +511,38 @@ const Zahlungen = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Zahlungsart</Label>
-              <Select
-                value={form.zahlungsart}
-                onValueChange={(v) => setForm((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(ZAHLUNGSART_LABELS) as [Zahlungsart, string][]).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Zahlungsart</Label>
+                <Select
+                  value={form.zahlungsart}
+                  onValueChange={(v) => setForm((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(ZAHLUNGSART_LABELS) as [Zahlungsart, string][]).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Abgegeben in Filiale</Label>
+                <Select
+                  value={form.filiale}
+                  onValueChange={(v) => setForm((f) => ({ ...f, filiale: v as Filiale }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="riemke">Riemke Markt</SelectItem>
+                    <SelectItem value="rathaus">Rathaus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -637,16 +669,28 @@ const Zahlungen = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Zahlungsart</Label>
-              <Select value={editPaymentForm.zahlungsart} onValueChange={(v) => setEditPaymentForm((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(ZAHLUNGSART_LABELS) as [Zahlungsart, string][]).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Zahlungsart</Label>
+                <Select value={editPaymentForm.zahlungsart} onValueChange={(v) => setEditPaymentForm((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(ZAHLUNGSART_LABELS) as [Zahlungsart, string][]).map(([val, label]) => (
+                      <SelectItem key={val} value={val}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Abgegeben in Filiale</Label>
+                <Select value={editPaymentForm.filiale} onValueChange={(v) => setEditPaymentForm((f) => ({ ...f, filiale: v as Filiale }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="riemke">Riemke Markt</SelectItem>
+                    <SelectItem value="rathaus">Rathaus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Betrag (€)</Label>
@@ -661,6 +705,7 @@ const Zahlungen = () => {
                     id: editingPayment.id,
                     betrag: isGutschrift ? String(-Math.abs(parseFloat(editPaymentForm.betrag))) : editPaymentForm.betrag,
                     zahlungsart: editPaymentForm.zahlungsart,
+                    filiale: editPaymentForm.filiale,
                     datum: editPaymentForm.datum,
                     einreichungsdatum: editPaymentForm.einreichungsdatum,
                     instructor_id: editPaymentForm.instructor_id,

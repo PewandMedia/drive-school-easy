@@ -306,6 +306,7 @@ export type Database = {
           created_at: string
           datum: string
           einreichungsdatum: string | null
+          filiale: string | null
           id: string
           instructor_id: string | null
           service_id: string | null
@@ -317,6 +318,7 @@ export type Database = {
           created_at?: string
           datum?: string
           einreichungsdatum?: string | null
+          filiale?: string | null
           id?: string
           instructor_id?: string | null
           service_id?: string | null
@@ -328,6 +330,7 @@ export type Database = {
           created_at?: string
           datum?: string
           einreichungsdatum?: string | null
+          filiale?: string | null
           id?: string
           instructor_id?: string | null
           service_id?: string | null

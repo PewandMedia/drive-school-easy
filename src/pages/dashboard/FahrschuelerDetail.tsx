@@ -169,6 +169,7 @@ const FahrschuelerDetail = () => {
   const [fsZahlung, setFsZahlung] = useState({
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
+    filiale: "riemke" as "riemke" | "rathaus",
     datum: new Date().toISOString().slice(0, 10),
     einreichungsdatum: new Date().toISOString().slice(0, 10),
     instructor_id: "",
@@ -445,6 +446,7 @@ const FahrschuelerDetail = () => {
         student_id: id!,
         betrag,
         zahlungsart: fsZahlung.zahlungsart,
+        filiale: fsZahlung.filiale,
         datum: new Date(fsZahlung.datum).toISOString(),
         einreichungsdatum: new Date(fsZahlung.einreichungsdatum).toISOString(),
         instructor_id: fsZahlung.instructor_id || null,
@@ -492,7 +494,7 @@ const FahrschuelerDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["payment_allocations", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items", id] });
       queryClient.invalidateQueries({ queryKey: ["open_items"] });
-      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", datum: prev.datum, einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: prev.instructor_id, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
+      setFsZahlung(prev => ({ betrag: "", zahlungsart: "bar", filiale: prev.filiale, datum: prev.datum, einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: prev.instructor_id, selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }));
       toast({ title: wasGutschrift ? "Gutschrift gespeichert" : "Zahlung erfasst" });
       // Auto-allocate credit for free payments (no Gutschrift, no specific items selected)
       if (!wasGutschrift && !hadSelectedItems) {
@@ -667,6 +669,7 @@ const FahrschuelerDetail = () => {
         .update({
           betrag: parseFloat(payment.betrag) || 0,
           zahlungsart: payment.zahlungsart,
+          filiale: payment.filiale || null,
           datum: new Date(payment.datum).toISOString(),
           einreichungsdatum: new Date(payment.einreichungsdatum ?? payment.datum).toISOString(),
           instructor_id: payment.instructor_id || null,
@@ -2309,7 +2312,7 @@ const FahrschuelerDetail = () => {
       </Dialog>
 
       {/* ── Modal: Zahlung ── */}
-      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: "", selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
+      <Dialog open={dlgZahlung} onOpenChange={(v) => { setDlgZahlung(v); if (v) { const sf = ((student as any)?.fahrschule === "rathaus" ? "rathaus" : "riemke") as "riemke" | "rathaus"; setFsZahlung(f => ({ ...f, filiale: sf })); } if (!v) setFsZahlung({ betrag: "", zahlungsart: "bar", filiale: "riemke", datum: new Date().toISOString().slice(0, 10), einreichungsdatum: new Date().toISOString().slice(0, 10), instructor_id: "", selectedOpenItems: [], istGutschrift: false, gutschriftNotiz: "" }); }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{fsZahlung.istGutschrift ? "Gutschrift erfassen" : "Zahlung erfassen"}</DialogTitle>
@@ -2344,16 +2347,28 @@ const FahrschuelerDetail = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Zahlungsart</Label>
-              <Select value={fsZahlung.zahlungsart} onValueChange={(v) => setFsZahlung((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bar">Bar</SelectItem>
-                  <SelectItem value="ec">EC-Karte</SelectItem>
-                  <SelectItem value="ueberweisung">Überweisung</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Zahlungsart</Label>
+                <Select value={fsZahlung.zahlungsart} onValueChange={(v) => setFsZahlung((f) => ({ ...f, zahlungsart: v as Zahlungsart }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bar">Bar</SelectItem>
+                    <SelectItem value="ec">EC-Karte</SelectItem>
+                    <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Abgegeben in Filiale</Label>
+                <Select value={fsZahlung.filiale} onValueChange={(v) => setFsZahlung((f) => ({ ...f, filiale: v as "riemke" | "rathaus" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="riemke">Riemke Markt</SelectItem>
+                    <SelectItem value="rathaus">Rathaus</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Betrag (€)</Label>
@@ -2731,16 +2746,28 @@ const FahrschuelerDetail = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Zahlungsart</Label>
-                <Select value={editingPayment.zahlungsart} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, zahlungsart: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bar">Bar</SelectItem>
-                    <SelectItem value="ec">EC-Karte</SelectItem>
-                    <SelectItem value="ueberweisung">Überweisung</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Zahlungsart</Label>
+                  <Select value={editingPayment.zahlungsart} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, zahlungsart: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bar">Bar</SelectItem>
+                      <SelectItem value="ec">EC-Karte</SelectItem>
+                      <SelectItem value="ueberweisung">Überweisung</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Abgegeben in Filiale</Label>
+                  <Select value={editingPayment.filiale || ((student as any)?.fahrschule === "rathaus" ? "rathaus" : "riemke")} onValueChange={(v) => setEditingPayment((prev: any) => ({ ...prev, filiale: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="riemke">Riemke Markt</SelectItem>
+                      <SelectItem value="rathaus">Rathaus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Betrag (€)</Label>

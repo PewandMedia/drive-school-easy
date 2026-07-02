@@ -28,6 +28,7 @@ type PaymentRow = {
   id: string;
   betrag: number;
   zahlungsart: "bar" | "ec" | "ueberweisung";
+  filiale: "riemke" | "rathaus" | null;
   datum: string;
   einreichungsdatum: string | null;
   instructor_id: string | null;
@@ -107,7 +108,7 @@ const Tagesabrechnung = () => {
       const data = await fetchAllRows<PaymentRow>(
         supabase
           .from("payments")
-          .select("id, betrag, zahlungsart, datum, einreichungsdatum, instructor_id, students(vorname, nachname, fahrschule), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
+          .select("id, betrag, zahlungsart, filiale, datum, einreichungsdatum, instructor_id, students(vorname, nachname, fahrschule), instructors(vorname, nachname), payment_allocations(betrag, open_items(beschreibung))")
           .gte("einreichungsdatum", dayStart.toISOString())
           .lt("einreichungsdatum", dayEnd.toISOString())
           .order("einreichungsdatum", { ascending: true }) as any
@@ -125,7 +126,11 @@ const Tagesabrechnung = () => {
   const filteredPayments = useMemo(() => {
     return payments.filter((p) => {
       if (filterZahlungsart !== "alle" && p.zahlungsart !== filterZahlungsart) return false;
-      if (filterFahrschule !== "alle" && (p.students?.fahrschule ?? "riemke") !== filterFahrschule) return false;
+      if (filterFahrschule !== "alle") {
+        // Fallback auf Schüler-Filiale, wenn Zahlung noch keine hat (Altdaten)
+        const paymentFiliale = p.filiale ?? (p.students?.fahrschule as any) ?? null;
+        if (paymentFiliale !== filterFahrschule) return false;
+      }
       return true;
     });
   }, [payments, filterZahlungsart, filterFahrschule]);
@@ -149,6 +154,13 @@ const Tagesabrechnung = () => {
     { key: "gesamt", label: "Gesamtbetrag", icon: FileText, amount: totals.amounts.gesamt, count: totals.counts.gesamt },
   ];
 
+  const filialeShort = (p: PaymentRow) => {
+    const f = p.filiale ?? (p.students?.fahrschule as any);
+    if (f === "riemke") return "Riemke";
+    if (f === "rathaus") return "Rathaus";
+    return "–";
+  };
+
   const renderTable = (rows: PaymentRow[], showSubtotals: boolean) => (
     <Table>
       <TableHeader>
@@ -157,6 +169,7 @@ const Tagesabrechnung = () => {
           <TableHead>Verwendungszweck</TableHead>
           <TableHead>Fahrlehrer</TableHead>
           <TableHead>Art</TableHead>
+          <TableHead>Filiale</TableHead>
           <TableHead>Kassiert am</TableHead>
           <TableHead>Im Büro am</TableHead>
           <TableHead className="text-right">Betrag</TableHead>
@@ -182,6 +195,9 @@ const Tagesabrechnung = () => {
                   {zahlungsartLabel[p.zahlungsart]}
                 </span>
               </TableCell>
+              <TableCell className={p.filiale ? "" : "text-muted-foreground italic"}>
+                {filialeShort(p)}
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {format(new Date(p.datum), "dd.MM.yyyy")}
               </TableCell>
@@ -199,7 +215,7 @@ const Tagesabrechnung = () => {
             const Icon = zahlungsartIcon[z];
             return (
               <TableRow key={z}>
-                <TableCell colSpan={5} />
+                <TableCell colSpan={6} />
                 <TableCell>
                   <span className="flex items-center gap-1.5">
                     <Icon className="h-4 w-4" />
@@ -211,7 +227,7 @@ const Tagesabrechnung = () => {
             );
           })}
           <TableRow>
-            <TableCell colSpan={5} />
+            <TableCell colSpan={6} />
             <TableCell className="font-bold">Gesamt ({totals.counts.gesamt})</TableCell>
             <TableCell className="text-right font-bold">{formatEUR(totals.amounts.gesamt)}</TableCell>
           </TableRow>
@@ -348,12 +364,13 @@ const Tagesabrechnung = () => {
           <>
             <table className="mb-4">
               <colgroup>
-                <col style={{ width: "14%" }} />
-                <col style={{ width: "28%" }} />
-                <col style={{ width: "12%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "24%" }} />
+                <col style={{ width: "11%" }} />
                 <col style={{ width: "7%" }} />
-                <col style={{ width: "13%" }} />
-                <col style={{ width: "13%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
                 <col style={{ width: "13%" }} />
               </colgroup>
               <thead>
@@ -362,6 +379,7 @@ const Tagesabrechnung = () => {
                   <th className="text-left py-1">Verwendungszweck</th>
                   <th className="text-left py-1">Fahrlehrer</th>
                   <th className="text-left py-1">Art</th>
+                  <th className="text-left py-1">Filiale</th>
                   <th className="text-left py-1 nowrap">Kassiert am</th>
                   <th className="text-left py-1 nowrap">Im Büro am</th>
                   <th className="text-right py-1 nowrap">Betrag</th>
@@ -376,6 +394,7 @@ const Tagesabrechnung = () => {
                     <td className="py-1">{getVerwendungszweck(p.payment_allocations)}</td>
                     <td className="py-1">{getInstructorName(p)}</td>
                     <td className="py-1">{zahlungsartLabel[p.zahlungsart]}</td>
+                    <td className="py-1">{filialeShort(p)}</td>
                     <td className="py-1 nowrap">{format(new Date(p.datum), "dd.MM.yyyy")}</td>
                     <td className="py-1 nowrap">{p.einreichungsdatum ? format(new Date(p.einreichungsdatum), "dd.MM.yyyy") : "–"}</td>
                     <td className="py-1 text-right nowrap">{formatEUR(p.betrag)}</td>
