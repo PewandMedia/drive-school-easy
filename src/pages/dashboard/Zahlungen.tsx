@@ -40,11 +40,18 @@ import {
 } from "@/components/ui/table";
 
 type Zahlungsart = "bar" | "ec" | "ueberweisung";
+type Filiale = "riemke" | "rathaus";
+
+const FILIALE_LABELS: Record<Filiale, string> = {
+  riemke: "Riemke Markt",
+  rathaus: "Rathaus",
+};
 
 type PaymentForm = {
   student_id: string;
   betrag: string;
   zahlungsart: Zahlungsart;
+  filiale: Filiale;
   datum: string;
   einreichungsdatum: string;
   instructor_id: string;
@@ -57,6 +64,7 @@ const defaultForm = (): PaymentForm => ({
   student_id: "",
   betrag: "",
   zahlungsart: "bar",
+  filiale: "riemke",
   datum: new Date().toISOString().slice(0, 10),
   einreichungsdatum: new Date().toISOString().slice(0, 10),
   instructor_id: "",
