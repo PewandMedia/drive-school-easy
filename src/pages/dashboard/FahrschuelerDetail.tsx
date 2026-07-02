@@ -135,6 +135,8 @@ const FahrschuelerDetail = () => {
   const multiPrintRef = useRef<HTMLDivElement>(null);
   const [dlgPrint, setDlgPrint] = useState(false);
   const [dlgPrintSel, setDlgPrintSel] = useState<string[]>([]);
+  const [printFilialeFilter, setPrintFilialeFilter] = useState<"alle" | "riemke" | "rathaus">("alle");
+  const [dlgZahlungPrint, setDlgZahlungPrint] = useState(false);
 
   // ── Form states ──
   const [fsFahrstunde, setFsFahrstunde] = useState({
