@@ -55,7 +55,7 @@ const FAHRZEUG_LABELS: Record<FahrzeugTyp, string> = {
   schaltwagen: "Schaltwagen",
 };
 
-const DAUER_OPTIONS = [45, 90, 135];
+const DAUER_OPTIONS = [45, 90, 135, 180];
 
 const calculatePrice = (dauer: number) =>
   Math.round(((dauer / 45) * 65) * 100) / 100;
