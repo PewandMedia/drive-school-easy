@@ -27,6 +27,7 @@ import {
   FileText,
   BarChart3,
   Shield,
+  Zap,
 } from "lucide-react";
 
 const navItems = [
@@ -43,6 +44,7 @@ const schuelerItems = [
 ];
 
 const verwaltungItems = [
+  { title: "Schnellerfassung", url: "/dashboard/schnellerfassung", icon: Zap },
   { title: "Leistungen", url: "/dashboard/leistungen", icon: ListChecks },
 ];
 

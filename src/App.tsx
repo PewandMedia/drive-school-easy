@@ -70,6 +70,7 @@ const App = () => (
                 <Route path="fahrschueler" element={<Fahrschueler />} />
                 <Route path="fahrschueler/:id" element={<FahrschuelerDetail />} />
                 <Route path="leistungen" element={<Leistungen />} />
+                <Route path="schnellerfassung" element={<Schnellerfassung />} />
                 <Route path="fahrstunden" element={<Fahrstunden />} />
                 <Route path="theorie" element={<Theorie />} />
                 <Route path="schaltstunden" element={<Schaltstunden />} />
