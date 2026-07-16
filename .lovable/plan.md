@@ -1,38 +1,41 @@
+# Schnellerfassung vereinfachen + Fahrstunden-Dauer als Einheiten
 
-## Ziel
-Eine neue Seite, auf der man **einen Fahrlehrer + ein Datum** auswählt und dann alle an diesem Tag erfassten **Fahrstunden** und **Zahlungen** dieses Fahrlehrers übersichtlich sieht — zum Abgleich mit dem Tagesnachweis.
+## Schnellerfassung (`src/pages/dashboard/Schnellerfassung.tsx`)
 
-## Neue Seite: `src/pages/dashboard/FahrlehrerTag.tsx`
-Route: `/dashboard/fahrlehrer-tag` (für alle eingeloggten Nutzer, kein Admin-Zwang — Sekretärinnen kontrollieren mit).
+Fahrstunden-Tab drastisch reduzieren – nur noch:
 
-### Aufbau
-1. **Filterleiste (oben)**
-   - Combobox: Fahrlehrer (aus `instructors`, aktive zuerst)
-   - Datepicker: Datum (Standard = heute)
+- **Datum & Uhrzeit** (bleibt)
+- **Einheiten** (Auswahl): `1 Einheit (45 min · 65 €)` oder `2 Einheiten / Doppelstunde (90 min · 130 €)` — Standard = 1
+- **Speichern**-Button
 
-2. **KPI-Zeile**
-   - Anzahl Fahrstunden · Summe Einheiten · Summe Minuten · Summe Umsatz Fahrstunden
-   - Anzahl Zahlungen · Summe Zahlungen
+Entfernt aus der Schnellerfassung:
+- Fahrlehrer-Auswahl
+- Fahrzeug-Auswahl (Automatik/Schaltwagen)
+- Typ-Auswahl (Übungsstunde/Überland/…)
+- Freies Minuten-Feld in 15-min-Schritten
 
-3. **Tabelle "Fahrstunden"**
-   Spalten: Uhrzeit · Fahrschüler (Nachname, Vorname) · Typ · Einheiten · Dauer (Min) · Preis
-   Sortiert nach `datum` aufsteigend.
+Beim Speichern:
+- `typ = 'uebungsstunde'` (Standard)
+- `fahrzeug_typ = 'automatik'` (Standard)
+- `instructor_id = null`
+- `dauer_minuten = einheiten * 45`
+- Preis wird wie bisher vom DB-Trigger `calculate_driving_lesson_price` automatisch berechnet (65 €/45 min)
 
-4. **Tabelle "Zahlungen"**
-   Spalten: Uhrzeit · Fahrschüler · Zahlungsart · Betrag · Notiz
-   Zahlungen werden dem Fahrlehrer über `instructor_id` in `payments` zugeordnet (Feld existiert laut Tagesabrechnung-Logik). Falls `payments.instructor_id` nicht existiert → nur "Zahlungen des Tages der Fahrschüler dieses Fahrlehrers" wäre unzuverlässig; deshalb muss diese Zuordnung geprüft werden — siehe Rückfrage unten.
+Der Zahlungs-Tab bleibt unverändert.
 
-### Queries
-- `driving_lessons` filtern: `instructor_id = X` **und** `datum` liegt zwischen `YYYY-MM-DD 00:00` und `YYYY-MM-DD 23:59`, join mit `students(vorname,nachname)`.
-- `payments` filtern: analog per Datum (`datum`-Spalte) + `instructor_id`.
-- React Query, staleTime 30s.
+## Fahrstunden-Seite (`src/pages/dashboard/Fahrstunden.tsx`)
 
-## Navigation
-Neuer Sidebar-Eintrag **"Tagesübersicht Fahrlehrer"** unter Gruppe *Schüler & Ausbildung*, Icon `CalendarCheck`, sichtbar für alle.
+Im Fahrstunden-Dialog das Feld **„Dauer (Minuten)"** ersetzen durch **„Einheiten"** mit Auswahl:
+- 1 Einheit (45 min)
+- 2 Einheiten (90 min · Doppelstunde) — Standard
+- 3 Einheiten (135 min)
+- 4 Einheiten (180 min)
+
+Intern weiterhin `dauer_minuten = einheiten * 45` speichern. Fehlstunde behält Sonderlogik.
+
+Fahrlehrer / Fahrzeug / Typ bleiben auf der regulären Fahrstunden-Seite erhalten – nur die Dauer-Eingabe wird umgestellt.
 
 ## Nicht angefasst
-- DB-Schema, Trigger, Preisberechnung, Salden, sonstige Seiten.
-- Schaltstunden/Theorie/Prüfungen bleiben außen vor (können später ergänzt werden).
-
-## Offene Rückfrage
-Sollen bei Zahlungen wirklich nur Zahlungen mit `instructor_id = ausgewählter Fahrlehrer` erscheinen (üblich bei Barzahlungen an den Fahrlehrer), oder **alle** Zahlungen der Fahrschüler dieses Fahrlehrers am Tag? Ich gehe im Plan von **Variante A: `payments.instructor_id`** aus — das entspricht dem Zweck "was der Fahrlehrer an diesem Tag kassiert hat".
+- DB-Schema, Trigger, Preisberechnung
+- Schaltstunden, Theorie, Prüfungen, Zahlungen
+- Balance-/Offene-Posten-Sync (läuft weiter über die bestehenden Trigger)
