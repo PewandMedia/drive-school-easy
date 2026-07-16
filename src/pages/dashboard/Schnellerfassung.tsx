@@ -123,13 +123,8 @@ const Schnellerfassung = () => {
     todayLocalDate(),
   );
 
-  // Fahrstunde form
-  const [lessonForm, setLessonForm] = useState({
-    typ: "uebungsstunde" as DrivingLessonTyp,
-    fahrzeug_typ: "automatik" as FahrzeugTyp,
-    vehicle_id: "",
-    dauer_minuten: 0,
-  });
+  // Fahrstunde form – vereinfacht: nur Einheiten (1 = 45min/65€)
+  const [einheiten, setEinheiten] = useState<number>(1);
 
   // Zahlung form
   const [paymentForm, setPaymentForm] = useState({
