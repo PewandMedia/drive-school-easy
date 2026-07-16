@@ -219,16 +219,13 @@ const Schnellerfassung = () => {
   const saveLesson = useMutation({
     mutationFn: async () => {
       if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
-      if (!stickyInstructor) throw new Error("Bitte Fahrlehrer wählen");
-      if (lessonForm.dauer_minuten <= 0 && lessonForm.typ !== "fehlstunde") {
-        throw new Error("Bitte Dauer eingeben");
-      }
+      if (einheiten <= 0) throw new Error("Bitte Einheiten wählen");
       const { error } = await supabase.from("driving_lessons").insert({
         student_id: selectedStudentId,
-        instructor_id: stickyInstructor,
-        typ: lessonForm.typ,
-        fahrzeug_typ: lessonForm.fahrzeug_typ,
-        dauer_minuten: lessonForm.dauer_minuten,
+        instructor_id: null,
+        typ: "uebungsstunde",
+        fahrzeug_typ: "automatik",
+        dauer_minuten: einheiten * 45,
         datum: new Date(stickyDatum).toISOString(),
       } as any);
       if (error) throw error;
@@ -239,8 +236,6 @@ const Schnellerfassung = () => {
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
       toast({ title: "Fahrstunde gespeichert" });
-      // Reset only volatile fields; keep sticky
-      setLessonForm((f) => ({ ...f, dauer_minuten: 0 }));
     },
     onError: (e: Error) =>
       toast({ title: "Fehler", description: e.message, variant: "destructive" }),
