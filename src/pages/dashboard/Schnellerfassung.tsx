@@ -123,13 +123,8 @@ const Schnellerfassung = () => {
     todayLocalDate(),
   );
 
-  // Fahrstunde form
-  const [lessonForm, setLessonForm] = useState({
-    typ: "uebungsstunde" as DrivingLessonTyp,
-    fahrzeug_typ: "automatik" as FahrzeugTyp,
-    vehicle_id: "",
-    dauer_minuten: 0,
-  });
+  // Fahrstunde form – vereinfacht: nur Einheiten (1 = 45min/65€)
+  const [einheiten, setEinheiten] = useState<number>(1);
 
   // Zahlung form
   const [paymentForm, setPaymentForm] = useState({
@@ -224,16 +219,13 @@ const Schnellerfassung = () => {
   const saveLesson = useMutation({
     mutationFn: async () => {
       if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
-      if (!stickyInstructor) throw new Error("Bitte Fahrlehrer wählen");
-      if (lessonForm.dauer_minuten <= 0 && lessonForm.typ !== "fehlstunde") {
-        throw new Error("Bitte Dauer eingeben");
-      }
+      if (einheiten <= 0) throw new Error("Bitte Einheiten wählen");
       const { error } = await supabase.from("driving_lessons").insert({
         student_id: selectedStudentId,
-        instructor_id: stickyInstructor,
-        typ: lessonForm.typ,
-        fahrzeug_typ: lessonForm.fahrzeug_typ,
-        dauer_minuten: lessonForm.dauer_minuten,
+        instructor_id: null,
+        typ: "uebungsstunde",
+        fahrzeug_typ: "automatik",
+        dauer_minuten: einheiten * 45,
         datum: new Date(stickyDatum).toISOString(),
       } as any);
       if (error) throw error;
@@ -244,8 +236,6 @@ const Schnellerfassung = () => {
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
       toast({ title: "Fahrstunde gespeichert" });
-      // Reset only volatile fields; keep sticky
-      setLessonForm((f) => ({ ...f, dauer_minuten: 0 }));
     },
     onError: (e: Error) =>
       toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -543,88 +533,21 @@ const Schnellerfassung = () => {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Fahrlehrer</Label>
+                      <Label>Einheiten</Label>
                       <Select
-                        value={stickyInstructor}
-                        onValueChange={setStickyInstructor}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Fahrlehrer wählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {instructors.map((i) => (
-                            <SelectItem key={i.id} value={i.id}>
-                              {i.nachname}, {i.vorname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Typ</Label>
-                      <Select
-                        value={lessonForm.typ}
-                        onValueChange={(v) =>
-                          setLessonForm((f) => ({
-                            ...f,
-                            typ: v as DrivingLessonTyp,
-                          }))
-                        }
+                        value={String(einheiten)}
+                        onValueChange={(v) => setEinheiten(parseInt(v))}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(TYP_LABELS).map(([k, v]) => (
-                            <SelectItem key={k} value={k}>
-                              {v}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="1">1 Einheit (45 min · 65 €)</SelectItem>
+                          <SelectItem value="2">2 Einheiten – Doppelstunde (90 min · 130 €)</SelectItem>
+                          <SelectItem value="3">3 Einheiten (135 min · 195 €)</SelectItem>
+                          <SelectItem value="4">4 Einheiten (180 min · 260 €)</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Fahrzeug</Label>
-                      <Select
-                        value={lessonForm.fahrzeug_typ}
-                        onValueChange={(v) =>
-                          setLessonForm((f) => ({
-                            ...f,
-                            fahrzeug_typ: v as FahrzeugTyp,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(FAHRZEUG_LABELS).map(([k, v]) => (
-                            <SelectItem key={k} value={k}>
-                              {v}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Dauer (Minuten)</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        step={15}
-                        value={lessonForm.dauer_minuten}
-                        onChange={(e) =>
-                          setLessonForm((f) => ({
-                            ...f,
-                            dauer_minuten: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {lessonForm.dauer_minuten > 0
-                          ? `${Math.floor(lessonForm.dauer_minuten / 45)} Einheiten`
-                          : "In 15er-Schritten"}
-                      </p>
                     </div>
                   </div>
 

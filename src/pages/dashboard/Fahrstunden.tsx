@@ -55,7 +55,7 @@ const FAHRZEUG_LABELS: Record<FahrzeugTyp, string> = {
   schaltwagen: "Schaltwagen",
 };
 
-const DAUER_OPTIONS = [45, 90, 135];
+const DAUER_OPTIONS = [45, 90, 135, 180];
 
 const calculatePrice = (dauer: number) =>
   Math.round(((dauer / 45) * 65) * 100) / 100;
@@ -99,7 +99,7 @@ const defaultForm = {
   typ: "uebungsstunde" as DrivingLessonTyp,
   fahrzeug_typ: "automatik" as FahrzeugTyp,
   vehicle_id: "",
-  dauer_minuten: 0,
+  dauer_minuten: 90,
   datum: new Date().toISOString().slice(0, 16),
 };
 
@@ -437,35 +437,24 @@ const Fahrstunden = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Dauer (Minuten)</Label>
-                  <div className="flex gap-2">
-                    {DAUER_OPTIONS.map((d) => (
-                      <Button
-                        key={d}
-                        type="button"
-                        variant={form.dauer_minuten === d ? "default" : "outline"}
-                        size="sm"
-                        onClick={() =>
-                          setForm((f) => ({ ...f, dauer_minuten: d }))
-                        }
-                      >
-                        {d} min
-                      </Button>
-                    ))}
-                    <Input
-                      type="number"
-                      min={0}
-                      step={15}
-                      className="w-24"
-                      value={form.dauer_minuten || ""}
-                      placeholder="0"
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          dauer_minuten: parseInt(e.target.value) || 0,
-                        }))
-                      }
-                    />
+                  <Label>Einheiten</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAUER_OPTIONS.map((d) => {
+                      const e = d / 45;
+                      return (
+                        <Button
+                          key={d}
+                          type="button"
+                          variant={form.dauer_minuten === d ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            setForm((f) => ({ ...f, dauer_minuten: d }))
+                          }
+                        >
+                          {e} {e === 1 ? "Einheit" : "Einheiten"} ({d} min)
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -682,14 +671,16 @@ const Fahrstunden = () => {
               <Input type="datetime-local" value={editForm.datum} onChange={(e) => setEditForm((f) => ({ ...f, datum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Dauer (Minuten)</Label>
-              <div className="flex gap-2">
-                {DAUER_OPTIONS.map((d) => (
-                  <Button key={d} type="button" variant={editForm.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setEditForm((f) => ({ ...f, dauer_minuten: d }))}>
-                    {d} min
-                  </Button>
-                ))}
-                <Input type="number" min={0} step={15} className="w-24" value={editForm.dauer_minuten || ""} onChange={(e) => setEditForm((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 0 }))} />
+              <Label>Einheiten</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAUER_OPTIONS.map((d) => {
+                  const e = d / 45;
+                  return (
+                    <Button key={d} type="button" variant={editForm.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setEditForm((f) => ({ ...f, dauer_minuten: d }))}>
+                      {e} {e === 1 ? "Einheit" : "Einheiten"} ({d} min)
+                    </Button>
+                  );
+                })}
               </div>
             </div>
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
