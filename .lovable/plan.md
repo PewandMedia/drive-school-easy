@@ -1,20 +1,41 @@
-## Problem
-In `src/pages/dashboard/Schnellerfassung.tsx` filtert die Query mit `.neq("status", "archiviert")`. Da 452 Fahrschüler `status = NULL` haben, werden diese in Postgres nicht als „ungleich archiviert" gewertet (NULL-Vergleich ergibt NULL) → die Liste ist leer.
+# Schnellerfassung vereinfachen + Fahrstunden-Dauer als Einheiten
 
-## Fix
-Eine Zeile in der `students_schnellerfassung`-Query anpassen:
+## Schnellerfassung (`src/pages/dashboard/Schnellerfassung.tsx`)
 
-```ts
-supabase
-  .from("students")
-  .select("id, vorname, nachname, geburtsdatum, fahrschule, fuehrerscheinklasse, status")
-  .or("status.is.null,status.neq.archiviert")
-  .order("nachname")
-```
+Fahrstunden-Tab drastisch reduzieren – nur noch:
 
-Damit werden sowohl NULL-Status als auch alle nicht-archivierten Schüler angezeigt.
+- **Datum & Uhrzeit** (bleibt)
+- **Einheiten** (Auswahl): `1 Einheit (45 min · 65 €)` oder `2 Einheiten / Doppelstunde (90 min · 130 €)` — Standard = 1
+- **Speichern**-Button
 
-## Verifikation
-- `/dashboard/schnellerfassung` zeigt links alle ~452 Fahrschüler.
-- Paginierung funktioniert weiterhin.
-- Archivierte Schüler (1) bleiben ausgeblendet.
+Entfernt aus der Schnellerfassung:
+- Fahrlehrer-Auswahl
+- Fahrzeug-Auswahl (Automatik/Schaltwagen)
+- Typ-Auswahl (Übungsstunde/Überland/…)
+- Freies Minuten-Feld in 15-min-Schritten
+
+Beim Speichern:
+- `typ = 'uebungsstunde'` (Standard)
+- `fahrzeug_typ = 'automatik'` (Standard)
+- `instructor_id = null`
+- `dauer_minuten = einheiten * 45`
+- Preis wird wie bisher vom DB-Trigger `calculate_driving_lesson_price` automatisch berechnet (65 €/45 min)
+
+Der Zahlungs-Tab bleibt unverändert.
+
+## Fahrstunden-Seite (`src/pages/dashboard/Fahrstunden.tsx`)
+
+Im Fahrstunden-Dialog das Feld **„Dauer (Minuten)"** ersetzen durch **„Einheiten"** mit Auswahl:
+- 1 Einheit (45 min)
+- 2 Einheiten (90 min · Doppelstunde) — Standard
+- 3 Einheiten (135 min)
+- 4 Einheiten (180 min)
+
+Intern weiterhin `dauer_minuten = einheiten * 45` speichern. Fehlstunde behält Sonderlogik.
+
+Fahrlehrer / Fahrzeug / Typ bleiben auf der regulären Fahrstunden-Seite erhalten – nur die Dauer-Eingabe wird umgestellt.
+
+## Nicht angefasst
+- DB-Schema, Trigger, Preisberechnung
+- Schaltstunden, Theorie, Prüfungen, Zahlungen
+- Balance-/Offene-Posten-Sync (läuft weiter über die bestehenden Trigger)
