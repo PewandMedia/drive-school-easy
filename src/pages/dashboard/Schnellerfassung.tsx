@@ -365,6 +365,23 @@ const Schnellerfassung = () => {
     });
   }, [students, searchTerm]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedStudents = useMemo(
+    () =>
+      filteredStudents.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize,
+      ),
+    [filteredStudents, currentPage, pageSize],
+  );
+
+  // Reset page when search/pageSize changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, pageSize]);
+
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -388,16 +405,19 @@ const Schnellerfassung = () => {
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               {filteredStudents.length} Fahrschüler
+              {filteredStudents.length > pageSize && (
+                <> · Seite {currentPage} / {totalPages}</>
+              )}
             </p>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {filteredStudents.length === 0 ? (
+            {pagedStudents.length === 0 ? (
               <p className="p-6 text-center text-sm text-muted-foreground">
                 Keine Fahrschüler gefunden
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {filteredStudents.map((s) => {
+                {pagedStudents.map((s) => {
                   const active = s.id === selectedStudentId;
                   return (
                     <li key={s.id}>
@@ -426,7 +446,49 @@ const Schnellerfassung = () => {
               </ul>
             )}
           </div>
+          {/* Pagination footer */}
+          <div className="border-t border-border p-2 flex items-center justify-between gap-2">
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => setPageSize(parseInt(v))}
+            >
+              <SelectTrigger className="h-8 w-[92px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 20, 30, 50, 100].map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} / Seite
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground min-w-[52px] text-center">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </aside>
+
 
         {/* RIGHT: Capture area */}
         <section className="rounded-xl border border-border bg-card min-h-[500px]">
