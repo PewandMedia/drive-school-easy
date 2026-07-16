@@ -437,35 +437,24 @@ const Fahrstunden = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Dauer (Minuten)</Label>
-                  <div className="flex gap-2">
-                    {DAUER_OPTIONS.map((d) => (
-                      <Button
-                        key={d}
-                        type="button"
-                        variant={form.dauer_minuten === d ? "default" : "outline"}
-                        size="sm"
-                        onClick={() =>
-                          setForm((f) => ({ ...f, dauer_minuten: d }))
-                        }
-                      >
-                        {d} min
-                      </Button>
-                    ))}
-                    <Input
-                      type="number"
-                      min={0}
-                      step={15}
-                      className="w-24"
-                      value={form.dauer_minuten || ""}
-                      placeholder="0"
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          dauer_minuten: parseInt(e.target.value) || 0,
-                        }))
-                      }
-                    />
+                  <Label>Einheiten</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAUER_OPTIONS.map((d) => {
+                      const e = d / 45;
+                      return (
+                        <Button
+                          key={d}
+                          type="button"
+                          variant={form.dauer_minuten === d ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            setForm((f) => ({ ...f, dauer_minuten: d }))
+                          }
+                        >
+                          {e} {e === 1 ? "Einheit" : "Einheiten"} ({d} min)
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
 
