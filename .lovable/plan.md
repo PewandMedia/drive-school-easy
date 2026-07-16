@@ -1,41 +1,45 @@
-# Schnellerfassung vereinfachen + Fahrstunden-Dauer als Einheiten
 
-## Schnellerfassung (`src/pages/dashboard/Schnellerfassung.tsx`)
+# Fahrlehrer-Tagesübersicht
 
-Fahrstunden-Tab drastisch reduzieren – nur noch:
+Neue Seite, auf der man einen Fahrlehrer und ein Datum auswählt und dann alle an diesem Tag erfassten Fahrstunden und Zahlungen dieses Fahrlehrers sieht – zum Abgleich mit dem Tagesnachweis.
 
-- **Datum & Uhrzeit** (bleibt)
-- **Einheiten** (Auswahl): `1 Einheit (45 min · 65 €)` oder `2 Einheiten / Doppelstunde (90 min · 130 €)` — Standard = 1
-- **Speichern**-Button
+## Neue Route
+- Pfad: `/dashboard/fahrlehrer-tagesuebersicht`
+- Neue Datei: `src/pages/dashboard/FahrlehrerTagesuebersicht.tsx`
+- Route in `src/App.tsx` registrieren (lazy import), sichtbar für **admin und sekretaerin** (kein `requiredRole`).
+- Sidebar-Eintrag in `src/components/AppSidebar.tsx` unter „Schüler & Ausbildung" direkt unter „Fahrlehrer-Statistik", Icon `CalendarCheck`, Titel **„Tagesübersicht Fahrlehrer"**. Ohne `adminOnly`, damit auch die Sekretärin kontrollieren kann.
 
-Entfernt aus der Schnellerfassung:
-- Fahrlehrer-Auswahl
-- Fahrzeug-Auswahl (Automatik/Schaltwagen)
-- Typ-Auswahl (Übungsstunde/Überland/…)
-- Freies Minuten-Feld in 15-min-Schritten
+## Bedienung
+1. **Fahrlehrer** – Select mit allen aktiven Fahrlehrern (`instructors` where `aktiv = true`), sortiert nach Nachname.
+2. **Datum** – Datumsfeld, Default = heute.
+3. Darunter zwei Blöcke, nur gerendert wenn Fahrlehrer gewählt ist:
 
-Beim Speichern:
-- `typ = 'uebungsstunde'` (Standard)
-- `fahrzeug_typ = 'automatik'` (Standard)
-- `instructor_id = null`
-- `dauer_minuten = einheiten * 45`
-- Preis wird wie bisher vom DB-Trigger `calculate_driving_lesson_price` automatisch berechnet (65 €/45 min)
+### Block A – Fahrstunden
+Tabelle mit allen `driving_lessons` mit `instructor_id = <selected>` und `datum::date = <selected>`:
+Spalten: Uhrzeit · Fahrschüler (`Nachname, Vorname`) · Typ (Übungsstunde / Überland / …) · Einheiten (`dauer_minuten/45`) · Dauer (min) · Fahrzeug (automatik/schaltwagen) · Preis.
+Footer: Anzahl Fahrstunden, Summe Einheiten, Summe Preis.
 
-Der Zahlungs-Tab bleibt unverändert.
+### Block B – Zahlungen
+Tabelle mit allen `payments` mit `instructor_id = <selected>` und `datum = <selected>`:
+Spalten: Fahrschüler · Betrag · Zahlungsart (Bar/EC/Überweisung) · Filiale · Verwendungszweck (aus `payment_allocations → open_items.beschreibung`, gleiches Muster wie `Tagesabrechnung.tsx`).
+Footer: Anzahl Zahlungen, Summe Betrag, aufgeteilt nach Bar / EC / Überweisung.
 
-## Fahrstunden-Seite (`src/pages/dashboard/Fahrstunden.tsx`)
+### Zusammenfassung oben
+Kleine Karte mit: „X Fahrstunden · Y Einheiten · Z € Umsatz Fahrstunden" und „N Zahlungen · Σ € eingenommen" – so sieht der Kontrolleur sofort, ob die Zahlen zum Tagesnachweis passen.
 
-Im Fahrstunden-Dialog das Feld **„Dauer (Minuten)"** ersetzen durch **„Einheiten"** mit Auswahl:
-- 1 Einheit (45 min)
-- 2 Einheiten (90 min · Doppelstunde) — Standard
-- 3 Einheiten (135 min)
-- 4 Einheiten (180 min)
-
-Intern weiterhin `dauer_minuten = einheiten * 45` speichern. Fehlstunde behält Sonderlogik.
-
-Fahrlehrer / Fahrzeug / Typ bleiben auf der regulären Fahrstunden-Seite erhalten – nur die Dauer-Eingabe wird umgestellt.
+## Daten
+- React Query, Key `["fahrlehrer-tagesuebersicht", instructorId, date]`, nur enabled wenn `instructorId` gesetzt.
+- Zwei parallele Queries analog zu `Tagesabrechnung.tsx`:
+  - `driving_lessons` mit Join auf `students(vorname,nachname)`, gefiltert per `.eq("instructor_id", …).gte("datum", startOfDay).lt("datum", startOfDay+1d)` (weil `datum` `timestamp` ist).
+  - `payments` mit Joins auf `students(vorname,nachname)` und `payment_allocations(betrag, open_items(beschreibung))`, gefiltert per `.eq("instructor_id", …).eq("datum", selectedDate)`.
+- `fetchAllRows` verwenden, um am 1000-Zeilen-Limit vorbeizukommen.
 
 ## Nicht angefasst
-- DB-Schema, Trigger, Preisberechnung
-- Schaltstunden, Theorie, Prüfungen, Zahlungen
-- Balance-/Offene-Posten-Sync (läuft weiter über die bestehenden Trigger)
+- Keine Änderungen an DB, Triggern, Preisberechnung, Saldo-Logik.
+- Keine Änderungen an bestehender `Tagesabrechnung`, `FahrlehrerStatistik`, `Zahlungen`, `Fahrstunden`.
+- Keine PDF-Export in dieser ersten Version (kann später ergänzt werden, wenn gewünscht).
+
+## Technische Details
+- Instructor-Namen konsistent als `Nachname, Vorname` (bestehende Konvention).
+- Zahlungsart-Icons/Labels wie in `Tagesabrechnung.tsx` wiederverwenden.
+- Datumsfilter mit `format(date, "yyyy-MM-dd")`.
