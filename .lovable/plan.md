@@ -1,77 +1,53 @@
 ## Ziel
-Neuer Menüpunkt **„Schnellerfassung"** (bestehender „Leistungen"-Bereich bleibt unverändert). Zweispaltiges Layout: links Fahrschüler-Liste mit Suche, rechts Schnellerfassung für Fahrstunden und Zahlungen inklusive kompakter Historie – damit man ohne Umweg über das Schülerprofil nacheinander Einträge für verschiedene Schüler machen kann.
+1. **Sync bestätigen und sicherstellen**: Alle Einträge aus der Schnellerfassung müssen im Fahrschüler-Profil und im Saldo korrekt erscheinen.
+2. **Paginierung** in der Schülerliste (Schnellerfassung) mit Seitenauswahl 10 / 20 / 30 / 50 / 100.
 
-## Neue Datei `src/pages/dashboard/Schnellerfassung.tsx`
+## 1. Sync-Check (nur Prüfung, keine neuen Tabellen)
 
-Layout (Desktop):
+Der bestehende Code speichert in dieselben Tabellen (`driving_lessons`, `payments`, `payment_allocations`), die auch das Fahrschüler-Profil liest. Business-Trigger in der Datenbank sorgen automatisch für:
+- `create_open_item_for_driving_lesson` → offener Posten wird erzeugt.
+- `calculate_driving_lesson_price` → Preis korrekt (65 € / 45 min).
+- `update_open_item_after_allocation` → Saldo je offenem Posten aktualisiert.
+- `audit_entity_change` → Aktivitätsprotokoll.
+
+Damit das Profil sofort aktuell ist, werden nach jeder Mutation folgende React-Query-Keys invalidiert (bereits vorhanden, ggf. ergänzen):
+- `driving_lessons`, `payments`, `payment_allocations_all`, `open_items`, `students`
+- Zusätzlich: `students_schnellerfassung`, `student_detail` (falls im Profil verwendet), damit die linke Liste + das Profil beim nächsten Öffnen frische Daten holen.
+
+Ergebnis: Wenn im Profil des Schülers geöffnet wird, erscheint die neue Fahrstunde/Zahlung mit korrektem Preis, offenem Posten und Saldo. Kein zusätzlicher Code nötig — nur die Invalidierung wird geprüft/ergänzt.
+
+## 2. Paginierung in der Schülerliste (Schnellerfassung)
+
+**`src/pages/dashboard/Schnellerfassung.tsx`:**
+
 ```text
-┌──────────────────────────┬────────────────────────────────────────┐
-│ Fahrschüler (links)      │ Ausgewählter Schüler                   │
-│ [🔎 Suche…            ]  │ Nachname, Vorname (DD.MM.YYYY)         │
-│ ─────────────────────    │  Filiale · Führerscheinklasse          │
-│ ● Meier, Anna (01.02…)   │ ──────────────────────────────────     │
-│   Müller, Ben (…)        │ [ Fahrstunde ]  [ Zahlung ]  (Tabs)    │
-│   Schulz, Chris (…)      │                                        │
-│ … (Liste, scrollbar)     │  ┌─ Fahrstunde eintragen ───────────┐  │
-│                          │  │ Datum · Typ · Dauer · Lehrer     │  │
-│                          │  │ Fahrzeug · Notiz  → Speichern    │  │
-│                          │  └──────────────────────────────────┘  │
-│                          │                                        │
-│                          │  Letzte 5 Fahrstunden (kompakt)        │
-│                          │  ─ Tabelle: Datum · Typ · Dauer · €    │
-└──────────────────────────┴────────────────────────────────────────┘
+┌ Fahrschüler ─────────────┐
+│ [🔎 Suchen…             ]│
+│ 342 Fahrschüler · Seite 1/35 │
+├──────────────────────────┤
+│ ● Meier, Anna (…)        │
+│   Müller, Ben (…)        │
+│   … (aktuelle Seite)     │
+├──────────────────────────┤
+│ Pro Seite: [ 20 ▾ ]      │
+│ ‹  1 / 35  ›             │
+└──────────────────────────┘
 ```
 
-Bei Auswahl eines anderen Schülers bleiben Fahrlehrer und Datum „sticky" (analog Memory `fahrstunden-erfassung-workflow`), Formularinhalte werden zurückgesetzt.
-
-### Linke Spalte – Schüler-Liste
-- Query: aktive Schüler (`students`, gefiltert auf nicht archiviert), sortiert nach Nachname/Vorname.
-- Suchfeld filtert nach Nachname/Vorname/Geburtsdatum (Client-seitig).
-- Darstellung als Liste (nicht Karten): Format „Nachname, Vorname (DD.MM.YYYY)" via `formatStudentName`. Aktive Zeile hervorgehoben (`bg-primary/10 text-primary`).
-- Scrollbereich mit fixer Höhe (`h-[calc(100vh-…)]`) und sichtbarem Scroll.
-
-### Rechte Spalte – Erfassung
-Tabs `Fahrstunde` / `Zahlung` (shadcn `Tabs`).
-
-**Fahrstunde-Formular** (Felder & Logik übernommen aus dem bestehenden Fahrstunden-Dialog):
-- Datum (default heute, sticky), Typ (`normal`/`sonderfahrt`/`fehlstunde`), Dauer in Minuten in 15er-Schritten (default 0 → verhindert versehentliches Speichern, siehe Memory), Fahrlehrer (Combobox, sticky), Fahrzeug optional, Notiz.
-- Preis wird per Trigger berechnet (bestehende Business-Logik).
-- Insert in `driving_lessons`, `queryClient.invalidateQueries` für `driving_lessons`, `open_items`, `students`.
-
-**Zahlung-Formular** (Felder aus bestehendem Zahlungen-Dialog):
-- Datum (default heute), Betrag, Zahlungsart (`bar`/`ueberweisung`/`karte`), Filiale (Riemke/Rathaus, default = Filiale des Schülers), Notiz.
-- Insert in `payments`; danach FIFO-Zuordnung wie im bestehenden Flow (Reuse der Hilfsfunktion aus `Zahlungen.tsx` — ggf. extrahieren nach `src/lib/paymentAllocation.ts`, sonst inline).
-- Invalidate `payments`, `payment_allocations`, `open_items`, `students`.
-
-**Feedback**: Nach erfolgreichem Speichern kurze Toast-Meldung, Formular teilweise resetten (Betrag/Dauer/Notiz), Datum + Fahrlehrer bleiben. Dialog bleibt geöffnet (kein Modal – ist inline). Nach 3 Speichern-Aktionen erscheint kein Reset – Nutzer kann direkt den nächsten Schüler links anklicken.
-
-### Historie (unter jedem Tab-Formular)
-- Fahrstunde-Tab: Tabelle „Letzte 5 Fahrstunden" (Datum · Typ · Dauer · €) mit Lösch-Icon.
-- Zahlung-Tab: Tabelle „Letzte 5 Zahlungen" (Datum · Betrag · Art · Filiale) mit Lösch-Icon (bestehende Delete-Logik/Sync aus Memory `zahlungs-loeschung-synchronisierung`).
-- Query pro selected student, `enabled: !!selectedStudentId`.
-
-## Routing & Navigation
-- `src/App.tsx`: neuer Lazy-Import `Schnellerfassung`, Route `dashboard/schnellerfassung`.
-- `src/components/AppSidebar.tsx`: neuer Eintrag in `verwaltungItems` **über** „Leistungen":
-  ```ts
-  { title: "Schnellerfassung", url: "/dashboard/schnellerfassung", icon: Zap },
-  ```
-  Icon `Zap` aus `lucide-react`. Beide Menüpunkte („Schnellerfassung", „Leistungen") sichtbar.
-
-## Wiederverwendung / kein Doppelcode
-- Für die Payment-Allokation (FIFO auf offene Posten) wird die vorhandene Logik aus `Zahlungen.tsx` in `src/lib/paymentAllocation.ts` als reine Funktion extrahiert und dort sowie in `Schnellerfassung.tsx` importiert. `FahrschuelerDetail.tsx` bleibt unverändert.
-- `StudentCombobox` wird **nicht** genutzt (Schülerauswahl erfolgt über die Liste links).
-- `formatStudentName`, `fetchAllRows` und bestehende Trigger übernehmen die Businessregeln.
+- Neuer State: `pageSize` (default 20), `page` (default 1).
+- Neuer `Select` mit Optionen 10 / 20 / 30 / 50 / 100 im Footer der linken Spalte.
+- Sichtbare Zeilen = `filteredStudents.slice((page-1)*pageSize, page*pageSize)`.
+- Prev/Next-Buttons (deaktiviert an den Rändern) + Anzeige „Seite X / Y".
+- Bei Suchänderung → `page = 1` zurücksetzen.
+- Bei Änderung der Seitengröße → `page = 1`.
+- Auswahl eines Schülers ändert die Seite nicht (der aktive Eintrag bleibt hervorgehoben, auch wenn er auf einer anderen Seite läge).
 
 ## Nicht in Scope
-- Keine Änderungen am alten `Leistungen`-Bereich (Services).
-- Keine Änderungen an Prüfungen, Theorie, Schaltstunden.
-- Keine Datenbankmigration nötig – alle benötigten Tabellen/Spalten existieren.
+- Keine Paginierung für andere Seiten in dieser Runde (siehe Memory: „Today's items have no limit. Older items and generic lists use 10-item limit with 'Load more'."). Wenn das später überall geändert werden soll, ist das ein eigener großer Umbau.
+- Keine Datenbankänderungen.
 
 ## Verifikation
-- Menü zeigt „Schnellerfassung" oberhalb von „Leistungen".
-- Ohne Auswahl: rechte Seite zeigt Platzhalter „Bitte Fahrschüler wählen".
-- Nach Auswahl: Formular vorausgefüllt (Filiale = Schülerfiliale), Historie geladen.
-- Fahrstunde speichern → erscheint in Liste; Preis korrekt (Trigger); offene Posten aktualisiert.
-- Zahlung speichern → offene Posten reduzieren sich per FIFO; Filiale wird gespeichert; erscheint in Tagesabrechnung.
-- Nächsten Schüler in linker Liste anklicken → Formular resettet Schüler-spezifische Felder, Datum + Fahrlehrer bleiben.
+- In der Schnellerfassung erscheinen unten Seitengrößen-Auswahl und Blätter-Pfeile.
+- Bei 100+ Schülern: nur pageSize-Einträge sichtbar, Blättern funktioniert, Anzahl-Anzeige korrekt.
+- Fahrstunde eintragen → Fahrschüler-Profil öffnen → Fahrstunde erscheint mit korrektem Preis, offener Posten und Saldo aktualisiert.
+- Zahlung eintragen → Fahrschüler-Profil zeigt Zahlung, FIFO-Zuordnung wurde auf offene Posten angewendet, Saldo reduziert.
