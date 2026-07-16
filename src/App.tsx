@@ -82,6 +82,7 @@ const App = () => (
                 {/* Admin-only routes */}
                 <Route path="fahrlehrer-statistik" element={<ProtectedRoute requiredRole="admin"><FahrlehrerStatistik /></ProtectedRoute>} />
                 <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
+                <Route path="fahrlehrer-tagesuebersicht" element={<FahrlehrerTagesuebersicht />} />
                 <Route path="auswertung" element={<ProtectedRoute requiredRole="admin"><Auswertung /></ProtectedRoute>} />
                 <Route path="benutzerverwaltung" element={<ProtectedRoute requiredRole="admin"><Benutzerverwaltung /></ProtectedRoute>} />
               </Route>
