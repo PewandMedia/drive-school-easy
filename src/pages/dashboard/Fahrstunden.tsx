@@ -671,14 +671,16 @@ const Fahrstunden = () => {
               <Input type="datetime-local" value={editForm.datum} onChange={(e) => setEditForm((f) => ({ ...f, datum: e.target.value }))} />
             </div>
             <div className="space-y-1.5">
-              <Label>Dauer (Minuten)</Label>
-              <div className="flex gap-2">
-                {DAUER_OPTIONS.map((d) => (
-                  <Button key={d} type="button" variant={editForm.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setEditForm((f) => ({ ...f, dauer_minuten: d }))}>
-                    {d} min
-                  </Button>
-                ))}
-                <Input type="number" min={0} step={15} className="w-24" value={editForm.dauer_minuten || ""} onChange={(e) => setEditForm((f) => ({ ...f, dauer_minuten: parseInt(e.target.value) || 0 }))} />
+              <Label>Einheiten</Label>
+              <div className="flex flex-wrap gap-2">
+                {DAUER_OPTIONS.map((d) => {
+                  const e = d / 45;
+                  return (
+                    <Button key={d} type="button" variant={editForm.dauer_minuten === d ? "default" : "outline"} size="sm" onClick={() => setEditForm((f) => ({ ...f, dauer_minuten: d }))}>
+                      {e} {e === 1 ? "Einheit" : "Einheiten"} ({d} min)
+                    </Button>
+                  );
+                })}
               </div>
             </div>
             <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 flex items-center justify-between">
