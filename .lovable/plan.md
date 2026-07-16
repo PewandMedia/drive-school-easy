@@ -1,59 +1,77 @@
 ## Ziel
-`src/pages/Login.tsx` bekommt das Split-Screen-Layout aus dem hochgeladenen Screenshot – links eine farbige Marken-Sektion, rechts das eigentliche Login-Formular. Statt Blau wird die bestehende Primärfarbe Rot (`--primary: 0 78% 50%`) verwendet, und die Inhalte werden auf die Fahrschulverwaltung zugeschnitten. Kein Business-/Steuer-Kontext.
+Neuer Menüpunkt **„Schnellerfassung"** (bestehender „Leistungen"-Bereich bleibt unverändert). Zweispaltiges Layout: links Fahrschüler-Liste mit Suche, rechts Schnellerfassung für Fahrstunden und Zahlungen inklusive kompakter Historie – damit man ohne Umweg über das Schülerprofil nacheinander Einträge für verschiedene Schüler machen kann.
 
-## Layout (nur `src/pages/Login.tsx`)
+## Neue Datei `src/pages/dashboard/Schnellerfassung.tsx`
 
+Layout (Desktop):
 ```text
-┌───────────────────────────┬──────────────────────────┐
-│  Rote Brand-Sektion       │  Weiße Login-Sektion     │
-│  (nur ab md: sichtbar)    │  (immer sichtbar)        │
-│                           │                          │
-│  [Logo] FAHRSCHUL-        │  Willkommen zurück       │
-│         VERWALTUNG        │  Bitte melden Sie sich   │
-│                           │  an, um fortzufahren.    │
-│  Fahrschule verwalten,    │                          │
-│  neu gedacht.             │  E-Mail                  │
-│                           │  [ Input                ] │
-│  Die interne Software     │                          │
-│  für Ihre Fahrschule…     │  Passwort                │
-│                           │  [ Input            👁  ] │
-│  🛡  Daten geschützt      │                          │
-│      DSGVO-konform        │  [   Anmelden  →       ] │
-│  🇩🇪  Hosting Deutschland │                          │
-│      Serverstandort DE    │  Kein Zugang? Wenden Sie │
-│                           │  sich an die Fahrschul-  │
-│  © 2026 Fahrschulverw.    │  leitung.                │
-└───────────────────────────┴──────────────────────────┘
+┌──────────────────────────┬────────────────────────────────────────┐
+│ Fahrschüler (links)      │ Ausgewählter Schüler                   │
+│ [🔎 Suche…            ]  │ Nachname, Vorname (DD.MM.YYYY)         │
+│ ─────────────────────    │  Filiale · Führerscheinklasse          │
+│ ● Meier, Anna (01.02…)   │ ──────────────────────────────────     │
+│   Müller, Ben (…)        │ [ Fahrstunde ]  [ Zahlung ]  (Tabs)    │
+│   Schulz, Chris (…)      │                                        │
+│ … (Liste, scrollbar)     │  ┌─ Fahrstunde eintragen ───────────┐  │
+│                          │  │ Datum · Typ · Dauer · Lehrer     │  │
+│                          │  │ Fahrzeug · Notiz  → Speichern    │  │
+│                          │  └──────────────────────────────────┘  │
+│                          │                                        │
+│                          │  Letzte 5 Fahrstunden (kompakt)        │
+│                          │  ─ Tabelle: Datum · Typ · Dauer · €    │
+└──────────────────────────┴────────────────────────────────────────┘
 ```
 
-Grid: `grid-cols-1 md:grid-cols-2`, volle Höhe (`min-h-screen`). Auf Mobil nur die rechte Karte, linke Sektion versteckt.
+Bei Auswahl eines anderen Schülers bleiben Fahrlehrer und Datum „sticky" (analog Memory `fahrstunden-erfassung-workflow`), Formularinhalte werden zurückgesetzt.
 
-## Linke Sektion – rotes Panel
-- `bg-primary text-primary-foreground` mit dezentem Grid-Hintergrund (SVG-Pattern via inline `backgroundImage`, weiße Linien mit ~6 % Deckkraft, damit es dem Screenshot entspricht, aber zur Rot-Palette passt).
-- Oben: Logo-Badge (weißes Quadrat mit rotem `Car`-Icon) + Wortmarke „FAHRSCHULVERWALTUNG".
-- Headline zweizeilig: „Fahrschule verwalten," / „neu gedacht.", groß, `font-bold`, `tracking-tight`.
-- Kurzer Absatz zur Software (interne Verwaltung für Fahrschüler, Fahrstunden, Prüfungen, Zahlungen).
-- Zwei Feature-Kacheln in halbtransparenten Boxen (`bg-white/10`, `border-white/15`):
-  1. `ShieldCheck` – „Daten geschützt" / „DSGVO-konform, verschlüsselt".
-  2. `Server` (oder `MapPin`) – „Hosting in Deutschland" / „Serverstandort DE".
-- Footer: `© 2026 Fahrschulverwaltung`.
+### Linke Spalte – Schüler-Liste
+- Query: aktive Schüler (`students`, gefiltert auf nicht archiviert), sortiert nach Nachname/Vorname.
+- Suchfeld filtert nach Nachname/Vorname/Geburtsdatum (Client-seitig).
+- Darstellung als Liste (nicht Karten): Format „Nachname, Vorname (DD.MM.YYYY)" via `formatStudentName`. Aktive Zeile hervorgehoben (`bg-primary/10 text-primary`).
+- Scrollbereich mit fixer Höhe (`h-[calc(100vh-…)]`) und sichtbarem Scroll.
 
-## Rechte Sektion – Login-Formular
-- Zentriert, `bg-background text-foreground`, max. Breite ~`max-w-sm`.
-- Überschrift „Willkommen zurück" (`text-2xl font-bold`) + Untertitel „Bitte melden Sie sich an, um fortzufahren."
-- Formularfelder wie im Screenshot:
-  - `E-Mail` – Input mit `Mail`-Icon links (Platzhalter `name@fahrschule.de`).
-  - `Passwort` – Input mit `Lock`-Icon links und `Eye`/`EyeOff`-Toggle rechts (neuer lokaler State `showPassword`).
-- Fehlermeldung wie bisher (`text-destructive`, `bg-destructive/10`).
-- Anmelde-Button: `w-full`, `bg-primary`, mit `ArrowRight`-Icon rechts; Ladezustand „Anmelden…".
-- Hilfetext unter dem Button: „Kein Zugang? Wenden Sie sich an die Fahrschulleitung."
+### Rechte Spalte – Erfassung
+Tabs `Fahrstunde` / `Zahlung` (shadcn `Tabs`).
 
-## Beibehalten
-- Auth-Logik (`supabase.auth.signInWithPassword`, `useAuth`, `Navigate` bei aktiver Session) bleibt unverändert.
-- Keine neuen Dependencies; Icons kommen aus `lucide-react` (`Car`, `Mail`, `Lock`, `Eye`, `EyeOff`, `ShieldCheck`, `Server`, `ArrowRight`).
-- Farben ausschließlich über Design-Tokens (`bg-primary`, `text-primary-foreground`, `bg-background`, `text-muted-foreground` …) – keine Hardcode-Hex-Werte.
+**Fahrstunde-Formular** (Felder & Logik übernommen aus dem bestehenden Fahrstunden-Dialog):
+- Datum (default heute, sticky), Typ (`normal`/`sonderfahrt`/`fehlstunde`), Dauer in Minuten in 15er-Schritten (default 0 → verhindert versehentliches Speichern, siehe Memory), Fahrlehrer (Combobox, sticky), Fahrzeug optional, Notiz.
+- Preis wird per Trigger berechnet (bestehende Business-Logik).
+- Insert in `driving_lessons`, `queryClient.invalidateQueries` für `driving_lessons`, `open_items`, `students`.
+
+**Zahlung-Formular** (Felder aus bestehendem Zahlungen-Dialog):
+- Datum (default heute), Betrag, Zahlungsart (`bar`/`ueberweisung`/`karte`), Filiale (Riemke/Rathaus, default = Filiale des Schülers), Notiz.
+- Insert in `payments`; danach FIFO-Zuordnung wie im bestehenden Flow (Reuse der Hilfsfunktion aus `Zahlungen.tsx` — ggf. extrahieren nach `src/lib/paymentAllocation.ts`, sonst inline).
+- Invalidate `payments`, `payment_allocations`, `open_items`, `students`.
+
+**Feedback**: Nach erfolgreichem Speichern kurze Toast-Meldung, Formular teilweise resetten (Betrag/Dauer/Notiz), Datum + Fahrlehrer bleiben. Dialog bleibt geöffnet (kein Modal – ist inline). Nach 3 Speichern-Aktionen erscheint kein Reset – Nutzer kann direkt den nächsten Schüler links anklicken.
+
+### Historie (unter jedem Tab-Formular)
+- Fahrstunde-Tab: Tabelle „Letzte 5 Fahrstunden" (Datum · Typ · Dauer · €) mit Lösch-Icon.
+- Zahlung-Tab: Tabelle „Letzte 5 Zahlungen" (Datum · Betrag · Art · Filiale) mit Lösch-Icon (bestehende Delete-Logik/Sync aus Memory `zahlungs-loeschung-synchronisierung`).
+- Query pro selected student, `enabled: !!selectedStudentId`.
+
+## Routing & Navigation
+- `src/App.tsx`: neuer Lazy-Import `Schnellerfassung`, Route `dashboard/schnellerfassung`.
+- `src/components/AppSidebar.tsx`: neuer Eintrag in `verwaltungItems` **über** „Leistungen":
+  ```ts
+  { title: "Schnellerfassung", url: "/dashboard/schnellerfassung", icon: Zap },
+  ```
+  Icon `Zap` aus `lucide-react`. Beide Menüpunkte („Schnellerfassung", „Leistungen") sichtbar.
+
+## Wiederverwendung / kein Doppelcode
+- Für die Payment-Allokation (FIFO auf offene Posten) wird die vorhandene Logik aus `Zahlungen.tsx` in `src/lib/paymentAllocation.ts` als reine Funktion extrahiert und dort sowie in `Schnellerfassung.tsx` importiert. `FahrschuelerDetail.tsx` bleibt unverändert.
+- `StudentCombobox` wird **nicht** genutzt (Schülerauswahl erfolgt über die Liste links).
+- `formatStudentName`, `fetchAllRows` und bestehende Trigger übernehmen die Businessregeln.
+
+## Nicht in Scope
+- Keine Änderungen am alten `Leistungen`-Bereich (Services).
+- Keine Änderungen an Prüfungen, Theorie, Schaltstunden.
+- Keine Datenbankmigration nötig – alle benötigten Tabellen/Spalten existieren.
 
 ## Verifikation
-- `/login` zeigt Desktop das Split-Layout: linkes rotes Panel mit Fahrschul-Content, rechts das Formular.
-- Auf Mobil (`<768px`) wird nur das Formular angezeigt, keine leere rote Fläche.
-- Login funktioniert weiterhin (gleiche Handler), Passwort-Toggle schaltet zwischen `password` und `text` um.
+- Menü zeigt „Schnellerfassung" oberhalb von „Leistungen".
+- Ohne Auswahl: rechte Seite zeigt Platzhalter „Bitte Fahrschüler wählen".
+- Nach Auswahl: Formular vorausgefüllt (Filiale = Schülerfiliale), Historie geladen.
+- Fahrstunde speichern → erscheint in Liste; Preis korrekt (Trigger); offene Posten aktualisiert.
+- Zahlung speichern → offene Posten reduzieren sich per FIFO; Filiale wird gespeichert; erscheint in Tagesabrechnung.
+- Nächsten Schüler in linker Liste anklicken → Formular resettet Schüler-spezifische Felder, Datum + Fahrlehrer bleiben.
