@@ -12,6 +12,8 @@ import {
   Banknote,
   Landmark,
   Clock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
@@ -111,6 +113,8 @@ const Schnellerfassung = () => {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [tab, setTab] = useState<"fahrstunde" | "zahlung">("fahrstunde");
+  const [pageSize, setPageSize] = useState(20);
+  const [page, setPage] = useState(1);
 
   // Sticky values across student changes
   const [stickyInstructor, setStickyInstructor] = useState<string>("");
