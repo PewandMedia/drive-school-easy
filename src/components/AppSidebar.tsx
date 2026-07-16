@@ -28,6 +28,7 @@ import {
   BarChart3,
   Shield,
   Zap,
+  CalendarCheck,
 } from "lucide-react";
 
 const navItems = [
@@ -41,6 +42,7 @@ const schuelerItems = [
   { title: "Theorie", url: "/dashboard/theorie", icon: BookOpen },
   { title: "Prüfungen", url: "/dashboard/pruefungen", icon: ClipboardCheck },
   { title: "Fahrlehrer-Statistik", url: "/dashboard/fahrlehrer-statistik", icon: UserCheck, adminOnly: true },
+  { title: "Tagesübersicht Fahrlehrer", url: "/dashboard/fahrlehrer-tagesuebersicht", icon: CalendarCheck },
 ];
 
 const verwaltungItems = [

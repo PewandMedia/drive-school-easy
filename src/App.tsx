@@ -24,6 +24,7 @@ const Zahlungen = lazy(() => import("./pages/dashboard/Zahlungen"));
 const Abrechnung = lazy(() => import("./pages/dashboard/Abrechnung"));
 const FahrlehrerStatistik = lazy(() => import("./pages/dashboard/FahrlehrerStatistik"));
 const Tagesabrechnung = lazy(() => import("./pages/dashboard/Tagesabrechnung"));
+const FahrlehrerTagesuebersicht = lazy(() => import("./pages/dashboard/FahrlehrerTagesuebersicht"));
 const Auswertung = lazy(() => import("./pages/dashboard/Auswertung"));
 const Benutzerverwaltung = lazy(() => import("./pages/dashboard/Benutzerverwaltung"));
 
@@ -81,6 +82,7 @@ const App = () => (
                 {/* Admin-only routes */}
                 <Route path="fahrlehrer-statistik" element={<ProtectedRoute requiredRole="admin"><FahrlehrerStatistik /></ProtectedRoute>} />
                 <Route path="tagesabrechnung" element={<Tagesabrechnung />} />
+                <Route path="fahrlehrer-tagesuebersicht" element={<FahrlehrerTagesuebersicht />} />
                 <Route path="auswertung" element={<ProtectedRoute requiredRole="admin"><Auswertung /></ProtectedRoute>} />
                 <Route path="benutzerverwaltung" element={<ProtectedRoute requiredRole="admin"><Benutzerverwaltung /></ProtectedRoute>} />
               </Route>
