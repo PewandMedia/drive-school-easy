@@ -146,7 +146,7 @@ const Schnellerfassung = () => {
         supabase
           .from("students")
           .select("id, vorname, nachname, geburtsdatum, fahrschule, fuehrerscheinklasse, status")
-          .neq("status", "archiviert")
+          .or("status.is.null,status.neq.archiviert")
           .order("nachname"),
       ) as Promise<Student[]>,
   });
