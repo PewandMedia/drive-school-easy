@@ -99,7 +99,7 @@ const defaultForm = {
   typ: "uebungsstunde" as DrivingLessonTyp,
   fahrzeug_typ: "automatik" as FahrzeugTyp,
   vehicle_id: "",
-  dauer_minuten: 0,
+  dauer_minuten: 90,
   datum: new Date().toISOString().slice(0, 16),
 };
 
