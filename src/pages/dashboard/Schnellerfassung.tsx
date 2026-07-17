@@ -219,10 +219,11 @@ const Schnellerfassung = () => {
   const saveLesson = useMutation({
     mutationFn: async () => {
       if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
+      if (!stickyInstructor) throw new Error("Bitte Fahrlehrer wählen");
       if (einheiten <= 0) throw new Error("Bitte Einheiten wählen");
       const { error } = await supabase.from("driving_lessons").insert({
         student_id: selectedStudentId,
-        instructor_id: null,
+        instructor_id: stickyInstructor,
         typ: "uebungsstunde",
         fahrzeug_typ: "automatik",
         dauer_minuten: einheiten * 45,
@@ -533,6 +534,24 @@ const Schnellerfassung = () => {
                       />
                     </div>
                     <div className="space-y-1.5">
+                      <Label>Fahrlehrer</Label>
+                      <Select
+                        value={stickyInstructor}
+                        onValueChange={setStickyInstructor}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Fahrlehrer wählen…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {instructors.map((i) => (
+                            <SelectItem key={i.id} value={i.id}>
+                              {i.nachname}, {i.vorname}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
                       <Label>Einheiten</Label>
                       <Select
                         value={String(einheiten)}
@@ -554,7 +573,7 @@ const Schnellerfassung = () => {
                   <div className="flex justify-end">
                     <Button
                       onClick={() => saveLesson.mutate()}
-                      disabled={saveLesson.isPending}
+                      disabled={saveLesson.isPending || !stickyInstructor}
                       className="gap-2"
                     >
                       <Save className="h-4 w-4" />
