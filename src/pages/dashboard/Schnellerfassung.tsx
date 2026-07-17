@@ -443,7 +443,7 @@ const Schnellerfassung = () => {
                     <li key={s.id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedStudentId(s.id)}
+                        onClick={() => handleSelectStudent(s.id)}
                         className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                           active
                             ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
