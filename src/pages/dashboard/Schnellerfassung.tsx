@@ -219,10 +219,11 @@ const Schnellerfassung = () => {
   const saveLesson = useMutation({
     mutationFn: async () => {
       if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
+      if (!stickyInstructor) throw new Error("Bitte Fahrlehrer wählen");
       if (einheiten <= 0) throw new Error("Bitte Einheiten wählen");
       const { error } = await supabase.from("driving_lessons").insert({
         student_id: selectedStudentId,
-        instructor_id: null,
+        instructor_id: stickyInstructor,
         typ: "uebungsstunde",
         fahrzeug_typ: "automatik",
         dauer_minuten: einheiten * 45,
