@@ -1,13 +1,16 @@
-## Fahrlehrer bei Schnellerfassung (Fahrstunde) verpflichtend
+## Fahrlehrer automatisch aus letzter Fahrstunde des Schülers vorbelegen
 
-In `src/pages/dashboard/Schnellerfassung.tsx` im Fahrstunden-Block:
+In `src/pages/dashboard/Schnellerfassung.tsx`:
 
-1. **Neuer State** `instructorId: string | null` (zusammen mit `studentId`, `einheiten`, `datum`).
-2. **Neue Query** `instructors` (nur `aktiv = true`, sortiert Nachname), analog zur Combobox in `Fahrstunden.tsx`.
-3. **Neues Select "Fahrlehrer"** direkt unter dem Fahrschüler-Feld — Optionen zeigen `Nachname, Vorname`.
-4. **`saveLesson` mutation**: `instructor_id: null` → `instructor_id: instructorId` verwenden.
-5. **Speichern-Button** ist disabled, solange `!studentId || !instructorId`.
-6. **Reset nach Speichern**: `instructorId` bleibt „sticky" (analog zur bestehenden Konvention in `Fahrstunden.tsx`), damit man mehrere Stunden hintereinander schnell erfassen kann. `studentId` und `einheiten` werden wie bisher zurückgesetzt.
-7. Toast-/Fehlermeldung falls Fahrlehrer fehlt.
+1. **Neue Query `lastInstructorByStudent`** — lädt aus `driving_lessons` pro Schüler den zuletzt verwendeten `instructor_id` (sortiert nach `datum` desc, `created_at` desc). Ergebnis wird als `Map<student_id, instructor_id>` bereitgestellt. Nutzt `fetchAllRows`, nur Felder `student_id, instructor_id, datum, created_at`, gefiltert auf `instructor_id not null`.
 
-Keine Änderungen an Fahrzeug, Typ, Preis-Logik, DB oder anderen Seiten.
+2. **Auto-Fill beim Schülerwechsel** — Wenn `studentId` gesetzt/geändert wird (via `onChange` der `StudentCombobox`) und für diesen Schüler eine `instructor_id` in der Map existiert, wird `stickyInstructor` automatisch auf diesen Wert gesetzt.
+   - Wenn kein bisheriger Fahrlehrer bekannt ist → `stickyInstructor` bleibt wie vorher (sticky vom letzten Speichern).
+   - Der Nutzer kann den vorgeschlagenen Fahrlehrer weiterhin manuell überschreiben.
+
+3. **Keine Änderungen** an Speicherlogik, Pflicht-Validierung, DB-Schema, anderen Seiten oder am Fahrlehrer-Select selbst — nur die Vorbelegung wird intelligenter.
+
+### Technische Details
+- Query key: `["last-instructor-by-student"]`, `staleTime` moderat (z. B. 30 s), invalidiert nach erfolgreichem `saveLesson`, damit neue Zuordnungen sofort greifen.
+- Map wird clientseitig aus dem sortierten Ergebnis gebaut: erster Treffer pro `student_id` gewinnt.
+- Auto-Fill läuft in einem `handleStudentChange`-Callback, nicht in `useEffect`, damit die Sticky-Logik beim reinen Re-Render nicht überschrieben wird.

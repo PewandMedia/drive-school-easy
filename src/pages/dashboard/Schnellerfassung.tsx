@@ -158,6 +158,35 @@ const Schnellerfassung = () => {
       ) as Promise<Instructor[]>,
   });
 
+  // Map: student_id -> most recently used instructor_id (from past driving_lessons)
+  const { data: lastInstructorByStudent = new Map<string, string>() } = useQuery<
+    Map<string, string>
+  >({
+    queryKey: ["last-instructor-by-student"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const rows = (await fetchAllRows(
+        supabase
+          .from("driving_lessons")
+          .select("student_id, instructor_id, datum, created_at")
+          .not("instructor_id", "is", null)
+          .order("datum", { ascending: false })
+          .order("created_at", { ascending: false }),
+      )) as { student_id: string; instructor_id: string }[];
+      const map = new Map<string, string>();
+      for (const r of rows) {
+        if (!map.has(r.student_id)) map.set(r.student_id, r.instructor_id);
+      }
+      return map;
+    },
+  });
+
+  const handleSelectStudent = (id: string) => {
+    setSelectedStudentId(id);
+    const suggested = lastInstructorByStudent.get(id);
+    if (suggested) setStickyInstructor(suggested);
+  };
+
   const { data: vehicles = [] } = useQuery<Vehicle[]>({
     queryKey: ["vehicles_active"],
     queryFn: async () => {
@@ -233,6 +262,7 @@ const Schnellerfassung = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["schnell_lessons", selectedStudentId] });
+      qc.invalidateQueries({ queryKey: ["last-instructor-by-student"] });
       qc.invalidateQueries({ queryKey: ["driving_lessons"] });
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
@@ -414,7 +444,7 @@ const Schnellerfassung = () => {
                     <li key={s.id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedStudentId(s.id)}
+                        onClick={() => handleSelectStudent(s.id)}
                         className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                           active
                             ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
