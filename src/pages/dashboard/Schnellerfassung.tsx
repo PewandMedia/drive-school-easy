@@ -262,6 +262,7 @@ const Schnellerfassung = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["schnell_lessons", selectedStudentId] });
+      qc.invalidateQueries({ queryKey: ["last-instructor-by-student"] });
       qc.invalidateQueries({ queryKey: ["driving_lessons"] });
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
