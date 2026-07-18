@@ -122,6 +122,9 @@ const Schnellerfassung = () => {
   const [stickyZahlungsDatum, setStickyZahlungsDatum] = useState<string>(
     todayLocalDate(),
   );
+  const [stickyEinreichungsdatum, setStickyEinreichungsdatum] = useState<string>(
+    todayLocalDate(),
+  );
 
   // Fahrstunde form – vereinfacht: nur Einheiten (1 = 45min/65€)
   const [einheiten, setEinheiten] = useState<number>(1);
@@ -131,6 +134,7 @@ const Schnellerfassung = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     filiale: "riemke" as Filiale,
+    istGutschrift: false,
   });
 
   // Queries
