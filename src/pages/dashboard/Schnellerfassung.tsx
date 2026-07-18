@@ -122,6 +122,9 @@ const Schnellerfassung = () => {
   const [stickyZahlungsDatum, setStickyZahlungsDatum] = useState<string>(
     todayLocalDate(),
   );
+  const [stickyEinreichungsdatum, setStickyEinreichungsdatum] = useState<string>(
+    todayLocalDate(),
+  );
 
   // Fahrstunde form – vereinfacht: nur Einheiten (1 = 45min/65€)
   const [einheiten, setEinheiten] = useState<number>(1);
@@ -131,6 +134,7 @@ const Schnellerfassung = () => {
     betrag: "",
     zahlungsart: "bar" as Zahlungsart,
     filiale: "riemke" as Filiale,
+    istGutschrift: false,
   });
 
   // Queries
@@ -275,56 +279,60 @@ const Schnellerfassung = () => {
   const savePayment = useMutation({
     mutationFn: async () => {
       if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
-      const betrag = parseFloat(paymentForm.betrag);
-      if (!betrag || betrag <= 0) throw new Error("Bitte gültigen Betrag eingeben");
+      const rawBetrag = parseFloat(paymentForm.betrag);
+      if (!rawBetrag || rawBetrag <= 0) throw new Error("Bitte gültigen Betrag eingeben");
+      const betrag = paymentForm.istGutschrift ? -Math.abs(rawBetrag) : rawBetrag;
 
       // Insert payment
       const { data: payment, error: payErr } = await supabase
         .from("payments")
         .insert({
           student_id: selectedStudentId,
+          instructor_id: stickyInstructor || null,
           betrag,
           zahlungsart: paymentForm.zahlungsart,
           filiale: paymentForm.filiale,
           datum: new Date(stickyZahlungsDatum).toISOString(),
-          einreichungsdatum: new Date(stickyZahlungsDatum).toISOString(),
+          einreichungsdatum: new Date(stickyEinreichungsdatum).toISOString(),
         } as any)
         .select("id")
         .single();
       if (payErr) throw payErr;
 
-      // FIFO allocation to open items
-      const { data: openItems, error: oiErr } = await supabase
-        .from("open_items")
-        .select("*")
-        .eq("student_id", selectedStudentId)
-        .neq("status", "bezahlt")
-        .order("datum", { ascending: true });
-      if (oiErr) throw oiErr;
+      // FIFO allocation only for positive payments
+      if (betrag > 0) {
+        const { data: openItems, error: oiErr } = await supabase
+          .from("open_items")
+          .select("*")
+          .eq("student_id", selectedStudentId)
+          .neq("status", "bezahlt")
+          .order("datum", { ascending: true });
+        if (oiErr) throw oiErr;
 
-      let remaining = betrag;
-      const allocations: {
-        payment_id: string;
-        open_item_id: string;
-        betrag: number;
-      }[] = [];
-      for (const item of openItems ?? []) {
-        if (remaining <= 0) break;
-        const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
-        if (offen <= 0) continue;
-        const zuordnung = Math.min(remaining, offen);
-        allocations.push({
-          payment_id: (payment as any).id,
-          open_item_id: (item as any).id,
-          betrag: zuordnung,
-        });
-        remaining -= zuordnung;
-      }
-      if (allocations.length > 0) {
-        const { error: allocErr } = await supabase
-          .from("payment_allocations")
-          .insert(allocations as any);
-        if (allocErr) throw allocErr;
+        let remaining = betrag;
+        const allocations: {
+          payment_id: string;
+          open_item_id: string;
+          betrag: number;
+        }[] = [];
+        for (const item of openItems ?? []) {
+          if (remaining <= 0) break;
+          const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
+          if (offen <= 0) continue;
+          const zuordnung = Math.min(remaining, offen);
+          allocations.push({
+            payment_id: (payment as any).id,
+            open_item_id: (item as any).id,
+            betrag: zuordnung,
+          });
+          remaining -= zuordnung;
+        }
+        if (allocations.length > 0) {
+          const { error: allocErr } = await supabase
+            .from("payment_allocations")
+            .insert(allocations as any);
+          if (allocErr) throw allocErr;
+        }
       }
     },
     onSuccess: () => {
@@ -674,11 +682,19 @@ const Schnellerfassung = () => {
                 <TabsContent value="zahlung" className="space-y-6 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label>Datum</Label>
+                      <Label>Zahlungsdatum</Label>
                       <Input
                         type="date"
                         value={stickyZahlungsDatum}
                         onChange={(e) => setStickyZahlungsDatum(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Im Büro eingereicht am</Label>
+                      <Input
+                        type="date"
+                        value={stickyEinreichungsdatum}
+                        onChange={(e) => setStickyEinreichungsdatum(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -693,6 +709,24 @@ const Schnellerfassung = () => {
                           setPaymentForm((f) => ({ ...f, betrag: e.target.value }))
                         }
                       />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Fahrlehrer</Label>
+                      <Select
+                        value={stickyInstructor}
+                        onValueChange={setStickyInstructor}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Fahrlehrer wählen…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {instructors.map((i) => (
+                            <SelectItem key={i.id} value={i.id}>
+                              {i.nachname}, {i.vorname}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1.5">
                       <Label>Zahlungsart</Label>
@@ -736,6 +770,20 @@ const Schnellerfassung = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="flex items-center gap-2 md:col-span-2">
+                      <input
+                        id="istGutschrift"
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-input accent-primary"
+                        checked={paymentForm.istGutschrift}
+                        onChange={(e) =>
+                          setPaymentForm((f) => ({ ...f, istGutschrift: e.target.checked }))
+                        }
+                      />
+                      <Label htmlFor="istGutschrift" className="cursor-pointer">
+                        Gutschrift / Rückzahlung (Betrag wird negativ gebucht)
+                      </Label>
                     </div>
                   </div>
 

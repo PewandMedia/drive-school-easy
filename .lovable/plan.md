@@ -1,16 +1,29 @@
-## Fahrlehrer automatisch aus letzter Fahrstunde des Schülers vorbelegen
+## Zahlungsformular in Schnellerfassung vervollständigen
 
-In `src/pages/dashboard/Schnellerfassung.tsx`:
+In `src/pages/dashboard/Schnellerfassung.tsx` bekommt der Tab „Zahlung" dieselben Felder wie das normale Zahlungsformular in `Zahlungen.tsx`.
 
-1. **Neue Query `lastInstructorByStudent`** — lädt aus `driving_lessons` pro Schüler den zuletzt verwendeten `instructor_id` (sortiert nach `datum` desc, `created_at` desc). Ergebnis wird als `Map<student_id, instructor_id>` bereitgestellt. Nutzt `fetchAllRows`, nur Felder `student_id, instructor_id, datum, created_at`, gefiltert auf `instructor_id not null`.
+### Neue/geänderte Felder im Formular
+1. **Zahlungsdatum** (bereits vorhanden als `stickyZahlungsDatum`) – bleibt.
+2. **Einreichungsdatum im Büro** – neuer eigener `date`-Input, Default = Zahlungsdatum, wird sticky zwischen Schülern gemerkt.
+3. **Betrag** – bleibt, zusätzlich Checkbox **„Gutschrift / Rückzahlung"** (macht den Betrag negativ, wie in `Zahlungen.tsx`).
+4. **Zahlungsart** – bleibt (Bar / EC / Überweisung).
+5. **Filiale** – bleibt (Default aus `student.fahrschule`).
+6. **Fahrlehrer** – neues Pflichtfeld-artiges Select (leer erlaubt = „–"), wird per Schülerwechsel automatisch aus `lastInstructorByStudent` vorbelegt (gleiche Logik wie bei Fahrstunden), bleibt danach sticky.
 
-2. **Auto-Fill beim Schülerwechsel** — Wenn `studentId` gesetzt/geändert wird (via `onChange` der `StudentCombobox`) und für diesen Schüler eine `instructor_id` in der Map existiert, wird `stickyInstructor` automatisch auf diesen Wert gesetzt.
-   - Wenn kein bisheriger Fahrlehrer bekannt ist → `stickyInstructor` bleibt wie vorher (sticky vom letzten Speichern).
-   - Der Nutzer kann den vorgeschlagenen Fahrlehrer weiterhin manuell überschreiben.
+### Speicherlogik (`savePayment`)
+- `einreichungsdatum` kommt jetzt aus dem eigenen Feld statt aus `stickyZahlungsDatum`.
+- `instructor_id` wird mitgespeichert (`null` wenn leer).
+- Betrag wird bei aktivierter Gutschrift-Checkbox negiert.
+- FIFO-Zuweisung auf offene Posten bleibt unverändert (nur bei positivem Betrag; bei Gutschrift keine Allocation, analog zur bestehenden Logik in `Zahlungen.tsx`).
 
-3. **Keine Änderungen** an Speicherlogik, Pflicht-Validierung, DB-Schema, anderen Seiten oder am Fahrlehrer-Select selbst — nur die Vorbelegung wird intelligenter.
+### Sticky-Verhalten
+- `stickyEinreichungsdatum` (neuer State), `stickyInstructor` (bereits vorhanden, wird jetzt auch für Zahlungen genutzt).
+- Beim Schülerwechsel: Fahrlehrer wird wie bei Fahrstunden aus `lastInstructorByStudent` vorgeschlagen; Filiale weiterhin aus `student.fahrschule`.
 
-### Technische Details
-- Query key: `["last-instructor-by-student"]`, `staleTime` moderat (z. B. 30 s), invalidiert nach erfolgreichem `saveLesson`, damit neue Zuordnungen sofort greifen.
-- Map wird clientseitig aus dem sortierten Ergebnis gebaut: erster Treffer pro `student_id` gewinnt.
-- Auto-Fill läuft in einem `handleStudentChange`-Callback, nicht in `useEffect`, damit die Sticky-Logik beim reinen Re-Render nicht überschrieben wird.
+### Nicht geändert
+- „Letzte Zahlungen"-Tabelle, Fahrstunden-Tab, DB-Schema, andere Seiten.
+
+### Technisch
+- Neue States: `stickyEinreichungsdatum: string`, `paymentForm.istGutschrift: boolean`.
+- Instructor-Select nutzt vorhandene `instructors`-Query und `stickyInstructor`.
+- Nach erfolgreichem Speichern: bestehende Query-Invalidations bleiben; `stickyEinreichungsdatum` und `stickyInstructor` bleiben erhalten.
