@@ -279,56 +279,60 @@ const Schnellerfassung = () => {
   const savePayment = useMutation({
     mutationFn: async () => {
       if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
-      const betrag = parseFloat(paymentForm.betrag);
-      if (!betrag || betrag <= 0) throw new Error("Bitte gültigen Betrag eingeben");
+      const rawBetrag = parseFloat(paymentForm.betrag);
+      if (!rawBetrag || rawBetrag <= 0) throw new Error("Bitte gültigen Betrag eingeben");
+      const betrag = paymentForm.istGutschrift ? -Math.abs(rawBetrag) : rawBetrag;
 
       // Insert payment
       const { data: payment, error: payErr } = await supabase
         .from("payments")
         .insert({
           student_id: selectedStudentId,
+          instructor_id: stickyInstructor || null,
           betrag,
           zahlungsart: paymentForm.zahlungsart,
           filiale: paymentForm.filiale,
           datum: new Date(stickyZahlungsDatum).toISOString(),
-          einreichungsdatum: new Date(stickyZahlungsDatum).toISOString(),
+          einreichungsdatum: new Date(stickyEinreichungsdatum).toISOString(),
         } as any)
         .select("id")
         .single();
       if (payErr) throw payErr;
 
-      // FIFO allocation to open items
-      const { data: openItems, error: oiErr } = await supabase
-        .from("open_items")
-        .select("*")
-        .eq("student_id", selectedStudentId)
-        .neq("status", "bezahlt")
-        .order("datum", { ascending: true });
-      if (oiErr) throw oiErr;
+      // FIFO allocation only for positive payments
+      if (betrag > 0) {
+        const { data: openItems, error: oiErr } = await supabase
+          .from("open_items")
+          .select("*")
+          .eq("student_id", selectedStudentId)
+          .neq("status", "bezahlt")
+          .order("datum", { ascending: true });
+        if (oiErr) throw oiErr;
 
-      let remaining = betrag;
-      const allocations: {
-        payment_id: string;
-        open_item_id: string;
-        betrag: number;
-      }[] = [];
-      for (const item of openItems ?? []) {
-        if (remaining <= 0) break;
-        const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
-        if (offen <= 0) continue;
-        const zuordnung = Math.min(remaining, offen);
-        allocations.push({
-          payment_id: (payment as any).id,
-          open_item_id: (item as any).id,
-          betrag: zuordnung,
-        });
-        remaining -= zuordnung;
-      }
-      if (allocations.length > 0) {
-        const { error: allocErr } = await supabase
-          .from("payment_allocations")
-          .insert(allocations as any);
-        if (allocErr) throw allocErr;
+        let remaining = betrag;
+        const allocations: {
+          payment_id: string;
+          open_item_id: string;
+          betrag: number;
+        }[] = [];
+        for (const item of openItems ?? []) {
+          if (remaining <= 0) break;
+          const offen = Number(item.betrag_gesamt) - Number(item.betrag_bezahlt);
+          if (offen <= 0) continue;
+          const zuordnung = Math.min(remaining, offen);
+          allocations.push({
+            payment_id: (payment as any).id,
+            open_item_id: (item as any).id,
+            betrag: zuordnung,
+          });
+          remaining -= zuordnung;
+        }
+        if (allocations.length > 0) {
+          const { error: allocErr } = await supabase
+            .from("payment_allocations")
+            .insert(allocations as any);
+          if (allocErr) throw allocErr;
+        }
       }
     },
     onSuccess: () => {
