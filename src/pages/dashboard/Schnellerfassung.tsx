@@ -681,8 +681,22 @@ const Schnellerfassung = () => {
                 {/* ZAHLUNG */}
                 <TabsContent value="zahlung" className="space-y-6 pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2 md:col-span-2">
+                      <input
+                        id="istGutschrift"
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-input accent-primary"
+                        checked={paymentForm.istGutschrift}
+                        onChange={(e) =>
+                          setPaymentForm((f) => ({ ...f, istGutschrift: e.target.checked }))
+                        }
+                      />
+                      <Label htmlFor="istGutschrift" className="cursor-pointer">
+                        Gutschrift
+                      </Label>
+                    </div>
                     <div className="space-y-1.5">
-                      <Label>Zahlungsdatum</Label>
+                      <Label>Einnahmedatum (Fahrlehrer)</Label>
                       <Input
                         type="date"
                         value={stickyZahlungsDatum}
@@ -690,34 +704,21 @@ const Schnellerfassung = () => {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Im Büro eingereicht am</Label>
+                      <Label>Einreichungsdatum (Büro)</Label>
                       <Input
                         type="date"
                         value={stickyEinreichungsdatum}
                         onChange={(e) => setStickyEinreichungsdatum(e.target.value)}
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Betrag (€)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        placeholder="0,00"
-                        value={paymentForm.betrag}
-                        onChange={(e) =>
-                          setPaymentForm((f) => ({ ...f, betrag: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Fahrlehrer</Label>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label>Fahrlehrer (optional)</Label>
                       <Select
                         value={stickyInstructor}
                         onValueChange={setStickyInstructor}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Fahrlehrer wählen…" />
+                          <SelectValue placeholder="— kein Fahrlehrer —" />
                         </SelectTrigger>
                         <SelectContent>
                           {instructors.map((i) => (
@@ -752,7 +753,7 @@ const Schnellerfassung = () => {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Filiale</Label>
+                      <Label>Abgegeben in Filiale</Label>
                       <Select
                         value={paymentForm.filiale}
                         onValueChange={(v) =>
@@ -771,19 +772,18 @@ const Schnellerfassung = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex items-center gap-2 md:col-span-2">
-                      <input
-                        id="istGutschrift"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-input accent-primary"
-                        checked={paymentForm.istGutschrift}
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label>Betrag (€)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        placeholder="0,00"
+                        value={paymentForm.betrag}
                         onChange={(e) =>
-                          setPaymentForm((f) => ({ ...f, istGutschrift: e.target.checked }))
+                          setPaymentForm((f) => ({ ...f, betrag: e.target.value }))
                         }
                       />
-                      <Label htmlFor="istGutschrift" className="cursor-pointer">
-                        Gutschrift / Rückzahlung (Betrag wird negativ gebucht)
-                      </Label>
                     </div>
                   </div>
 
