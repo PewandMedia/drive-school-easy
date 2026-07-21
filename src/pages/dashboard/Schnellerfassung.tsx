@@ -562,8 +562,9 @@ const Schnellerfassung = () => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
-        {/* LEFT: Student list */}
-        <aside className="rounded-xl border border-border bg-card flex flex-col h-[calc(100vh-220px)] min-h-[500px]">
+        {/* LEFT: Student list + Recent entries */}
+        <div className="flex flex-col gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+        <aside className="rounded-xl border border-border bg-card flex flex-col flex-1 min-h-[320px]">
           <div className="p-3 border-b border-border">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
