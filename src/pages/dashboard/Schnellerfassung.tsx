@@ -1076,6 +1076,131 @@ const Schnellerfassung = () => {
                     )}
                   </div>
                 </TabsContent>
+
+                {/* PRÜFUNG */}
+                <TabsContent value="pruefung" className="space-y-6 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Prüfungsart</Label>
+                      <Select
+                        value={examForm.typ}
+                        onValueChange={(v) =>
+                          setExamForm((f) => ({ ...f, typ: v as ExamTyp }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="theorie">Theorieprüfung</SelectItem>
+                          <SelectItem value="praxis">Praxisprüfung</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Datum</Label>
+                      <Input
+                        type="date"
+                        value={stickyExamDatum}
+                        onChange={(e) => setStickyExamDatum(e.target.value)}
+                      />
+                    </div>
+
+                    {examForm.typ === "praxis" && (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label>Fahrlehrer</Label>
+                          <Select
+                            value={stickyInstructor}
+                            onValueChange={setStickyInstructor}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Fahrlehrer wählen…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {instructors.map((i) => (
+                                <SelectItem key={i.id} value={i.id}>
+                                  {i.nachname}, {i.vorname}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Fahrzeug (optional)</Label>
+                          <Select
+                            value={examForm.vehicleId || "none"}
+                            onValueChange={(v) =>
+                              setExamForm((f) => ({
+                                ...f,
+                                vehicleId: v === "none" ? "" : v,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="— kein Fahrzeug —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">— kein Fahrzeug —</SelectItem>
+                              {vehicles.map((v) => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.bezeichnung} ({v.kennzeichen})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <Label>Ergebnis</Label>
+                      <Select
+                        value={examForm.status}
+                        onValueChange={(v) =>
+                          setExamForm((f) => ({ ...f, status: v as ExamStatus }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                            <SelectItem key={k} value={k}>
+                              {v}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Preis (€)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={examForm.preis}
+                        onChange={(e) =>
+                          setExamForm((f) => ({ ...f, preis: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => saveExam.mutate()}
+                      disabled={
+                        saveExam.isPending ||
+                        (examForm.typ === "praxis" && !stickyInstructor)
+                      }
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      Prüfung speichern
+                    </Button>
+                  </div>
+                </TabsContent>
               </Tabs>
             </div>
           )}
