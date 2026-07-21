@@ -196,32 +196,40 @@ const Kontrolle = () => {
       </Card>
 
       {/* Summary */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Fahrstunden</p>
-            <p className="text-2xl font-bold">{filteredLessons.length}</p>
-            <p className="text-xs text-muted-foreground">{einheitenSum} Einheiten</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Umsatz Fahrstunden</p>
-            <p className="text-2xl font-bold">{formatEUR(lessonSum)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Zahlungen</p>
-            <p className="text-2xl font-bold">{filteredPayments.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Summe Zahlungen</p>
-            <p className="text-2xl font-bold">{formatEUR(paymentSum)}</p>
-          </CardContent>
-        </Card>
+      <div className={"grid gap-4 " + (anzeige === "beides" ? "md:grid-cols-4" : "md:grid-cols-2")}>
+        {anzeige !== "zahlungen" && (
+          <>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Fahrstunden</p>
+                <p className="text-2xl font-bold">{filteredLessons.length}</p>
+                <p className="text-xs text-muted-foreground">{einheitenSum} Einheiten</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Umsatz Fahrstunden</p>
+                <p className="text-2xl font-bold">{formatEUR(lessonSum)}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+        {anzeige !== "fahrstunden" && (
+          <>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Zahlungen</p>
+                <p className="text-2xl font-bold">{filteredPayments.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Summe Zahlungen</p>
+                <p className="text-2xl font-bold">{formatEUR(paymentSum)}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Fahrstunden */}
