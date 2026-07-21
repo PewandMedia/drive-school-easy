@@ -336,6 +336,18 @@ const Schnellerfassung = () => {
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
       toast({ title: "Fahrstunde gespeichert" });
+      if (selectedStudent) {
+        pushRecent({
+          kind: "fahrstunde",
+          studentId: selectedStudent.id,
+          studentLabel: formatStudentName(
+            selectedStudent.nachname,
+            selectedStudent.vorname,
+            selectedStudent.geburtsdatum,
+          ),
+          description: `${einheiten}E · ${einheiten * 45} min · ${eur(einheiten * 65)}`,
+        });
+      }
     },
     onError: (e: Error) =>
       toast({ title: "Fehler", description: e.message, variant: "destructive" }),
