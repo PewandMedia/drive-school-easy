@@ -126,7 +126,7 @@ const Schnellerfassung = () => {
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [tab, setTab] = useState<"fahrstunde" | "zahlung">("fahrstunde");
+  const [tab, setTab] = useState<"fahrstunde" | "zahlung" | "pruefung">("fahrstunde");
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
 
@@ -139,6 +139,7 @@ const Schnellerfassung = () => {
   const [stickyEinreichungsdatum, setStickyEinreichungsdatum] = useState<string>(
     todayLocalDate(),
   );
+  const [stickyExamDatum, setStickyExamDatum] = useState<string>(todayLocalDate());
 
   // Fahrstunde form – vereinfacht: nur Einheiten (1 = 45min/65€)
   const [einheiten, setEinheiten] = useState<number>(1);
@@ -150,6 +151,29 @@ const Schnellerfassung = () => {
     filiale: "riemke" as Filiale,
     istGutschrift: false,
   });
+
+  // Prüfung form
+  const [examForm, setExamForm] = useState({
+    typ: "theorie" as ExamTyp,
+    status: "angemeldet" as ExamStatus,
+    vehicleId: "",
+    preis: "0",
+  });
+
+  // Recent entries (session only)
+  const [recentEntries, setRecentEntries] = useState<RecentEntry[]>([]);
+  const pushRecent = (entry: Omit<RecentEntry, "id" | "timestamp">) => {
+    setRecentEntries((prev) =>
+      [
+        {
+          ...entry,
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+        },
+        ...prev,
+      ].slice(0, 10),
+    );
+  };
 
   // Queries
   const { data: students = [] } = useQuery<Student[]>({
