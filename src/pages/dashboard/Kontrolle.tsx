@@ -17,6 +17,7 @@ import {
 import { formatStudentName } from "@/lib/formatStudentName";
 
 type Filiale = "alle" | "riemke" | "rathaus";
+type Anzeige = "beides" | "fahrstunden" | "zahlungen";
 
 type LessonRow = {
   id: string;
@@ -70,6 +71,7 @@ const Kontrolle = () => {
   const [bis, setBis] = useState(today);
   const [filiale, setFiliale] = useState<Filiale>("alle");
   const [search, setSearch] = useState("");
+  const [anzeige, setAnzeige] = useState<Anzeige>("beides");
 
   const { data: lessons = [], isLoading: lessonsLoading } = useQuery({
     queryKey: ["kontrolle-lessons", von, bis],
@@ -145,7 +147,7 @@ const Kontrolle = () => {
       {/* Filter */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="von">Von</Label>
               <Input id="von" type="date" value={von} onChange={(e) => setVon(e.target.value)} />
@@ -162,6 +164,17 @@ const Kontrolle = () => {
                   <SelectItem value="alle">Alle Filialen</SelectItem>
                   <SelectItem value="riemke">Riemke Markt</SelectItem>
                   <SelectItem value="rathaus">Rathaus</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Anzeigen</Label>
+              <Select value={anzeige} onValueChange={(v) => setAnzeige(v as Anzeige)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="beides">Beides</SelectItem>
+                  <SelectItem value="fahrstunden">Nur Fahrstunden</SelectItem>
+                  <SelectItem value="zahlungen">Nur Zahlungen</SelectItem>
                 </SelectContent>
               </Select>
             </div>
