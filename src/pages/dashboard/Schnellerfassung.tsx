@@ -86,6 +86,13 @@ const FILIALE_LABELS: Record<Filiale, string> = {
   rathaus: "Rathaus",
 };
 
+const STATUS_LABELS: Record<ExamStatus, string> = {
+  angemeldet: "Angemeldet",
+  bestanden: "Bestanden",
+  nicht_bestanden: "Nicht bestanden",
+  krank: "Krank",
+};
+
 const eur = (v: number) =>
   v.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
