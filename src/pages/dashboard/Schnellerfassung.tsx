@@ -661,6 +661,71 @@ const Schnellerfassung = () => {
           </div>
         </aside>
 
+        {/* Recent entries panel */}
+        <div className="rounded-xl border border-border bg-card flex flex-col max-h-[280px]">
+          <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Letzte Einträge</p>
+            {recentEntries.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {recentEntries.length}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {recentEntries.length === 0 ? (
+              <p className="p-4 text-center text-xs text-muted-foreground">
+                Noch keine Einträge in dieser Sitzung.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentEntries.map((e) => {
+                  const Icon =
+                    e.kind === "fahrstunde"
+                      ? Car
+                      : e.kind === "zahlung"
+                        ? CreditCard
+                        : GraduationCap;
+                  const iconColor =
+                    e.kind === "fahrstunde"
+                      ? "text-blue-500"
+                      : e.kind === "zahlung"
+                        ? "text-green-600"
+                        : "text-purple-500";
+                  return (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectStudent(e.studentId)}
+                        className="w-full text-left px-3 py-2 hover:bg-muted/60 flex items-start gap-2"
+                      >
+                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${iconColor}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {e.studentLabel}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {e.description}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                            {formatDistanceToNow(new Date(e.timestamp), {
+                              addSuffix: true,
+                              locale: de,
+                            })}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+        </div>
+
+
+
 
         {/* RIGHT: Capture area */}
         <section className="rounded-xl border border-border bg-card min-h-[500px]">
