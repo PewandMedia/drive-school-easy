@@ -759,12 +759,15 @@ const Schnellerfassung = () => {
               </div>
 
               <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-                <TabsList className="grid w-full max-w-sm grid-cols-2">
+                <TabsList className="grid w-full max-w-md grid-cols-3">
                   <TabsTrigger value="fahrstunde" className="gap-2">
                     <Car className="h-4 w-4" /> Fahrstunde
                   </TabsTrigger>
                   <TabsTrigger value="zahlung" className="gap-2">
                     <CreditCard className="h-4 w-4" /> Zahlung
+                  </TabsTrigger>
+                  <TabsTrigger value="pruefung" className="gap-2">
+                    <GraduationCap className="h-4 w-4" /> Prüfung
                   </TabsTrigger>
                 </TabsList>
 
