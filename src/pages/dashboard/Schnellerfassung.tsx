@@ -412,14 +412,72 @@ const Schnellerfassung = () => {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, _vars, _ctx) => {
       qc.invalidateQueries({ queryKey: ["schnell_payments", selectedStudentId] });
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
       toast({ title: "Zahlung gespeichert" });
+      if (selectedStudent) {
+        const raw = parseFloat(paymentForm.betrag) || 0;
+        const signed = paymentForm.istGutschrift ? -Math.abs(raw) : raw;
+        pushRecent({
+          kind: "zahlung",
+          studentId: selectedStudent.id,
+          studentLabel: formatStudentName(
+            selectedStudent.nachname,
+            selectedStudent.vorname,
+            selectedStudent.geburtsdatum,
+          ),
+          description: `${eur(signed)} · ${ZAHLUNGSART_LABELS[paymentForm.zahlungsart]} · ${FILIALE_LABELS[paymentForm.filiale]}`,
+        });
+      }
       setPaymentForm((f) => ({ ...f, betrag: "" }));
+    },
+    onError: (e: Error) =>
+      toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const saveExam = useMutation({
+    mutationFn: async () => {
+      if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
+      if (examForm.typ === "praxis" && !stickyInstructor)
+        throw new Error("Bitte Fahrlehrer wählen (Praxisprüfung)");
+      const preis = parseFloat(examForm.preis) || 0;
+      const isPraxis = examForm.typ === "praxis";
+      const vehicle = vehicles.find((v) => v.id === examForm.vehicleId);
+      const fahrzeug_typ: FahrzeugTyp =
+        isPraxis && vehicle ? vehicle.typ : "automatik";
+      const { error } = await supabase.from("exams").insert({
+        student_id: selectedStudentId,
+        typ: examForm.typ,
+        fahrzeug_typ,
+        datum: new Date(examForm.datum ?? stickyExamDatum).toISOString(),
+        status: examForm.status,
+        preis,
+        instructor_id: isPraxis ? stickyInstructor : null,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["exams_all"] });
+      qc.invalidateQueries({ queryKey: ["schnell_exams", selectedStudentId] });
+      qc.invalidateQueries({ queryKey: ["open_items"] });
+      qc.invalidateQueries({ queryKey: ["students"] });
+      toast({ title: "Prüfung gespeichert" });
+      if (selectedStudent) {
+        pushRecent({
+          kind: "pruefung",
+          studentId: selectedStudent.id,
+          studentLabel: formatStudentName(
+            selectedStudent.nachname,
+            selectedStudent.vorname,
+            selectedStudent.geburtsdatum,
+          ),
+          description: `${examForm.typ === "theorie" ? "Theorieprüfung" : "Fahrprüfung"} · ${STATUS_LABELS[examForm.status]}`,
+        });
+      }
     },
     onError: (e: Error) =>
       toast({ title: "Fehler", description: e.message, variant: "destructive" }),
