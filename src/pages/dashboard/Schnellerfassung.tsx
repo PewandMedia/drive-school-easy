@@ -242,6 +242,33 @@ const Schnellerfassung = () => {
     },
   });
 
+  // Prüfungspreise (Standardpreise)
+  const { data: priceEntries = [] } = useQuery({
+    queryKey: ["prices_pruefungen_schnell"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("prices")
+        .select("*")
+        .eq("aktiv", true)
+        .ilike("kategorie", "Prüfungen");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Set exam price when typ or prices change
+  useEffect(() => {
+    if (priceEntries.length === 0) return;
+    const match =
+      priceEntries.find((p: any) =>
+        examForm.typ === "theorie"
+          ? p.bezeichnung.toLowerCase().includes("theorie")
+          : p.bezeichnung.toLowerCase().includes("fahr") ||
+            p.bezeichnung.toLowerCase().includes("praxis"),
+      ) ?? priceEntries[0];
+    if (match) setExamForm((f) => ({ ...f, preis: String((match as any).preis) }));
+  }, [examForm.typ, priceEntries]);
+
   const selectedStudent = useMemo(
     () => students.find((s) => s.id === selectedStudentId) ?? null,
     [students, selectedStudentId],
