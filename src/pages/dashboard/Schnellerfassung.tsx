@@ -14,7 +14,10 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
+  History,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { formatStudentName } from "@/lib/formatStudentName";
@@ -44,8 +47,19 @@ import type { Database } from "@/integrations/supabase/types";
 
 type DrivingLessonTyp = Database["public"]["Enums"]["driving_lesson_typ"];
 type FahrzeugTyp = Database["public"]["Enums"]["fahrzeug_typ"];
+type ExamTyp = "theorie" | "praxis";
+type ExamStatus = "angemeldet" | "bestanden" | "nicht_bestanden" | "krank";
 type Zahlungsart = "bar" | "ec" | "ueberweisung";
 type Filiale = "riemke" | "rathaus";
+
+type RecentEntry = {
+  id: string;
+  kind: "fahrstunde" | "zahlung" | "pruefung";
+  studentId: string;
+  studentLabel: string;
+  description: string;
+  timestamp: number;
+};
 
 const TYP_LABELS: Record<DrivingLessonTyp, string> = {
   uebungsstunde: "Übungsstunde",
@@ -70,6 +84,13 @@ const ZAHLUNGSART_LABELS: Record<Zahlungsart, string> = {
 const FILIALE_LABELS: Record<Filiale, string> = {
   riemke: "Riemke Markt",
   rathaus: "Rathaus",
+};
+
+const STATUS_LABELS: Record<ExamStatus, string> = {
+  angemeldet: "Angemeldet",
+  bestanden: "Bestanden",
+  nicht_bestanden: "Nicht bestanden",
+  krank: "Krank",
 };
 
 const eur = (v: number) =>
@@ -112,7 +133,7 @@ const Schnellerfassung = () => {
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [tab, setTab] = useState<"fahrstunde" | "zahlung">("fahrstunde");
+  const [tab, setTab] = useState<"fahrstunde" | "zahlung" | "pruefung">("fahrstunde");
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
 
@@ -125,6 +146,7 @@ const Schnellerfassung = () => {
   const [stickyEinreichungsdatum, setStickyEinreichungsdatum] = useState<string>(
     todayLocalDate(),
   );
+  const [stickyExamDatum, setStickyExamDatum] = useState<string>(todayLocalDate());
 
   // Fahrstunde form – vereinfacht: nur Einheiten (1 = 45min/65€)
   const [einheiten, setEinheiten] = useState<number>(1);
@@ -136,6 +158,29 @@ const Schnellerfassung = () => {
     filiale: "riemke" as Filiale,
     istGutschrift: false,
   });
+
+  // Prüfung form
+  const [examForm, setExamForm] = useState({
+    typ: "theorie" as ExamTyp,
+    status: "angemeldet" as ExamStatus,
+    vehicleId: "",
+    preis: "0",
+  });
+
+  // Recent entries (session only)
+  const [recentEntries, setRecentEntries] = useState<RecentEntry[]>([]);
+  const pushRecent = (entry: Omit<RecentEntry, "id" | "timestamp">) => {
+    setRecentEntries((prev) =>
+      [
+        {
+          ...entry,
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+        },
+        ...prev,
+      ].slice(0, 10),
+    );
+  };
 
   // Queries
   const { data: students = [] } = useQuery<Student[]>({
@@ -204,6 +249,33 @@ const Schnellerfassung = () => {
     },
   });
 
+  // Prüfungspreise (Standardpreise)
+  const { data: priceEntries = [] } = useQuery({
+    queryKey: ["prices_pruefungen_schnell"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("prices")
+        .select("*")
+        .eq("aktiv", true)
+        .ilike("kategorie", "Prüfungen");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Set exam price when typ or prices change
+  useEffect(() => {
+    if (priceEntries.length === 0) return;
+    const match =
+      priceEntries.find((p: any) =>
+        examForm.typ === "theorie"
+          ? p.bezeichnung.toLowerCase().includes("theorie")
+          : p.bezeichnung.toLowerCase().includes("fahr") ||
+            p.bezeichnung.toLowerCase().includes("praxis"),
+      ) ?? priceEntries[0];
+    if (match) setExamForm((f) => ({ ...f, preis: String((match as any).preis) }));
+  }, [examForm.typ, priceEntries]);
+
   const selectedStudent = useMemo(
     () => students.find((s) => s.id === selectedStudentId) ?? null,
     [students, selectedStudentId],
@@ -271,6 +343,18 @@ const Schnellerfassung = () => {
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
       toast({ title: "Fahrstunde gespeichert" });
+      if (selectedStudent) {
+        pushRecent({
+          kind: "fahrstunde",
+          studentId: selectedStudent.id,
+          studentLabel: formatStudentName(
+            selectedStudent.nachname,
+            selectedStudent.vorname,
+            selectedStudent.geburtsdatum,
+          ),
+          description: `${einheiten}E · ${einheiten * 45} min · ${eur(einheiten * 65)}`,
+        });
+      }
     },
     onError: (e: Error) =>
       toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -335,14 +419,72 @@ const Schnellerfassung = () => {
         }
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, _vars, _ctx) => {
       qc.invalidateQueries({ queryKey: ["schnell_payments", selectedStudentId] });
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["payment_allocations_all"] });
       qc.invalidateQueries({ queryKey: ["open_items"] });
       qc.invalidateQueries({ queryKey: ["students"] });
       toast({ title: "Zahlung gespeichert" });
+      if (selectedStudent) {
+        const raw = parseFloat(paymentForm.betrag) || 0;
+        const signed = paymentForm.istGutschrift ? -Math.abs(raw) : raw;
+        pushRecent({
+          kind: "zahlung",
+          studentId: selectedStudent.id,
+          studentLabel: formatStudentName(
+            selectedStudent.nachname,
+            selectedStudent.vorname,
+            selectedStudent.geburtsdatum,
+          ),
+          description: `${eur(signed)} · ${ZAHLUNGSART_LABELS[paymentForm.zahlungsart]} · ${FILIALE_LABELS[paymentForm.filiale]}`,
+        });
+      }
       setPaymentForm((f) => ({ ...f, betrag: "" }));
+    },
+    onError: (e: Error) =>
+      toast({ title: "Fehler", description: e.message, variant: "destructive" }),
+  });
+
+  const saveExam = useMutation({
+    mutationFn: async () => {
+      if (!selectedStudentId) throw new Error("Kein Fahrschüler ausgewählt");
+      if (examForm.typ === "praxis" && !stickyInstructor)
+        throw new Error("Bitte Fahrlehrer wählen (Praxisprüfung)");
+      const preis = parseFloat(examForm.preis) || 0;
+      const isPraxis = examForm.typ === "praxis";
+      const vehicle = vehicles.find((v) => v.id === examForm.vehicleId);
+      const fahrzeug_typ: FahrzeugTyp =
+        isPraxis && vehicle ? vehicle.typ : "automatik";
+      const { error } = await supabase.from("exams").insert({
+        student_id: selectedStudentId,
+        typ: examForm.typ,
+        fahrzeug_typ,
+        datum: new Date(stickyExamDatum).toISOString(),
+        status: examForm.status,
+        preis,
+        instructor_id: isPraxis ? stickyInstructor : null,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["exams_all"] });
+      qc.invalidateQueries({ queryKey: ["schnell_exams", selectedStudentId] });
+      qc.invalidateQueries({ queryKey: ["open_items"] });
+      qc.invalidateQueries({ queryKey: ["students"] });
+      toast({ title: "Prüfung gespeichert" });
+      if (selectedStudent) {
+        pushRecent({
+          kind: "pruefung",
+          studentId: selectedStudent.id,
+          studentLabel: formatStudentName(
+            selectedStudent.nachname,
+            selectedStudent.vorname,
+            selectedStudent.geburtsdatum,
+          ),
+          description: `${examForm.typ === "theorie" ? "Theorieprüfung" : "Fahrprüfung"} · ${STATUS_LABELS[examForm.status]}`,
+        });
+      }
     },
     onError: (e: Error) =>
       toast({ title: "Fehler", description: e.message, variant: "destructive" }),
@@ -420,8 +562,9 @@ const Schnellerfassung = () => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
-        {/* LEFT: Student list */}
-        <aside className="rounded-xl border border-border bg-card flex flex-col h-[calc(100vh-220px)] min-h-[500px]">
+        {/* LEFT: Student list + Recent entries */}
+        <div className="flex flex-col gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+        <aside className="rounded-xl border border-border bg-card flex flex-col flex-1 min-h-[320px]">
           <div className="p-3 border-b border-border">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -518,6 +661,71 @@ const Schnellerfassung = () => {
           </div>
         </aside>
 
+        {/* Recent entries panel */}
+        <div className="rounded-xl border border-border bg-card flex flex-col max-h-[280px]">
+          <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Letzte Einträge</p>
+            {recentEntries.length > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {recentEntries.length}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {recentEntries.length === 0 ? (
+              <p className="p-4 text-center text-xs text-muted-foreground">
+                Noch keine Einträge in dieser Sitzung.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentEntries.map((e) => {
+                  const Icon =
+                    e.kind === "fahrstunde"
+                      ? Car
+                      : e.kind === "zahlung"
+                        ? CreditCard
+                        : GraduationCap;
+                  const iconColor =
+                    e.kind === "fahrstunde"
+                      ? "text-blue-500"
+                      : e.kind === "zahlung"
+                        ? "text-green-600"
+                        : "text-purple-500";
+                  return (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectStudent(e.studentId)}
+                        className="w-full text-left px-3 py-2 hover:bg-muted/60 flex items-start gap-2"
+                      >
+                        <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${iconColor}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {e.studentLabel}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {e.description}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                            {formatDistanceToNow(new Date(e.timestamp), {
+                              addSuffix: true,
+                              locale: de,
+                            })}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+        </div>
+
+
+
 
         {/* RIGHT: Capture area */}
         <section className="rounded-xl border border-border bg-card min-h-[500px]">
@@ -551,12 +759,15 @@ const Schnellerfassung = () => {
               </div>
 
               <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-                <TabsList className="grid w-full max-w-sm grid-cols-2">
+                <TabsList className="grid w-full max-w-md grid-cols-3">
                   <TabsTrigger value="fahrstunde" className="gap-2">
                     <Car className="h-4 w-4" /> Fahrstunde
                   </TabsTrigger>
                   <TabsTrigger value="zahlung" className="gap-2">
                     <CreditCard className="h-4 w-4" /> Zahlung
+                  </TabsTrigger>
+                  <TabsTrigger value="pruefung" className="gap-2">
+                    <GraduationCap className="h-4 w-4" /> Prüfung
                   </TabsTrigger>
                 </TabsList>
 
@@ -863,6 +1074,131 @@ const Schnellerfassung = () => {
                         </TableBody>
                       </Table>
                     )}
+                  </div>
+                </TabsContent>
+
+                {/* PRÜFUNG */}
+                <TabsContent value="pruefung" className="space-y-6 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Prüfungsart</Label>
+                      <Select
+                        value={examForm.typ}
+                        onValueChange={(v) =>
+                          setExamForm((f) => ({ ...f, typ: v as ExamTyp }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="theorie">Theorieprüfung</SelectItem>
+                          <SelectItem value="praxis">Praxisprüfung</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Datum</Label>
+                      <Input
+                        type="date"
+                        value={stickyExamDatum}
+                        onChange={(e) => setStickyExamDatum(e.target.value)}
+                      />
+                    </div>
+
+                    {examForm.typ === "praxis" && (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label>Fahrlehrer</Label>
+                          <Select
+                            value={stickyInstructor}
+                            onValueChange={setStickyInstructor}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Fahrlehrer wählen…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {instructors.map((i) => (
+                                <SelectItem key={i.id} value={i.id}>
+                                  {i.nachname}, {i.vorname}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Fahrzeug (optional)</Label>
+                          <Select
+                            value={examForm.vehicleId || "none"}
+                            onValueChange={(v) =>
+                              setExamForm((f) => ({
+                                ...f,
+                                vehicleId: v === "none" ? "" : v,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="— kein Fahrzeug —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">— kein Fahrzeug —</SelectItem>
+                              {vehicles.map((v) => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.bezeichnung} ({v.kennzeichen})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <Label>Ergebnis</Label>
+                      <Select
+                        value={examForm.status}
+                        onValueChange={(v) =>
+                          setExamForm((f) => ({ ...f, status: v as ExamStatus }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                            <SelectItem key={k} value={k}>
+                              {v}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Preis (€)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={examForm.preis}
+                        onChange={(e) =>
+                          setExamForm((f) => ({ ...f, preis: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => saveExam.mutate()}
+                      disabled={
+                        saveExam.isPending ||
+                        (examForm.typ === "praxis" && !stickyInstructor)
+                      }
+                      className="gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      Prüfung speichern
+                    </Button>
                   </div>
                 </TabsContent>
               </Tabs>
