@@ -14,7 +14,10 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
+  History,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { formatStudentName } from "@/lib/formatStudentName";
