@@ -47,8 +47,19 @@ import type { Database } from "@/integrations/supabase/types";
 
 type DrivingLessonTyp = Database["public"]["Enums"]["driving_lesson_typ"];
 type FahrzeugTyp = Database["public"]["Enums"]["fahrzeug_typ"];
+type ExamTyp = "theorie" | "praxis";
+type ExamStatus = "angemeldet" | "bestanden" | "nicht_bestanden" | "krank";
 type Zahlungsart = "bar" | "ec" | "ueberweisung";
 type Filiale = "riemke" | "rathaus";
+
+type RecentEntry = {
+  id: string;
+  kind: "fahrstunde" | "zahlung" | "pruefung";
+  studentId: string;
+  studentLabel: string;
+  description: string;
+  timestamp: number;
+};
 
 const TYP_LABELS: Record<DrivingLessonTyp, string> = {
   uebungsstunde: "Übungsstunde",
