@@ -47,6 +47,7 @@ const schuelerItems = [
 
 const verwaltungItems = [
   { title: "Schnellerfassung", url: "/dashboard/schnellerfassung", icon: Zap },
+  { title: "Kontrolle", url: "/dashboard/kontrolle", icon: ClipboardCheck },
   { title: "Leistungen", url: "/dashboard/leistungen", icon: ListChecks },
 ];
 

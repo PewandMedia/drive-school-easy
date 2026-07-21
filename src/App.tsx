@@ -16,6 +16,7 @@ const Fahrschueler = lazy(() => import("./pages/dashboard/Fahrschueler"));
 const FahrschuelerDetail = lazy(() => import("./pages/dashboard/FahrschuelerDetail"));
 const Leistungen = lazy(() => import("./pages/dashboard/Leistungen"));
 const Schnellerfassung = lazy(() => import("./pages/dashboard/Schnellerfassung"));
+const Kontrolle = lazy(() => import("./pages/dashboard/Kontrolle"));
 const Fahrstunden = lazy(() => import("./pages/dashboard/Fahrstunden"));
 const Theorie = lazy(() => import("./pages/dashboard/Theorie"));
 const Schaltstunden = lazy(() => import("./pages/dashboard/Schaltstunden"));
@@ -72,6 +73,7 @@ const App = () => (
                 <Route path="fahrschueler/:id" element={<FahrschuelerDetail />} />
                 <Route path="leistungen" element={<Leistungen />} />
                 <Route path="schnellerfassung" element={<Schnellerfassung />} />
+                <Route path="kontrolle" element={<Kontrolle />} />
                 <Route path="fahrstunden" element={<Fahrstunden />} />
                 <Route path="theorie" element={<Theorie />} />
                 <Route path="schaltstunden" element={<Schaltstunden />} />
