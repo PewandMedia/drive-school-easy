@@ -17,6 +17,7 @@ import {
 import { formatStudentName } from "@/lib/formatStudentName";
 
 type Filiale = "alle" | "riemke" | "rathaus";
+type Anzeige = "beides" | "fahrstunden" | "zahlungen";
 
 type LessonRow = {
   id: string;
@@ -70,6 +71,7 @@ const Kontrolle = () => {
   const [bis, setBis] = useState(today);
   const [filiale, setFiliale] = useState<Filiale>("alle");
   const [search, setSearch] = useState("");
+  const [anzeige, setAnzeige] = useState<Anzeige>("beides");
 
   const { data: lessons = [], isLoading: lessonsLoading } = useQuery({
     queryKey: ["kontrolle-lessons", von, bis],
@@ -145,7 +147,7 @@ const Kontrolle = () => {
       {/* Filter */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="von">Von</Label>
               <Input id="von" type="date" value={von} onChange={(e) => setVon(e.target.value)} />
@@ -162,6 +164,17 @@ const Kontrolle = () => {
                   <SelectItem value="alle">Alle Filialen</SelectItem>
                   <SelectItem value="riemke">Riemke Markt</SelectItem>
                   <SelectItem value="rathaus">Rathaus</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Anzeigen</Label>
+              <Select value={anzeige} onValueChange={(v) => setAnzeige(v as Anzeige)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="beides">Beides</SelectItem>
+                  <SelectItem value="fahrstunden">Nur Fahrstunden</SelectItem>
+                  <SelectItem value="zahlungen">Nur Zahlungen</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -183,35 +196,44 @@ const Kontrolle = () => {
       </Card>
 
       {/* Summary */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Fahrstunden</p>
-            <p className="text-2xl font-bold">{filteredLessons.length}</p>
-            <p className="text-xs text-muted-foreground">{einheitenSum} Einheiten</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Umsatz Fahrstunden</p>
-            <p className="text-2xl font-bold">{formatEUR(lessonSum)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Zahlungen</p>
-            <p className="text-2xl font-bold">{filteredPayments.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground">Summe Zahlungen</p>
-            <p className="text-2xl font-bold">{formatEUR(paymentSum)}</p>
-          </CardContent>
-        </Card>
+      <div className={"grid gap-4 " + (anzeige === "beides" ? "md:grid-cols-4" : "md:grid-cols-2")}>
+        {anzeige !== "zahlungen" && (
+          <>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Fahrstunden</p>
+                <p className="text-2xl font-bold">{filteredLessons.length}</p>
+                <p className="text-xs text-muted-foreground">{einheitenSum} Einheiten</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Umsatz Fahrstunden</p>
+                <p className="text-2xl font-bold">{formatEUR(lessonSum)}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+        {anzeige !== "fahrstunden" && (
+          <>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Zahlungen</p>
+                <p className="text-2xl font-bold">{filteredPayments.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground">Summe Zahlungen</p>
+                <p className="text-2xl font-bold">{formatEUR(paymentSum)}</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Fahrstunden */}
+      {anzeige !== "zahlungen" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -269,8 +291,10 @@ const Kontrolle = () => {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Zahlungen */}
+      {anzeige !== "fahrstunden" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -326,6 +350,7 @@ const Kontrolle = () => {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 };

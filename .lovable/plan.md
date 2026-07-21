@@ -1,19 +1,23 @@
-## Neue Seite „Kontrolle"
+Ziel: Auf der Seite „Kontrolle“ soll der Nutzer wählen können, ob er nur Fahrstunden, nur Zahlungen oder beides angezeigt bekommen möchte.
 
-Fügt einen neuen Menüpunkt **Kontrolle** unterhalb von **Schnellerfassung** in der Sidebar hinzu.
+Geplante Änderungen in `src/pages/dashboard/Kontrolle.tsx`:
 
-### Funktionsumfang
-- Zwei Datumsfelder: **Von** und **Bis** (Default: erster Tag des laufenden Monats bis heute).
-- Optionaler Filiale-Filter (Alle / Riemke Markt / Rathaus) analog zu Tagesabrechnung.
-- Zwei Tabellen untereinander:
-  1. **Fahrstunden** im Zeitraum – Datum, Schüler (Nachname, Vorname), Fahrlehrer, Einheiten/Dauer, Preis.
-  2. **Zahlungen** im Zeitraum – Einnahmedatum, Einreichungsdatum, Schüler, Fahrlehrer, Zahlungsart, Filiale, Betrag.
-- Zusammenfassungs-Karten oben: Anzahl Fahrstunden, Summe Einheiten, Summe Fahrstunden-Umsatz, Anzahl Zahlungen, Summe Zahlungen.
-- Suche über Schülernamen zusätzlich zum Zeitraum.
+1. Neuer Filter „Anzeige“
+   - State `anzeige` mit Werten `"beides" | "fahrstunden" | "zahlungen"`.
+   - Ein Select/ToggleGroup in der Filterkarte neben „Filiale“.
+   - Label: „Anzeigen“ mit Optionen „Beides“, „Nur Fahrstunden“, „Nur Zahlungen“.
 
-### Technische Umsetzung
-- Neue Datei `src/pages/dashboard/Kontrolle.tsx`.
-- Queries mit `fetchAllRows` auf `driving_lessons` und `payments`, gefiltert per `.gte('datum', von).lte('datum', bis)` (Zahlungen filtern nach `datum` = Einnahmedatum).
-- Route `/dashboard/kontrolle` in `src/App.tsx` (lazy geladen wie die anderen Dashboard-Routen).
-- Eintrag in `src/components/AppSidebar.tsx` direkt unter Schnellerfassung mit passendem Lucide-Icon (`ClipboardCheck`).
-- Reine Leseansicht – keine DB-Migrationen, keine Mutationen.
+2. Bedingte Darstellung der Bereiche
+   - Die Fahrstunden-Karte wird nur gerendert, wenn `anzeige !== "zahlungen"`.
+   - Die Zahlungen-Karte wird nur gerendert, wenn `anzeige !== "fahrstunden"`.
+
+3. Zusammenfassungskarten anpassen
+   - Wenn „Nur Fahrstunden“ gewählt ist, werden nur die Fahrstunden-Summenkarten angezeigt (Zahlungskarten ausgeblendet).
+   - Wenn „Nur Zahlungen“ gewählt ist, werden nur die Zahlungs-Summenkarten angezeigt (Fahrstundenkarten ausgeblendet).
+   - Bei „Beides“ bleibt die aktuelle 4-Spalten-Übersicht bestehen.
+
+4. Datenabfragen
+   - Die Supabase-Queries für Fahrstunden und Zahlungen bleiben unverändert, damit schnelles Umschalten möglich ist.
+   - Filiale-Filter und Schüler-Suche wirken sich weiterhin nur auf Zahlungen bzw. beide Listen aus.
+
+Keine Schema-Änderungen, keine neuen Dateien, keine Änderungen an anderen Seiten.
