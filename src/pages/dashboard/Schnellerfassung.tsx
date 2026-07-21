@@ -460,7 +460,7 @@ const Schnellerfassung = () => {
         student_id: selectedStudentId,
         typ: examForm.typ,
         fahrzeug_typ,
-        datum: new Date(examForm.datum ?? stickyExamDatum).toISOString(),
+        datum: new Date(stickyExamDatum).toISOString(),
         status: examForm.status,
         preis,
         instructor_id: isPraxis ? stickyInstructor : null,
