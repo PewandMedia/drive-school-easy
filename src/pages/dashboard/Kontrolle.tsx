@@ -233,6 +233,7 @@ const Kontrolle = () => {
       </div>
 
       {/* Fahrstunden */}
+      {anzeige !== "zahlungen" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -290,8 +291,10 @@ const Kontrolle = () => {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Zahlungen */}
+      {anzeige !== "fahrstunden" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -347,6 +350,7 @@ const Kontrolle = () => {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 };
